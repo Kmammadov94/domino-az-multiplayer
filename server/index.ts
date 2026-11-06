@@ -43,6 +43,94 @@ app.get('/health', (_req, res) => {
   });
 });
 
+// User Cloud Storage File Persistence
+const USERS_FILE = path.resolve(process.cwd(), 'data/users.json');
+
+const loadUserDatabase = (): Record<string, any> => {
+  try {
+    if (fs.existsSync(USERS_FILE)) {
+      const raw = fs.readFileSync(USERS_FILE, 'utf-8');
+      return JSON.parse(raw);
+    }
+  } catch (e) {
+    console.error('Failed to load user database:', e);
+  }
+  return {};
+};
+
+const saveUserDatabase = (db: Record<string, any>): void => {
+  try {
+    const dir = path.dirname(USERS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(USERS_FILE, JSON.stringify(db, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('Failed to save user database:', e);
+  }
+};
+
+let userDatabase = loadUserDatabase();
+
+// Sync user stats endpoint
+app.post('/api/user-stats', (req, res) => {
+  const { googleId, email, name, picture, stats } = req.body || {};
+  if (!googleId) {
+    return res.status(400).json({ error: 'googleId is required' });
+  }
+
+  const existing = userDatabase[googleId] || {};
+  const existingStats = existing.stats || {};
+
+  // Merge stats intelligently (keep highest coins, union of unlocked items, max streak, etc.)
+  const mergedStats = {
+    coins: Math.max(existingStats.coins || 0, stats?.coins || 0),
+    equippedSkin: stats?.equippedSkin || existingStats.equippedSkin || 'ivory_classic',
+    unlockedSkins: Array.from(
+      new Set([...(existingStats.unlockedSkins || []), ...(stats?.unlockedSkins || ['ivory_classic'])])
+    ),
+    equippedAvatar: stats?.equippedAvatar || existingStats.equippedAvatar || 'avatar_baku_classic',
+    unlockedAvatars: Array.from(
+      new Set([...(existingStats.unlockedAvatars || []), ...(stats?.unlockedAvatars || [])])
+    ),
+    dailyStreak: Math.max(existingStats.dailyStreak || 0, stats?.dailyStreak || 0),
+    matchesPlayed: Math.max(existingStats.matchesPlayed || 0, stats?.matchesPlayed || 0),
+    matchesWon: Math.max(existingStats.matchesWon || 0, stats?.matchesWon || 0),
+    lastDailyClaim: stats?.lastDailyClaim || existingStats.lastDailyClaim
+  };
+
+  userDatabase[googleId] = {
+    profile: {
+      googleId,
+      email: email || existing.profile?.email || '',
+      name: name || existing.profile?.name || '',
+      picture: picture || existing.profile?.picture || ''
+    },
+    stats: mergedStats,
+    updatedAt: Date.now()
+  };
+
+  saveUserDatabase(userDatabase);
+
+  res.json({
+    success: true,
+    profile: userDatabase[googleId].profile,
+    stats: mergedStats
+  });
+});
+
+// Fetch user stats endpoint
+app.get('/api/user-stats/:googleId', (req, res) => {
+  const { googleId } = req.params;
+  const user = userDatabase[googleId];
+  if (!user) {
+    return res.status(404).json({ error: 'User not found in cloud' });
+  }
+  res.json({
+    success: true,
+    profile: user.profile,
+    stats: user.stats
+  });
+});
+
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {

@@ -30,7 +30,13 @@ import { sounds } from './utils/sound';
 import {
   loadPlayerStats,
   savePlayerStats,
-  checkDailyClaim
+  checkDailyClaim,
+  GoogleUserProfile,
+  loadGoogleUser,
+  saveGoogleUser,
+  syncWithCloud,
+  isGuestNoticeDismissed,
+  setGuestNoticeDismissed
 } from './utils/storage';
 
 import { BoardView } from './components/BoardView';
@@ -47,6 +53,7 @@ import { AvatarView } from './components/AvatarView';
 import { PLAYER_AVATARS, DEFAULT_AVATAR_ID } from './data/avatars';
 import { MultiplayerLobbyModal } from './components/MultiplayerLobbyModal';
 import { TeahouseChatOverlay } from './components/TeahouseChatOverlay';
+import { GoogleAuthModal } from './components/GoogleAuthModal';
 import { multiplayerSocket } from './services/multiplayerSocket';
 import {
   MultiplayerRoomSummary,
@@ -68,7 +75,10 @@ import {
   RotateCcw,
   Sparkles,
   Globe,
-  Clock
+  Clock,
+  Cloud,
+  ShieldAlert,
+  X
 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -83,6 +93,13 @@ export const App: React.FC = () => {
   const [showDailyReward, setShowDailyReward] = useState<boolean>(false);
   const [showRules, setShowRules] = useState<boolean>(false);
   const [showGameEnd, setShowGameEnd] = useState<boolean>(false);
+  const [showGoogleAuthModal, setShowGoogleAuthModal] = useState<boolean>(false);
+
+  // Google User & Cloud Sync State
+  const [googleUser, setGoogleUser] = useState<GoogleUserProfile | null>(loadGoogleUser);
+  const [showGuestWarning, setShowGuestWarning] = useState<boolean>(
+    !loadGoogleUser() && !isGuestNoticeDismissed()
+  );
 
   // Active Game State
   const [inGame, setInGame] = useState<boolean>(false);
@@ -389,10 +406,24 @@ export const App: React.FC = () => {
     sounds.enabled = soundEnabled;
   }, [soundEnabled]);
 
-  // Persist stats whenever changed
+  // Initial cloud sync if already signed in with Google
+  useEffect(() => {
+    if (googleUser) {
+      syncWithCloud(googleUser, stats).then((synced) => {
+        if (synced && JSON.stringify(synced) !== JSON.stringify(stats)) {
+          setStats(synced);
+        }
+      });
+    }
+  }, [googleUser?.googleId]);
+
+  // Persist stats whenever changed (and auto-sync with cloud if signed in)
   const handleUpdateStats = (newStats: PlayerStats) => {
     setStats(newStats);
     savePlayerStats(newStats);
+    if (googleUser) {
+      syncWithCloud(googleUser, newStats);
+    }
   };
 
   // Start a new Match
@@ -1362,6 +1393,29 @@ export const App: React.FC = () => {
             </span>
           </button>
 
+          {/* Google Cloud Sync Status / Login Button */}
+          {googleUser ? (
+            <button
+              onClick={() => setShowGoogleAuthModal(true)}
+              title={`${googleUser.name} (${googleUser.email}) — Buludla Sinxron`}
+              className="bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/50 rounded-full px-2 py-0.5 sm:px-2.5 sm:py-1 flex items-center gap-1.5 transition shadow active:scale-95"
+            >
+              <Cloud className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              <span className="font-bold text-emerald-300 text-[10px] sm:text-[11px] max-w-[65px] sm:max-w-[85px] truncate">
+                {googleUser.name}
+              </span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowGoogleAuthModal(true)}
+              title="Google ilə Daxil ol (Məcburi deyil, qızılları qoruyur)"
+              className="bg-slate-800 hover:bg-slate-700 border border-amber-500/40 rounded-full px-2 py-0.5 sm:px-2.5 sm:py-1 flex items-center gap-1 text-[11px] font-bold text-amber-300 transition shadow active:scale-95"
+            >
+              <span className="font-black text-xs text-white">G</span>
+              <span className="hidden sm:inline">Giriş</span>
+            </button>
+          )}
+
           {/* Daily Reward Button */}
           <button
             onClick={() => setShowDailyReward(true)}
@@ -1527,6 +1581,41 @@ export const App: React.FC = () => {
                   </span>
                 </div>
               </button>
+
+              {/* Optional Non-Mandatory Guest Warning Notice Banner */}
+              {!googleUser && showGuestWarning && (
+                <div className="w-full mb-3.5 bg-gradient-to-r from-amber-950/90 via-slate-900 to-amber-950/90 border border-amber-500/60 rounded-2xl p-3 flex items-center justify-between gap-2.5 shadow-xl animate-fade-in text-left">
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <ShieldAlert className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-xs font-black text-amber-300">
+                        Qonaq rejimindəsiniz — Tərəqqiniz itə bilər!
+                      </span>
+                      <span className="text-[10px] text-slate-300 leading-tight mt-0.5">
+                        Google ilə daxil olmasanız, brauzer tarixçəsi silindikdə qızıllarınız itəcək. (Məcburi deyil)
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button
+                      onClick={() => setShowGoogleAuthModal(true)}
+                      className="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition shadow active:scale-95 whitespace-nowrap"
+                    >
+                      Google ilə Qoru
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowGuestWarning(false);
+                        setGuestNoticeDismissed(true);
+                      }}
+                      title="Bildirişi bağla"
+                      className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Online Multiplayer Hero Action */}
               <button
@@ -2091,6 +2180,27 @@ export const App: React.FC = () => {
         onToggleReady={handleToggleReady}
         onStartGame={handleStartGame}
         onLeaveRoom={handleLeaveRoom}
+      />
+
+      {/* Google Sign-In & Cloud Sync Modal */}
+      <GoogleAuthModal
+        isOpen={showGoogleAuthModal}
+        onClose={() => setShowGoogleAuthModal(false)}
+        currentUser={googleUser}
+        onSignIn={(user) => {
+          saveGoogleUser(user);
+          setGoogleUser(user);
+          setShowGuestWarning(false);
+          syncWithCloud(user, stats).then((synced) => {
+            if (synced) setStats(synced);
+          });
+        }}
+        onSignOut={() => {
+          saveGoogleUser(null);
+          setGoogleUser(null);
+          setShowGuestWarning(true);
+          setGuestNoticeDismissed(false);
+        }}
       />
     </div>
   );

@@ -2,6 +2,16 @@ import { PlayerStats } from '../types/domino';
 import { DEFAULT_AVATAR_ID, FREE_AVATAR_IDS } from '../data/avatars';
 
 const STORAGE_KEY = 'az_domino_telefon365_v1';
+const GOOGLE_USER_KEY = 'az_domino_google_user_v1';
+const GUEST_DISMISS_KEY = 'az_domino_guest_banner_dismissed';
+
+export interface GoogleUserProfile {
+  googleId: string;
+  email: string;
+  name: string;
+  picture?: string;
+  signedInAt: number;
+}
 
 export const DEFAULT_STATS: PlayerStats = {
   coins: 20, // Starting gift: 20 gold coins
@@ -45,6 +55,75 @@ export const savePlayerStats = (stats: PlayerStats): void => {
   } catch (err) {
     console.error('Failed to save player stats', err);
   }
+};
+
+export const loadGoogleUser = (): GoogleUserProfile | null => {
+  try {
+    const raw = localStorage.getItem(GOOGLE_USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const saveGoogleUser = (user: GoogleUserProfile | null): void => {
+  try {
+    if (user) {
+      localStorage.setItem(GOOGLE_USER_KEY, JSON.stringify(user));
+    } else {
+      localStorage.removeItem(GOOGLE_USER_KEY);
+    }
+  } catch (err) {
+    console.error('Failed to save google user', err);
+  }
+};
+
+export const isGuestNoticeDismissed = (): boolean => {
+  try {
+    return sessionStorage.getItem(GUEST_DISMISS_KEY) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+export const setGuestNoticeDismissed = (dismissed: boolean): void => {
+  try {
+    if (dismissed) {
+      sessionStorage.setItem(GUEST_DISMISS_KEY, 'true');
+    } else {
+      sessionStorage.removeItem(GUEST_DISMISS_KEY);
+    }
+  } catch {}
+};
+
+// Sync stats with cloud server
+export const syncWithCloud = async (
+  profile: GoogleUserProfile,
+  currentStats: PlayerStats
+): Promise<PlayerStats> => {
+  try {
+    const res = await fetch('/api/user-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        googleId: profile.googleId,
+        email: profile.email,
+        name: profile.name,
+        picture: profile.picture,
+        stats: currentStats
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.stats) {
+        savePlayerStats(data.stats);
+        return data.stats;
+      }
+    }
+  } catch (e) {
+    console.warn('Cloud sync offline or server unreachable, using local stats:', e);
+  }
+  return currentStats;
 };
 
 export interface DailyClaimCheck {
