@@ -7,6 +7,7 @@ export interface TileData {
 }
 
 export type GameMode = '2p_solo' | '3p_solo' | '4p_solo' | '4p_duo';
+export type GameVariant = '365' | '101';
 
 export type Language = 'az' | 'ru' | 'en';
 

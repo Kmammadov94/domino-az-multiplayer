@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Player, Language, GameMode } from '../types/domino';
+import { Player, Language, GameMode, GameVariant } from '../types/domino';
+import { Match101State } from '../utils/domino101Logic';
 import { translations } from '../i18n/translations';
 import { sounds } from '../utils/sound';
-import { Trophy, Frown, Coins, ArrowRight, RotateCcw, Eye, EyeOff } from 'lucide-react';
+import { Trophy, Frown, Coins, ArrowRight, RotateCcw, Eye, EyeOff, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { AvatarView } from './AvatarView';
 
@@ -23,6 +24,10 @@ interface GameEndModalProps {
   isHost?: boolean;
   onNextHand: () => void;
   onRestartMatch: () => void;
+  variant?: GameVariant;
+  match101State?: Match101State;
+  isSeka?: boolean;
+  ayazCaught?: boolean;
 }
 
 export const GameEndModal: React.FC<GameEndModalProps> = ({
@@ -41,7 +46,11 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
   myPlayerIndex = 0,
   isHost = true,
   onNextHand,
-  onRestartMatch
+  onRestartMatch,
+  variant = '365',
+  match101State,
+  isSeka = false,
+  ayazCaught = false
 }) => {
   const [isViewingBoard, setIsViewingBoard] = useState<boolean>(false);
 
@@ -161,6 +170,10 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
                 ? userWon
                   ? t.instant35Win
                   : t.instant35Loss
+                : variant === '101'
+                ? userWon
+                  ? '🎉 101 XAL! Komandanız Matçın Qalibi Oldu!'
+                  : 'Rəqib Komanda 101 Xala Çatdı!'
                 : userWon
                 ? t.matchWinner
                 : `${winnerPlayer?.name || 'Rəqib'} matçın qalibi oldu!`}
@@ -168,12 +181,24 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
             <p className="text-xs text-amber-400/90 mb-4 font-semibold">
               {isInstant35
                 ? t.instant35Desc
+                : variant === '101'
+                ? `101 Matçı — ${t.team1}: ${match101State?.team1.mainScore ?? 0} xal vs ${t.team2}: ${match101State?.team2.mainScore ?? 0} xal`
                 : mode === '4p_duo'
                 ? `${t.team1}: ${players.find((p) => p.team === 1)?.score ?? 0} — ${
                     t.team2
                   }: ${players.find((p) => p.team === 2)?.score ?? 0}`
                 : `365 ${t.targetScore}`}
             </p>
+
+            {/* Quru Məğlubiyyət (Dry Defeat) Banner in 101 */}
+            {variant === '101' && match101State?.isDryDefeat && (
+              <div className="p-3 bg-gradient-to-r from-rose-950/80 via-red-900/60 to-rose-950/80 border-2 border-rose-500 rounded-2xl mb-4 text-center shadow-lg animate-pulse">
+                <span className="text-sm font-black text-rose-300 block">🫖 QURU MƏĞLUBİYYƏT (101 vs 0)!</span>
+                <span className="text-xs text-rose-200 mt-1 block">
+                  Rəqib saya belə düşə bilmədi! Çayxana ənənəsinə görə çaylar və mürəbbə uduzan tərəfdəndir!
+                </span>
+              </div>
+            )}
 
             {/* Coin reward badge */}
             <div className="bg-amber-500/20 border border-amber-500/40 rounded-xl px-4 py-2 flex items-center gap-2 mb-5">
@@ -235,9 +260,11 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
             </div>
 
             <h2 className="text-xl font-black mb-1">
-              {userWon ? (
+              {isSeka ? (
+                <span className="text-amber-400">🤝 Seka! (Bərabərlik)</span>
+              ) : userWon ? (
                 <span className="text-emerald-400">
-                  {isBaglandi ? 'Bağlandı! Siz Qazandınız!' : 'Domino! Siz Qazandınız!'}
+                  {isBaglandi ? 'Bağlandı! Komandanız Qazandı!' : 'Domino! Komandanız Qazandı!'}
                 </span>
               ) : (
                 <span className="text-amber-300">
@@ -248,11 +275,26 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
               )}
             </h2>
 
+            {/* 101 Specific event message */}
+            {variant === '101' && match101State?.lastEventMessage && (
+              <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 my-2 text-xs text-amber-200 font-bold text-center">
+                {match101State.lastEventMessage}
+              </div>
+            )}
+
+            {/* Ayaz [0:0] 20 Penalty Callout */}
+            {variant === '101' && ayazCaught && (
+              <div className="p-2 rounded-xl bg-rose-500/20 border border-rose-500/50 mb-2.5 text-xs text-rose-300 font-extrabold flex items-center justify-center gap-2">
+                <span>❄️ Ayaz [0:0] Tələsi:</span>
+                <span className="text-white">+20 Cərimə Xalı!</span>
+              </div>
+            )}
+
             {baglandiOver365Restart ? (
               <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl my-2 text-xs text-amber-300">
                 {t.baglandiOver365Notice}
               </div>
-            ) : (
+            ) : !isSeka && (
               <p className="text-xs text-slate-400 mb-3 font-medium">
                 {userWon
                   ? (isBaglandi

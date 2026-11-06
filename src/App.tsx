@@ -5,8 +5,15 @@ import {
   Player,
   TileData,
   DominoSkin,
-  PlayerStats
+  PlayerStats,
+  GameVariant
 } from './types/domino';
+import {
+  Match101State,
+  createInitial101State,
+  findFirstHandStarter101,
+  process101Round
+} from './utils/domino101Logic';
 import { DOMINO_SKINS } from './data/skins';
 import { translations } from './i18n/translations';
 import {
@@ -93,6 +100,7 @@ import {
   ShieldAlert,
   Users,
   Bot,
+  Trophy,
   X
 } from 'lucide-react';
 
@@ -152,6 +160,12 @@ export const App: React.FC = () => {
   const [isInstant35, setIsInstant35] = useState<boolean>(false);
   const [allowDoubleCombo, setAllowDoubleCombo] = useState<boolean>(true);
   const [reshuffleNotice, setReshuffleNotice] = useState<string | null>(null);
+
+  // 101 Game Mode State
+  const [gameVariant, setGameVariant] = useState<GameVariant>('101');
+  const [match101State, setMatch101State] = useState<Match101State>(createInitial101State);
+  const [is101Seka, setIs101Seka] = useState<boolean>(false);
+  const [is101AyazCaught, setIs101AyazCaught] = useState<boolean>(false);
 
   // Multiplayer State
   const [showMultiplayerLobby, setShowMultiplayerLobby] = useState<boolean>(false);
@@ -670,8 +684,14 @@ export const App: React.FC = () => {
   };
 
   // Start a new Match
-  const startMatch = (chosenMode: GameMode) => {
+  const startMatch = (chosenMode: GameMode, chosenVariant: GameVariant = gameVariant) => {
+    setGameVariant(chosenVariant);
     setMode(chosenMode);
+    if (chosenVariant === '101') {
+      setMatch101State(createInitial101State());
+      setIs101Seka(false);
+      setIs101AyazCaught(false);
+    }
     const numPlayers =
       chosenMode === '2p_solo' ? 2 : chosenMode === '3p_solo' ? 3 : 4;
     const numAI = numPlayers - 1;
@@ -806,7 +826,10 @@ export const App: React.FC = () => {
     let mustPlayTile: TileData | null = null;
 
     if (isFirstHandOfMatch) {
-      const { playerIndex, forcedTile: ft } = findFirstHandStarter(hands);
+      const { playerIndex, forcedTile: ft } =
+        gameVariant === '101'
+          ? findFirstHandStarter101(hands)
+          : findFirstHandStarter(hands);
       starter = playerIndex;
       mustPlayTile = ft;
     }
@@ -826,6 +849,66 @@ export const App: React.FC = () => {
     if (turnTimeoutRef.current) {
       clearTimeout(turnTimeoutRef.current);
       turnTimeoutRef.current = null;
+    }
+
+    // ==========================================
+    // DOMINO 101 MODE FINISH HAND
+    // ==========================================
+    if (gameVariant === '101') {
+      setIsBaglandi(endedInBaglandi);
+      setPlayers(finalPlayers);
+
+      const res = process101Round(
+        match101State,
+        finalPlayers,
+        roundWinnerPlayerIndex,
+        endedInBaglandi
+      );
+
+      setMatch101State(res.nextMatchState);
+      setIs101Seka(res.isSeka);
+      setIs101AyazCaught(res.ayazCaught);
+      setRawBonusPoints(res.roundRawPoints);
+      setHandBonusPoints(res.roundRawPoints);
+      if (res.winnerTeam) {
+        setWinnerTeam(res.winnerTeam);
+      }
+      setWinnerIndex(res.winnerPlayerIndex);
+
+      setHandRevealed(true);
+      setRevealPhase(1);
+
+      setTimeout(() => {
+        setRevealPhase(2);
+        if (res.roundRawPoints > 0) {
+          sounds.playScorePoints(res.roundRawPoints);
+        }
+
+        setTimeout(() => {
+          const playersWith101 = finalPlayers.map((p) => {
+            const teamMain =
+              p.team === 1 ? res.nextMatchState.team1.mainScore : res.nextMatchState.team2.mainScore;
+            return {
+              ...p,
+              score: teamMain
+            };
+          });
+
+          setPlayers(playersWith101);
+
+          if (res.isMatchOver) {
+            setIsMatchOver(true);
+            const userWon = res.nextMatchState.team1.mainScore > res.nextMatchState.team2.mainScore;
+            setWinnerTeam(userWon ? 1 : 2);
+            awardMatchCoins(userWon);
+          } else {
+            setIsMatchOver(false);
+          }
+
+          setShowGameEnd(true);
+        }, 900);
+      }, 800);
+      return;
     }
 
     setIsBaglandi(endedInBaglandi);
@@ -1055,6 +1138,11 @@ export const App: React.FC = () => {
       const res = placeTileOnBranch(board, tile, branchId);
       nextBoard = res.board;
       scored = res.scoredPoints;
+    }
+
+    // In Domino 101, turns never award in-game 5-multiple points; scoring is strictly end-of-round
+    if (gameVariant === '101') {
+      scored = 0;
     }
 
     const isDouble = tile.left === tile.right;
@@ -2138,7 +2226,7 @@ export const App: React.FC = () => {
               <div className="flex items-center justify-between w-full px-1 mb-2 mt-1">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
                   <Bot className="w-4 h-4 text-amber-400" />
-                  <span>Kompüterə (Botlara) Qarşı:</span>
+                  <span>Kompüterə (Botlara) Qarşı Oyun:</span>
                 </div>
                 <span className="text-[10px] text-amber-300 font-bold bg-slate-800/90 border border-slate-700 px-2.5 py-0.5 rounded-full flex items-center gap-1">
                   <span>🤖</span>
@@ -2146,64 +2234,142 @@ export const App: React.FC = () => {
                 </span>
               </div>
 
+              {/* Game Mode / Variant Switcher: Domino 101 vs Domino 365 */}
+              <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-950/90 rounded-2xl border border-slate-800/80 mb-2.5 shadow-inner">
+                <button
+                  onClick={() => setGameVariant('101')}
+                  className={`py-2 px-3 rounded-xl font-black text-xs transition flex items-center justify-center gap-1.5 ${
+                    gameVariant === '101'
+                      ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-slate-950 shadow-md font-black scale-[1.02]'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Trophy className="w-3.5 h-3.5" />
+                  <span>Domino 101</span>
+                  <span className="text-[9px] bg-slate-950 text-amber-300 px-1.5 py-0.5 rounded-full font-bold">
+                    Klassik
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setGameVariant('365')}
+                  className={`py-2 px-3 rounded-xl font-black text-xs transition flex items-center justify-center gap-1.5 ${
+                    gameVariant === '365'
+                      ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 shadow-md font-black scale-[1.02]'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Domino 365</span>
+                  <span className="text-[9px] bg-slate-950 text-emerald-300 px-1.5 py-0.5 rounded-full font-bold">
+                    Telefon
+                  </span>
+                </button>
+              </div>
+
               {/* Mode Buttons */}
               <div className="w-full space-y-2.5">
-                <button
-                  onClick={() => startMatch('4p_duo')}
-                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-sm shadow-xl transition-all flex items-center justify-between group transform hover:-translate-y-0.5"
-                >
-                  <span className="flex items-center gap-2">
-                    <Play className="w-4 h-4 fill-slate-950" />
-                    <span>4 Nəfərlik Qoşa (2 vs 2 Cütlük)</span>
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] bg-slate-950 text-slate-300 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                      🤖 3 Botla
-                    </span>
-                    <span className="text-[10px] bg-slate-950 text-amber-300 font-bold px-2 py-0.5 rounded-full">
-                      Məşhur
-                    </span>
-                  </div>
-                </button>
+                {gameVariant === '101' ? (
+                  <>
+                    <button
+                      onClick={() => startMatch('4p_duo', '101')}
+                      className="w-full py-4 px-4 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-xl transition-all flex flex-col gap-1.5 group transform hover:-translate-y-0.5 border border-amber-300/80 active:scale-95 text-left"
+                    >
+                      <div className="w-full flex items-center justify-between">
+                        <span className="flex items-center gap-2 text-sm sm:text-base">
+                          <Play className="w-5 h-5 fill-slate-950" />
+                          <span>4 Nəfərlik Qoşa (2 vs 2 Cütlük)</span>
+                        </span>
+                        <span className="text-[10px] bg-slate-950 text-amber-300 font-black px-2 py-0.5 rounded-full shadow">
+                          HƏDƏF: 101
+                        </span>
+                      </div>
+                      <div className="w-full flex items-center justify-between text-[11px] text-slate-900 font-bold pt-1 border-t border-slate-950/15">
+                        <span>Hər kəsə 7 daş • Bazar yoxdur</span>
+                        <span>İlk gediş: 1-1 (1 Qoşa)</span>
+                      </div>
+                    </button>
 
-                <button
-                  onClick={() => startMatch('2p_solo')}
-                  className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition flex items-center justify-between"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <span>2 Nəfərlik Tək</span>
-                    <span className="text-slate-400 font-normal text-xs">(Siz vs Bot)</span>
-                  </span>
-                  <span className="text-amber-400/90 text-xs font-semibold bg-slate-900/60 px-2 py-0.5 rounded-md border border-slate-700/60">
-                    🤖 1 vs 1 Bot
-                  </span>
-                </button>
+                    {/* Quick 101 Rules Accordion Banner */}
+                    <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-2xl text-left text-xs space-y-1.5 shadow-inner">
+                      <div className="flex items-center justify-between text-[11px] font-black text-amber-300 pb-1 border-b border-white/5">
+                        <span>📖 Azərbaycan 101 Qaydaları:</span>
+                        <span className="text-slate-400 font-normal">Klassik Çayxana</span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 leading-snug">
+                        • <strong className="text-amber-300">Saya Düşmək (13 Xal):</strong> İlk dəfə xal yazmaq üçün tək əldə ən azı 13 xal toplamalısınız. 13-dən az xal qaralamada qalır.
+                      </p>
+                      <p className="text-[11px] text-slate-300 leading-snug">
+                        • <strong className="text-rose-400">Qaralamanın Yanması:</strong> Saya düşməmiş komandanın qaralaması rəqib udanda və ya 3 cəhddə 13-ü aşa bilməyəndə sıfırlanır!
+                      </p>
+                      <p className="text-[11px] text-slate-300 leading-snug">
+                        • <strong className="text-cyan-300">Ayaz [0:0] Tələsi:</strong> Əldə qalan cüt boş daşı (0-0) tək xal deyil, 20 cərimə xalı sayılır!
+                      </p>
+                      <p className="text-[11px] text-slate-300 leading-snug">
+                        • <strong className="text-yellow-300">Seka (Bərabərlik):</strong> Bağlı oyunda xallar bərabərdirsə, Seka Bankına yığılır və növbəti əli udana verilir.
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => startMatch('4p_duo', '365')}
+                      className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-xl transition-all flex items-center justify-between group transform hover:-translate-y-0.5"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Play className="w-4 h-4 fill-slate-950" />
+                        <span>4 Nəfərlik Qoşa (2 vs 2 Cütlük)</span>
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] bg-slate-950 text-slate-300 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                          🤖 3 Botla
+                        </span>
+                        <span className="text-[10px] bg-slate-950 text-emerald-300 font-bold px-2 py-0.5 rounded-full">
+                          365 XAL
+                        </span>
+                      </div>
+                    </button>
 
-                <button
-                  onClick={() => startMatch('3p_solo')}
-                  className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition flex items-center justify-between"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <span>3 Nəfərlik Tək</span>
-                    <span className="text-slate-400 font-normal text-xs">(Siz vs 2 Bot)</span>
-                  </span>
-                  <span className="text-amber-400/90 text-xs font-semibold bg-slate-900/60 px-2 py-0.5 rounded-md border border-slate-700/60">
-                    🤖 1 vs 2 Bot
-                  </span>
-                </button>
+                    <button
+                      onClick={() => startMatch('2p_solo', '365')}
+                      className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition flex items-center justify-between"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span>2 Nəfərlik Tək</span>
+                        <span className="text-slate-400 font-normal text-xs">(Siz vs Bot)</span>
+                      </span>
+                      <span className="text-amber-400/90 text-xs font-semibold bg-slate-900/60 px-2 py-0.5 rounded-md border border-slate-700/60">
+                        🤖 1 vs 1 Bot
+                      </span>
+                    </button>
 
-                <button
-                  onClick={() => startMatch('4p_solo')}
-                  className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition flex items-center justify-between"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <span>4 Nəfərlik Tək</span>
-                    <span className="text-slate-400 font-normal text-xs">(Siz vs 3 Bot)</span>
-                  </span>
-                  <span className="text-amber-400/90 text-xs font-semibold bg-slate-900/60 px-2 py-0.5 rounded-md border border-slate-700/60">
-                    🤖 1 vs 3 Bot
-                  </span>
-                </button>
+                    <button
+                      onClick={() => startMatch('3p_solo', '365')}
+                      className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition flex items-center justify-between"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span>3 Nəfərlik Tək</span>
+                        <span className="text-slate-400 font-normal text-xs">(Siz vs 2 Bot)</span>
+                      </span>
+                      <span className="text-amber-400/90 text-xs font-semibold bg-slate-900/60 px-2 py-0.5 rounded-md border border-slate-700/60">
+                        🤖 1 vs 2 Bot
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => startMatch('4p_solo', '365')}
+                      className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition flex items-center justify-between"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span>4 Nəfərlik Tək</span>
+                        <span className="text-slate-400 font-normal text-xs">(Siz vs 3 Bot)</span>
+                      </span>
+                      <span className="text-amber-400/90 text-xs font-semibold bg-slate-900/60 px-2 py-0.5 rounded-md border border-slate-700/60">
+                        🤖 1 vs 3 Bot
+                      </span>
+                    </button>
+                  </>
+                )}
               </div>
 
               {/* Double Combo Rule Toggle in Lobby */}
@@ -2264,6 +2430,8 @@ export const App: React.FC = () => {
                 lastScoredPoints={effectiveLastScored}
                 equippedFrame={stats.equippedFrame}
                 equippedTitle={stats.equippedTitle}
+                variant={effectiveInMultiplayer ? '365' : gameVariant}
+                match101State={match101State}
               />
             </div>
 
@@ -2765,6 +2933,10 @@ export const App: React.FC = () => {
         isHost={effectiveInMultiplayer ? mpIsHost : true}
         onNextHand={handleNextHandAction}
         onRestartMatch={handleRestartMatchAction}
+        variant={effectiveInMultiplayer ? '365' : gameVariant}
+        match101State={match101State}
+        isSeka={is101Seka}
+        ayazCaught={is101AyazCaught}
       />
 
       <MultiplayerLobbyModal

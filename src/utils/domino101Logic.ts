@@ -1,0 +1,261 @@
+import { TileData, Player } from '../types/domino';
+
+export interface Team101State {
+  isOpen: boolean; // Saya düşüb? (13+ xal toplayaraq)
+  draftScore: number; // Qaralama hesab (13-dən az xallar burada toplanır)
+  mainScore: number; // Əsas hesab (101-ə qədər yarış)
+  unopenedAttempts: number; // 3 dəfə qaydası sayğacı
+}
+
+export type Round101EventType =
+  | 'opened' // 13+ xal toplandı və saya düşdü!
+  | 'draft_accumulated' // 13-dən az xal qaralamaya əlavə olundu
+  | 'draft_burn_opponent' // Rəqib udduğu üçün açılmamış qaralama silindi
+  | 'draft_burn_3times' // 3 dəfə 13-ü aşa bilmədiyi üçün qaralama silindi
+  | 'seka_tie' // Bağlı oyunda xallar bərabər oldu, bank yarandı
+  | 'seka_awarded' // Əvvəlki bank cari qalibə verildi
+  | 'standard_points'; // Artıq saya düşüb, birbaşa əsas hesaba yazıldı
+
+export interface Match101State {
+  team1: Team101State;
+  team2: Team101State;
+  sekaBank: number;
+  lastRoundEvent?: Round101EventType;
+  lastEventMessage?: string;
+  isDryDefeat?: boolean;
+}
+
+export const createInitial101State = (): Match101State => ({
+  team1: { isOpen: false, draftScore: 0, mainScore: 0, unopenedAttempts: 0 },
+  team2: { isOpen: false, draftScore: 0, mainScore: 0, unopenedAttempts: 0 },
+  sekaBank: 0
+});
+
+// Sum remaining pips in hand for 101 mode:
+// Blank-Blank [0:0] (Ayaz) is severely penalized as 20 points!
+export const sumHandPips101 = (hand: TileData[]): number => {
+  if (!hand || !Array.isArray(hand) || hand.length === 0) return 0;
+  return hand.reduce((total, tile) => {
+    if (!tile) return total;
+    if (tile.left === 0 && tile.right === 0) {
+      return total + 20; // Ayaz 20 penalty points!
+    }
+    return total + (tile.left + tile.right);
+  }, 0);
+};
+
+// Check if a hand holds the Ayaz (0-0) tile
+export const hasAyazInHand = (hand: TileData[]): boolean => {
+  if (!hand || !Array.isArray(hand)) return false;
+  return hand.some((t) => t && t.left === 0 && t.right === 0);
+};
+
+// First hand starter in 101: Player holding [1:1] (1 qoşa) MUST start
+export const findFirstHandStarter101 = (
+  hands: TileData[][]
+): { playerIndex: number; forcedTile: TileData } => {
+  // 1. Search for [1:1]
+  for (let p = 0; p < hands.length; p++) {
+    const tile11 = hands[p]?.find((t) => t && t.left === 1 && t.right === 1);
+    if (tile11) {
+      return { playerIndex: p, forcedTile: tile11 };
+    }
+  }
+
+  // 2. Fallback to lowest double
+  for (let d = 2; d <= 6; d++) {
+    for (let p = 0; p < hands.length; p++) {
+      const doubleTile = hands[p]?.find((t) => t && t.left === d && t.right === d);
+      if (doubleTile) {
+        return { playerIndex: p, forcedTile: doubleTile };
+      }
+    }
+  }
+
+  // 3. Fallback to 0:0 or first available tile
+  return { playerIndex: 0, forcedTile: hands[0]?.[0] || { id: '1-1', left: 1, right: 1 } };
+};
+
+export interface Round101CalculationResult {
+  winnerTeam: 1 | 2 | null; // null if Seka tie
+  winnerPlayerIndex: number;
+  isBaglandi: boolean;
+  isSeka: boolean;
+  roundRawPoints: number;
+  sekaBankBonus: number;
+  team1Pips: number;
+  team2Pips: number;
+  ayazCaught: boolean;
+  nextMatchState: Match101State;
+  isMatchOver: boolean;
+  isDryDefeat: boolean;
+}
+
+export const process101Round = (
+  currentState: Match101State,
+  players: Player[],
+  lastTilePlacedPlayerIndex: number,
+  isBaglandi: boolean
+): Round101CalculationResult => {
+  const nextState: Match101State = {
+    team1: { ...currentState.team1 },
+    team2: { ...currentState.team2 },
+    sekaBank: currentState.sekaBank
+  };
+
+  // Calculate pips for both teams (with Ayaz = 20 points)
+  let team1Pips = 0;
+  let team2Pips = 0;
+  let ayazCaught = false;
+
+  players.forEach((p) => {
+    const pips = sumHandPips101(p.hand);
+    if (hasAyazInHand(p.hand)) {
+      ayazCaught = true;
+    }
+    if (p.team === 1) {
+      team1Pips += pips;
+    } else {
+      team2Pips += pips;
+    }
+  });
+
+  let winningTeam: 1 | 2 | null = null;
+  let winnerPlayerIndex = lastTilePlacedPlayerIndex;
+  let isSeka = false;
+  let roundRawPoints = 0;
+
+  if (isBaglandi) {
+    if (team1Pips < team2Pips) {
+      winningTeam = 1;
+      roundRawPoints = team2Pips;
+      // Winner is the team 1 player with smallest remaining hand
+      const t1Players = players.filter((p) => p.team === 1);
+      const best = t1Players.reduce((prev, curr) =>
+        sumHandPips101(curr.hand) < sumHandPips101(prev.hand) ? curr : prev
+      );
+      winnerPlayerIndex = best.id;
+    } else if (team2Pips < team1Pips) {
+      winningTeam = 2;
+      roundRawPoints = team1Pips;
+      const t2Players = players.filter((p) => p.team === 2);
+      const best = t2Players.reduce((prev, curr) =>
+        sumHandPips101(curr.hand) < sumHandPips101(prev.hand) ? curr : prev
+      );
+      winnerPlayerIndex = best.id;
+    } else {
+      // Perfect tie in a blocked game: SEKA!
+      isSeka = true;
+      winningTeam = null;
+      const pooledPoints = team1Pips + team2Pips;
+      nextState.sekaBank += pooledPoints;
+      nextState.lastRoundEvent = 'seka_tie';
+      nextState.lastEventMessage = `🤝 Seka! Hər iki komandanın əlində eyni (${team1Pips}) xal qaldı. ${pooledPoints} xal Seka Bankına əlavə olundu!`;
+      return {
+        winnerTeam: null,
+        winnerPlayerIndex: lastTilePlacedPlayerIndex,
+        isBaglandi: true,
+        isSeka: true,
+        roundRawPoints: 0,
+        sekaBankBonus: 0,
+        team1Pips,
+        team2Pips,
+        ayazCaught,
+        nextMatchState: nextState,
+        isMatchOver: false,
+        isDryDefeat: false
+      };
+    }
+  } else {
+    // Normal out (one player emptied their hand)
+    const winningPlayer = players[lastTilePlacedPlayerIndex];
+    winningTeam = winningPlayer.team as 1 | 2;
+    winnerPlayerIndex = lastTilePlacedPlayerIndex;
+    // Points captured are the opposing team's entire remaining pips
+    roundRawPoints = winningTeam === 1 ? team2Pips : team1Pips;
+  }
+
+  const losingTeam = winningTeam === 1 ? 2 : 1;
+  const winnerTeamKey = winningTeam === 1 ? 'team1' : 'team2';
+  const loserTeamKey = losingTeam === 1 ? 'team1' : 'team2';
+
+  const sekaBankBonus = nextState.sekaBank;
+  nextState.sekaBank = 0; // Claimed by winner
+
+  // 1. Opponent Burn (Silinmə) Rule:
+  // If the loser team was NOT open and had draft points, their draft points burn to zero!
+  if (!nextState[loserTeamKey].isOpen && nextState[loserTeamKey].draftScore > 0) {
+    nextState[loserTeamKey].draftScore = 0;
+    nextState[loserTeamKey].unopenedAttempts = 0;
+    nextState.lastRoundEvent = 'draft_burn_opponent';
+    nextState.lastEventMessage = `🔥 Rəqib qalib gəldiyi üçün ${losingTeam}-ci komandanın açılmamış qaralama xalları yandı!`;
+  }
+
+  // 2. Score processing for winning team:
+  const winTeamState = nextState[winnerTeamKey];
+
+  if (winTeamState.isOpen) {
+    // Already opened: All points go straight to Main Score!
+    winTeamState.mainScore += roundRawPoints + sekaBankBonus;
+    nextState.lastRoundEvent = sekaBankBonus > 0 ? 'seka_awarded' : 'standard_points';
+    nextState.lastEventMessage =
+      sekaBankBonus > 0
+        ? `🏆 ${winningTeam}-ci komanda qalib gəldi: +${roundRawPoints} xal və Seka Bankından +${sekaBankBonus} xal!`
+        : `✅ ${winningTeam}-ci komanda əsas hesaba +${roundRawPoints} xal yazdırdı!`;
+  } else {
+    // Not open yet! 13-Point Threshold (Saya Düşmək) applies!
+    if (roundRawPoints >= 13) {
+      // Successful Opening (Saya Düşdü!)
+      winTeamState.isOpen = true;
+      const transferredDraft = winTeamState.draftScore;
+      winTeamState.mainScore += roundRawPoints + transferredDraft + sekaBankBonus;
+      winTeamState.draftScore = 0;
+      winTeamState.unopenedAttempts = 0;
+      nextState.lastRoundEvent = 'opened';
+      nextState.lastEventMessage = `🎉 ${winningTeam}-ci komanda SAYA DÜŞDÜ! ${roundRawPoints} xal toplandı və qaralamadakı ${transferredDraft} xal əsas hesaba köçürüldü!`;
+    } else {
+      // Under 13: Points go to Draft Balance
+      winTeamState.draftScore += roundRawPoints + sekaBankBonus;
+      winTeamState.unopenedAttempts += 1;
+
+      // 3-Times Rule Check:
+      if (winTeamState.unopenedAttempts >= 3) {
+        winTeamState.draftScore = 0;
+        winTeamState.unopenedAttempts = 0;
+        nextState.lastRoundEvent = 'draft_burn_3times';
+        nextState.lastEventMessage = `⚠️ 3 Dəfə Qaydası: ${winningTeam}-ci komanda 3 cəhddə 13 xalı aşa bilmədiyi üçün qaralama sıfırlandı!`;
+      } else {
+        nextState.lastRoundEvent = 'draft_accumulated';
+        nextState.lastEventMessage = `📝 ${winningTeam}-ci komanda 13 xalı aşa bilmədi. +${roundRawPoints} xal qaralamaya yazıldı (${winTeamState.unopenedAttempts}/3 cəhd).`;
+      }
+    }
+  }
+
+  // Check Match Victory (101 points target)
+  const isMatchOver = winTeamState.mainScore >= 101;
+  let isDryDefeat = false;
+
+  if (isMatchOver) {
+    const loserMain = nextState[loserTeamKey].mainScore;
+    if (loserMain === 0) {
+      isDryDefeat = true;
+      nextState.isDryDefeat = true;
+      nextState.lastEventMessage = `🫖 QURU MƏĞLUBİYYƏT! ${losingTeam}-ci komanda saya belə düşə bilmədi (0 xal)! Çayxana qaydasına görə çaylar uduzandandır!`;
+    }
+  }
+
+  return {
+    winnerTeam: winningTeam,
+    winnerPlayerIndex,
+    isBaglandi,
+    isSeka: false,
+    roundRawPoints,
+    sekaBankBonus,
+    team1Pips,
+    team2Pips,
+    ayazCaught,
+    nextMatchState: nextState,
+    isMatchOver,
+    isDryDefeat
+  };
+};

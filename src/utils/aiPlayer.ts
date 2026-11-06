@@ -107,8 +107,9 @@ export const selectBestAIMove = (
     if (bIsDouble !== aIsDouble) {
       return bIsDouble - aIsDouble;
     }
-    const aPips = a.tile.left + a.tile.right;
-    const bPips = b.tile.left + b.tile.right;
+    // Ayaz [0:0] carries a severe 20-point penalty in 101, so AI prioritizes discarding it!
+    const aPips = a.tile.left === 0 && a.tile.right === 0 ? 20 : a.tile.left + a.tile.right;
+    const bPips = b.tile.left === 0 && b.tile.right === 0 ? 20 : b.tile.left + b.tile.right;
     return bPips - aPips;
   });
 
