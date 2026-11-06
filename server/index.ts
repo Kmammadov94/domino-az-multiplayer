@@ -50,17 +50,8 @@ const io = new Server(server, {
 const rooms: Map<string, GameRoom> = new Map();
 const socketToRoom: Map<string, string> = new Map();
 
-// Authentic Baku Room Code Generator
-const BAKU_CODES = [
-  'BAKU', 'XEZER', 'SEKI', '365', 'QALA', 'XAN', 'BUTA', 'NEFT', 'ODLAR', 'BULVAR'
-];
-
+// 100% Random Alphanumeric Room Code Generator (e.g. 7K4X, M9P2)
 const generateRoomCode = (): string => {
-  // First try an available Baku cultural keyword
-  for (const code of BAKU_CODES) {
-    if (!rooms.has(code)) return code;
-  }
-  // Otherwise generate random 4-letter alphanumeric code
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
   do {

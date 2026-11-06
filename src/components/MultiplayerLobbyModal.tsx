@@ -476,7 +476,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                     value={roomCodeInput}
                     onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
                     maxLength={8}
-                    placeholder="Məsələn: BAKU"
+                    placeholder="Məsələn: 7K4X"
                     className="bg-slate-950 border-2 border-slate-700 rounded-xl px-4 py-3 text-lg font-black text-amber-300 text-center tracking-widest uppercase font-mono focus:outline-none focus:border-amber-400 transition"
                   />
 

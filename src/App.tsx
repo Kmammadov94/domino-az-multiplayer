@@ -1969,6 +1969,8 @@ export const App: React.FC = () => {
             {effectiveInMultiplayer && (
               <TeahouseChatOverlay
                 recentMessages={mpChatMessages}
+                myPlayerIndex={localPlayerIndex}
+                myPlayerName={effectivePlayers[localPlayerIndex]?.name || 'Sən'}
                 onSendChat={(text?: string, emoji?: string) =>
                   multiplayerSocket.sendChat(text, emoji)
                 }
