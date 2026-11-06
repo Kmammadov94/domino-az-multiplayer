@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GameBoard, BranchId, TILE_SHORT, TILE_LONG } from '../utils/boardEngine';
 import { DominoSkin, TileData } from '../types/domino';
+import { TABLE_THEMES, DEFAULT_TABLE_THEME_ID, TableTheme } from '../data/tableThemes';
 import { DominoTile } from './DominoTile';
 import { RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 
 interface BoardViewProps {
   board: GameBoard;
   skin: DominoSkin;
+  tableThemeId?: string;
   selectedTile: TileData | null;
   playableBranches: BranchId[];
   onSelectBranch: (branchId: BranchId) => void;
@@ -20,12 +22,15 @@ interface BoardViewProps {
 export const BoardView: React.FC<BoardViewProps> = ({
   board,
   skin,
+  tableThemeId = DEFAULT_TABLE_THEME_ID,
   selectedTile,
   playableBranches,
   onSelectBranch,
   branchExpectedScores = {} as Record<BranchId, number>,
   hoveredBranch = null
 }) => {
+  const tableTheme: TableTheme =
+    TABLE_THEMES.find((t) => t.id === tableThemeId) || TABLE_THEMES[0];
   const containerRef = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState({ w: 900, h: 500 });
 
@@ -167,10 +172,29 @@ export const BoardView: React.FC<BoardViewProps> = ({
       onWheel={handleWheel}
       className="relative w-full h-full flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing select-none"
     >
-      {/* Felt Table Background Texture */}
-      <div className="absolute inset-0 bg-radial from-[#1e5832] via-[#154726] to-[#0a2313] shadow-inner pointer-events-none opacity-95">
-        {/* Subtle wood rail border shadow */}
-        <div className="absolute inset-0 border-[10px] border-[#29170a] shadow-[inset_0_0_40px_rgba(0,0,0,0.8)]" />
+      {/* Dynamic Table Felt Texture */}
+      <div className={`absolute inset-0 ${tableTheme.feltClass} shadow-inner pointer-events-none opacity-95 transition-colors duration-500`}>
+        {/* Rail border */}
+        <div className={`absolute inset-0 border-[10px] ${tableTheme.railBorderClass} shadow-[inset_0_0_40px_rgba(0,0,0,0.85)]`} />
+
+        {/* Carpet Ornamental Weave Center Overlay */}
+        {tableTheme.patternType === 'carpet' && (
+          <div className="absolute inset-0 flex items-center justify-center opacity-15 pointer-events-none">
+            <div className="w-[500px] h-[340px] border-4 border-dashed border-amber-300 rounded-3xl flex items-center justify-center">
+              <span className="text-8xl select-none filter blur-[0.5px]">🪡</span>
+            </div>
+          </div>
+        )}
+
+        {/* Midnight Velvet Gold Corner Trims */}
+        {tableTheme.patternType === 'velvet' && (
+          <div className="absolute inset-6 border border-amber-500/20 rounded-2xl pointer-events-none" />
+        )}
+
+        {/* Wood Corner Accents */}
+        {tableTheme.patternType === 'wood' && (
+          <div className="absolute inset-4 border-2 border-[#1a0e05]/60 rounded-xl pointer-events-none shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]" />
+        )}
       </div>
 
       {/* World Container with dynamic transformation */}

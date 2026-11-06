@@ -10,6 +10,8 @@ interface ScoreBoardProps {
   lang: Language;
   roundNumber: number;
   lastScoredPoints?: { playerName: string; points: number } | null;
+  equippedFrame?: string;
+  equippedTitle?: string;
 }
 
 export const ScoreBoard: React.FC<ScoreBoardProps> = ({
@@ -17,7 +19,9 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
   mode,
   lang,
   roundNumber,
-  lastScoredPoints
+  lastScoredPoints,
+  equippedFrame,
+  equippedTitle
 }) => {
   const t = translations[lang];
 
@@ -125,6 +129,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
               <div className="flex items-center gap-1 mb-0.5">
                 <AvatarView
                   avatarId={p.avatarId || (idx === 0 ? undefined : idx === 1 ? 'avatar_tea_master' : idx === 2 ? 'avatar_sheki_guest' : 'avatar_icherisheher_sage')}
+                  frameId={idx === 0 ? equippedFrame : undefined}
                   size={20}
                   showBorder={false}
                 />

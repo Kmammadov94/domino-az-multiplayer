@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { DominoSkin, Language, PlayerStats } from '../types/domino';
 import { DOMINO_SKINS } from '../data/skins';
 import { PLAYER_AVATARS, PlayerAvatar, DEFAULT_AVATAR_ID, FREE_AVATAR_IDS } from '../data/avatars';
+import { AVATAR_FRAMES, PLAYER_TITLES, DEFAULT_FRAME_ID, DEFAULT_TITLE_ID, AvatarFrame, PlayerTitle } from '../data/profileCustomization';
+import { TABLE_THEMES, DEFAULT_TABLE_THEME_ID, TableTheme } from '../data/tableThemes';
 import { translations } from '../i18n/translations';
 import { DominoTile } from './DominoTile';
 import { AvatarView } from './AvatarView';
 import { sounds } from '../utils/sound';
-import { X, Coins, Sparkles, Check, ShoppingBag, User, Layers } from 'lucide-react';
+import { triggerHaptic } from '../utils/haptics';
+import { X, Coins, Sparkles, Check, ShoppingBag, User, Layers, Shield, Award, Palette } from 'lucide-react';
 
 interface StoreModalProps {
   isOpen: boolean;
@@ -14,7 +17,7 @@ interface StoreModalProps {
   lang: Language;
   stats: PlayerStats;
   onUpdateStats: (newStats: PlayerStats) => void;
-  initialTab?: 'skins' | 'avatars';
+  initialTab?: 'skins' | 'avatars' | 'frames' | 'titles' | 'tables';
 }
 
 export const StoreModal: React.FC<StoreModalProps> = ({
@@ -25,7 +28,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   onUpdateStats,
   initialTab = 'skins'
 }) => {
-  const [storeTab, setStoreTab] = useState<'skins' | 'avatars'>(initialTab);
+  const [storeTab, setStoreTab] = useState<'skins' | 'avatars' | 'frames' | 'titles' | 'tables'>(initialTab);
   const [selectedSkinCategory, setSelectedSkinCategory] = useState<string>('all');
   const [selectedAvatarCategory, setSelectedAvatarCategory] = useState<string>('all');
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -105,6 +108,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       ...stats,
       equippedAvatar: avatarId
     });
+    triggerHaptic('light');
     sounds.playTileDraw();
   };
 
@@ -124,7 +128,90 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       unlockedAvatars: nextUnlocked,
       equippedAvatar: avatar.id
     });
+    triggerHaptic('success');
     sounds.playCoinChime();
+  };
+
+  const currentEquippedFrame = stats.equippedFrame || DEFAULT_FRAME_ID;
+  const currentUnlockedFrames = stats.unlockedFrames && stats.unlockedFrames.length > 0
+    ? stats.unlockedFrames
+    : [DEFAULT_FRAME_ID];
+
+  const currentEquippedTitle = stats.equippedTitle || DEFAULT_TITLE_ID;
+  const currentUnlockedTitles = stats.unlockedTitles && stats.unlockedTitles.length > 0
+    ? stats.unlockedTitles
+    : [DEFAULT_TITLE_ID];
+
+  const currentEquippedTable = stats.equippedTableTheme || DEFAULT_TABLE_THEME_ID;
+
+  // Equip Frame
+  const handleEquipFrame = (frameId: string) => {
+    onUpdateStats({
+      ...stats,
+      equippedFrame: frameId
+    });
+    triggerHaptic('light');
+    sounds.playTileDraw();
+  };
+
+  // Buy Frame
+  const handleBuyFrame = (frame: AvatarFrame) => {
+    if (stats.coins < frame.price) {
+      setFeedback(t.notEnoughCoins);
+      setTimeout(() => setFeedback(null), 2500);
+      return;
+    }
+
+    const nextCoins = stats.coins - frame.price;
+    const nextUnlocked = [...currentUnlockedFrames, frame.id];
+    onUpdateStats({
+      ...stats,
+      coins: nextCoins,
+      unlockedFrames: nextUnlocked,
+      equippedFrame: frame.id
+    });
+    triggerHaptic('success');
+    sounds.playCoinChime();
+  };
+
+  // Equip Title
+  const handleEquipTitle = (titleId: string) => {
+    onUpdateStats({
+      ...stats,
+      equippedTitle: titleId
+    });
+    triggerHaptic('light');
+    sounds.playTileDraw();
+  };
+
+  // Buy Title
+  const handleBuyTitle = (title: PlayerTitle) => {
+    if (stats.coins < title.price) {
+      setFeedback(t.notEnoughCoins);
+      setTimeout(() => setFeedback(null), 2500);
+      return;
+    }
+
+    const nextCoins = stats.coins - title.price;
+    const nextUnlocked = [...currentUnlockedTitles, title.id];
+    onUpdateStats({
+      ...stats,
+      coins: nextCoins,
+      unlockedTitles: nextUnlocked,
+      equippedTitle: title.id
+    });
+    triggerHaptic('success');
+    sounds.playCoinChime();
+  };
+
+  // Equip Table Theme
+  const handleEquipTableTheme = (themeId: string) => {
+    onUpdateStats({
+      ...stats,
+      equippedTableTheme: themeId
+    });
+    triggerHaptic('medium');
+    sounds.playTileDraw();
   };
 
   return (
@@ -139,7 +226,11 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             <div>
               <h2 className="text-lg sm:text-xl font-black text-amber-300">{t.store}</h2>
               <p className="text-[10px] sm:text-xs text-slate-400">
-                {storeTab === 'skins' ? '20 unikal domino dəsti' : '30 xüsusi profil şəkli'}
+                {storeTab === 'skins' && '20 unikal domino daş dəsti'}
+                {storeTab === 'avatars' && '30 xüsusi profil şəkli'}
+                {storeTab === 'frames' && 'Avatar çərçivələri və parlaq effektlər'}
+                {storeTab === 'titles' && 'Masa titulları və çayxana dərəcələri'}
+                {storeTab === 'tables' && 'Masa örtüyü və çuxa dizaynı'}
               </p>
             </div>
           </div>
@@ -160,36 +251,66 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           </div>
         </div>
 
-        {/* Primary Store Tab Switcher (Skins vs Avatars) */}
-        <div className="grid grid-cols-2 p-2 bg-slate-950 border-b border-slate-800 gap-2">
+        {/* Primary Store Tab Switcher (5 Tabs: Skins, Avatars, Frames, Titles, Tables) */}
+        <div className="grid grid-cols-5 p-1.5 bg-slate-950 border-b border-slate-800 gap-1.5 overflow-x-auto text-[11px] sm:text-xs">
           <button
             onClick={() => setStoreTab('skins')}
-            className={`py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all ${
+            className={`py-2 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all ${
               storeTab === 'skins'
-                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-lg'
+                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md font-black'
                 : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Layers className="w-4 h-4" />
-            <span>{t.storeTabs?.skins || 'Daş Dəstləri'}</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-950/30 font-black">
-              20
-            </span>
+            <Layers className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">{t.storeTabs?.skins || 'Daşlar'}</span>
           </button>
 
           <button
             onClick={() => setStoreTab('avatars')}
-            className={`py-2 px-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all ${
+            className={`py-2 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all ${
               storeTab === 'avatars'
-                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-lg'
+                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-md font-black'
                 : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
             }`}
           >
-            <User className="w-4 h-4" />
-            <span>{t.storeTabs?.avatars || 'Profil Şəkilləri'}</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-950/30 font-black">
-              30
-            </span>
+            <User className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">{t.storeTabs?.avatars || 'Avatarlar'}</span>
+          </button>
+
+          <button
+            onClick={() => setStoreTab('frames')}
+            className={`py-2 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all ${
+              storeTab === 'frames'
+                ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-md font-black'
+                : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Shield className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">Çərçivələr</span>
+          </button>
+
+          <button
+            onClick={() => setStoreTab('titles')}
+            className={`py-2 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all ${
+              storeTab === 'titles'
+                ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-slate-950 shadow-md font-black'
+                : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Award className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">Titullar</span>
+          </button>
+
+          <button
+            onClick={() => setStoreTab('tables')}
+            className={`py-2 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all ${
+              storeTab === 'tables'
+                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-slate-950 shadow-md font-black'
+                : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Palette className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">Örtük</span>
           </button>
         </div>
 
@@ -412,6 +533,195 @@ export const StoreModal: React.FC<StoreModalProps> = ({
               })}
             </div>
           </>
+        )}
+
+        {/* 3. Avatar Frames Tab */}
+        {storeTab === 'frames' && (
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {AVATAR_FRAMES.map((frame) => {
+              const isEquipped = currentEquippedFrame === frame.id;
+              const isUnlocked = currentUnlockedFrames.includes(frame.id) || frame.price === 0;
+
+              return (
+                <div
+                  key={frame.id}
+                  className={`relative rounded-2xl p-4 border flex flex-col items-center text-center transition-all ${
+                    isEquipped
+                      ? 'bg-amber-950/40 border-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.2)]'
+                      : 'bg-slate-800/60 border-slate-700/80 hover:border-slate-600'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="font-bold text-white text-sm">{frame.name[lang] || frame.name.az}</h3>
+                    {frame.badge && <span className="text-base">{frame.badge}</span>}
+                  </div>
+
+                  <p className="text-[11px] text-slate-400 mb-3 line-clamp-2">
+                    {frame.desc[lang] || frame.desc.az}
+                  </p>
+
+                  <div className="my-2 p-3 rounded-2xl bg-slate-950 flex items-center justify-center">
+                    <AvatarView
+                      avatarId={currentEquippedAvatar}
+                      frameId={frame.id}
+                      size={72}
+                      showBorder={true}
+                    />
+                  </div>
+
+                  <div className="w-full mt-3">
+                    {isEquipped ? (
+                      <button
+                        disabled
+                        className="w-full py-1.5 rounded-xl bg-amber-500/20 border border-amber-400/50 text-amber-300 text-xs font-bold flex items-center justify-center gap-1"
+                      >
+                        <Sparkles className="w-3 h-3 text-amber-400" />
+                        <span>Seçilib</span>
+                      </button>
+                    ) : isUnlocked ? (
+                      <button
+                        onClick={() => handleEquipFrame(frame.id)}
+                        className="w-full py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition active:scale-95"
+                      >
+                        Quraşdır
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleBuyFrame(frame)}
+                        className="w-full py-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 text-slate-950 text-xs font-black transition flex items-center justify-center gap-1 active:scale-95 shadow"
+                      >
+                        <Coins className="w-3 h-3" />
+                        <span>{frame.price} Qızıl</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* 4. Player Titles Tab */}
+        {storeTab === 'titles' && (
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {PLAYER_TITLES.map((title) => {
+              const isEquipped = currentEquippedTitle === title.id;
+              const isUnlocked = currentUnlockedTitles.includes(title.id) || title.price === 0;
+
+              return (
+                <div
+                  key={title.id}
+                  className={`relative rounded-2xl p-4 border flex items-center justify-between gap-3 transition-all ${
+                    isEquipped
+                      ? 'bg-purple-950/40 border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.2)]'
+                      : 'bg-slate-800/60 border-slate-700/80 hover:border-slate-600'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-2xl p-2 rounded-xl bg-black/40 border border-white/5 flex-shrink-0">
+                      {title.icon || '🏆'}
+                    </span>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-black text-white text-sm truncate">
+                        {title.title[lang] || title.title.az}
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border mt-1 inline-block w-fit ${title.badgeColor}`}>
+                        Masa Titulu
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex-shrink-0">
+                    {isEquipped ? (
+                      <button
+                        disabled
+                        className="py-1.5 px-3 rounded-xl bg-purple-500/20 border border-purple-400/50 text-purple-300 text-xs font-bold flex items-center gap-1"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Aktiv</span>
+                      </button>
+                    ) : isUnlocked ? (
+                      <button
+                        onClick={() => handleEquipTitle(title.id)}
+                        className="py-1.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition active:scale-95"
+                      >
+                        Seç
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleBuyTitle(title)}
+                        className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 text-slate-950 text-xs font-black transition flex items-center gap-1 active:scale-95 shadow"
+                      >
+                        <Coins className="w-3 h-3" />
+                        <span>{title.price}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* 5. Table Themes Tab */}
+        {storeTab === 'tables' && (
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {TABLE_THEMES.map((theme) => {
+              const isEquipped = currentEquippedTable === theme.id;
+
+              return (
+                <div
+                  key={theme.id}
+                  className={`relative rounded-2xl p-4 border flex flex-col justify-between transition-all ${
+                    isEquipped
+                      ? 'bg-teal-950/40 border-teal-400 shadow-[0_0_20px_rgba(45,212,191,0.2)]'
+                      : 'bg-slate-800/60 border-slate-700/80 hover:border-slate-600'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <h3 className="font-bold text-white text-sm">
+                        {theme.name[lang] || theme.name.az}
+                      </h3>
+                      <div
+                        className="w-5 h-5 rounded-full border border-white/30 shadow"
+                        style={{ backgroundColor: theme.previewColor }}
+                      />
+                    </div>
+                    <p className="text-xs text-slate-300 mb-3">
+                      {theme.desc[lang] || theme.desc.az}
+                    </p>
+
+                    {/* Table Felt Swatch Preview */}
+                    <div className={`h-24 rounded-xl ${theme.feltClass} border-4 ${theme.railBorderClass} relative shadow-inner overflow-hidden flex items-center justify-center`}>
+                      <span className="text-xs font-bold text-white/50 tracking-wider uppercase select-none">
+                        {theme.patternType}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3">
+                    {isEquipped ? (
+                      <button
+                        disabled
+                        className="w-full py-1.5 rounded-xl bg-teal-500/20 border border-teal-400/50 text-teal-300 text-xs font-bold flex items-center justify-center gap-1"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Masada İstifadə Olunur</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleEquipTableTheme(theme.id)}
+                        className="w-full py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold transition active:scale-95 shadow"
+                      >
+                        Bu Örtüyü Seç
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>

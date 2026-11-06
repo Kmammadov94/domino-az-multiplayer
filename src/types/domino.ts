@@ -78,6 +78,11 @@ export interface PlayerStats {
   unlockedSkins: string[];
   equippedAvatar?: string;
   unlockedAvatars?: string[];
+  equippedFrame?: string;
+  unlockedFrames?: string[];
+  equippedTitle?: string;
+  unlockedTitles?: string[];
+  equippedTableTheme?: string;
   lastDailyClaim?: string; // YYYY-MM-DD
   dailyStreak: number;
   matchesPlayed: number;

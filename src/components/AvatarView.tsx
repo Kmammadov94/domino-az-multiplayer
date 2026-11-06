@@ -1,8 +1,10 @@
 import React from 'react';
 import { PLAYER_AVATARS, DEFAULT_AVATAR_ID, PlayerAvatar } from '../data/avatars';
+import { AVATAR_FRAMES, DEFAULT_FRAME_ID, AvatarFrame } from '../data/profileCustomization';
 
 interface AvatarViewProps {
   avatarId?: string;
+  frameId?: string;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | number;
   showBorder?: boolean;
   showGlow?: boolean;
@@ -12,6 +14,7 @@ interface AvatarViewProps {
 
 export const AvatarView: React.FC<AvatarViewProps> = ({
   avatarId = DEFAULT_AVATAR_ID,
+  frameId = DEFAULT_FRAME_ID,
   size = 'md',
   showBorder = true,
   showGlow = false,
@@ -20,6 +23,9 @@ export const AvatarView: React.FC<AvatarViewProps> = ({
 }) => {
   const avatar: PlayerAvatar =
     PLAYER_AVATARS.find((a) => a.id === avatarId) || PLAYER_AVATARS[0];
+
+  const frame: AvatarFrame =
+    AVATAR_FRAMES.find((f) => f.id === frameId) || AVATAR_FRAMES[0];
 
   // Resolve pixel dimensions
   let pxSize = 48;
@@ -47,23 +53,30 @@ export const AvatarView: React.FC<AvatarViewProps> = ({
 
   const { theme } = avatar;
 
+  const resolvedBorder = frame.id !== 'frame_none'
+    ? frame.borderClass
+    : showBorder
+    ? `border-2 ${avatar.borderColor}`
+    : '';
+
   return (
-    <div
-      onClick={onClick}
-      style={{
-        width: `${pxSize}px`,
-        height: `${pxSize}px`,
-        boxShadow: showGlow ? `0 0 16px ${avatar.glowColor}` : undefined
-      }}
-      className={`relative rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden transition-transform duration-200 ${
-        showBorder ? `border-2 ${avatar.borderColor}` : ''
-      } ${onClick ? 'cursor-pointer hover:scale-105 active:scale-95' : ''} ${className}`}
-    >
-      <svg
-        viewBox="0 0 100 100"
-        className="w-full h-full select-none"
-        xmlns="http://www.w3.org/2000/svg"
+    <div className={`relative inline-flex items-center justify-center flex-shrink-0 ${className}`}>
+      <div
+        onClick={onClick}
+        style={{
+          width: `${pxSize}px`,
+          height: `${pxSize}px`,
+          boxShadow: showGlow || frame.glow ? `0 0 16px ${frame.glow || avatar.glowColor}` : undefined
+        }}
+        className={`relative rounded-full flex items-center justify-center overflow-hidden transition-transform duration-200 ${
+          resolvedBorder
+        } ${onClick ? 'cursor-pointer hover:scale-105 active:scale-95' : ''}`}
       >
+        <svg
+          viewBox="0 0 100 100"
+          className="w-full h-full select-none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
         <defs>
           <radialGradient id={`bg-${avatar.id}`} cx="50%" cy="40%" r="60%">
             <stop offset="0%" stopColor={theme.bgAccent} />
@@ -412,6 +425,17 @@ export const AvatarView: React.FC<AvatarViewProps> = ({
           </g>
         )}
       </svg>
+      </div>
+
+      {/* Frame Badge Icon on Top-Right Corner */}
+      {frame.badge && (
+        <span
+          className="absolute -top-1 -right-1 text-xs select-none pointer-events-none filter drop-shadow animate-bounce"
+          style={{ fontSize: `${Math.max(10, pxSize * 0.32)}px` }}
+        >
+          {frame.badge}
+        </span>
+      )}
     </div>
   );
 };

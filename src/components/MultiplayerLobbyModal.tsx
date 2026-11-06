@@ -531,6 +531,60 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                   </button>
                 </div>
               )}
+
+              {/* Recent Opponents & Friends Section */}
+              {(() => {
+                let recentList: Array<{ name: string; avatarId?: string; date: string }> = [];
+                try {
+                  recentList = JSON.parse(localStorage.getItem('domino_recent_players') || '[]');
+                } catch {}
+                if (recentList.length === 0) return null;
+
+                return (
+                  <div className="mt-2 pt-3 border-t border-slate-800 text-left">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-amber-300/90 flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Son Rəqiblər & Dostlar</span>
+                      </span>
+                      <span className="text-[10px] text-slate-500">
+                        {recentList.length} nəfər
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                      {recentList.map((rp, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 px-2.5 py-1.5 rounded-xl flex-shrink-0"
+                        >
+                          <AvatarView
+                            avatarId={rp.avatarId || 'avatar_tea_master'}
+                            size={24}
+                            showBorder={false}
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-slate-200 truncate max-w-[80px]">
+                              {rp.name}
+                            </span>
+                            <span className="text-[9px] text-slate-500">{rp.date}</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setSelectedMode('2p_solo');
+                              handleCreate();
+                            }}
+                            title="Otaq yaradıb dəvət et"
+                            className="ml-1 text-[10px] font-black bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-lg active:scale-95 transition"
+                          >
+                            Dəvət
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </>
           )}
         </div>

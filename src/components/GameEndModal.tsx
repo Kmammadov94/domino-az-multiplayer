@@ -187,15 +187,19 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
               {isHost ? (
                 <button
                   onClick={onRestartMatch}
-                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-sm shadow-lg transition flex items-center justify-center gap-2 active:scale-95"
+                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-xl transition flex items-center justify-center gap-2 active:scale-95"
                 >
                   <RotateCcw className="w-4 h-4" />
-                  <span>{t.playAgain || 'Yenidən Oyna'}</span>
+                  <span>🔄 Təkrar Oyna (Rematch)</span>
                 </button>
               ) : (
-                <div className="w-full py-3 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-300 font-bold text-xs flex items-center justify-center gap-2 animate-pulse">
-                  <span>👑 Otaq sahibinin yenidən başlatması gözlənilir...</span>
-                </div>
+                <button
+                  onClick={onRestartMatch}
+                  className="w-full py-3 rounded-xl bg-amber-950/60 border border-amber-500/50 text-amber-300 font-bold text-xs flex items-center justify-center gap-2 hover:bg-amber-900/60 transition active:scale-95"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span>🔄 Otaq Sahibi ilə Təkrar Oyna</span>
+                </button>
               )}
 
               {/* View Board Final State Button */}

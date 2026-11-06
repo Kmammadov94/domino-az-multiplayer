@@ -39,6 +39,13 @@ import {
   setGuestNoticeDismissed
 } from './utils/storage';
 
+import { triggerHaptic } from './utils/haptics';
+import { TABLE_THEMES, DEFAULT_TABLE_THEME_ID } from './data/tableThemes';
+import { PLAYER_TITLES } from './data/profileCustomization';
+import { TABLE_GIFTS, TableGiftDef } from './data/tableGifts';
+import { TeahousesModal } from './components/TeahousesModal';
+import { TableGiftPicker } from './components/TableGiftPicker';
+import { TableGiftAnimationOverlay, ActiveGiftAnimation } from './components/TableGiftAnimationOverlay';
 import { BoardView } from './components/BoardView';
 import { ScoreBoard } from './components/ScoreBoard';
 import { PlayerControls } from './components/PlayerControls';
@@ -147,6 +154,11 @@ export const App: React.FC = () => {
   const [mpMyIndex, setMpMyIndex] = useState<number>(0);
   const [mpIsHost, setMpIsHost] = useState<boolean>(false);
 
+  // Teahouse Rooms & Interactive Table Gifts State
+  const [showTeahousesModal, setShowTeahousesModal] = useState<boolean>(false);
+  const [giftTargetPlayer, setGiftTargetPlayer] = useState<{ index: number; name: string } | null>(null);
+  const [activeGiftAnimation, setActiveGiftAnimation] = useState<ActiveGiftAnimation | null>(null);
+
   // Setup multiplayer socket events & query param auto-join / session reconnection
   useEffect(() => {
     // Check saved session in localStorage to survive F5 / page reloads
@@ -229,6 +241,23 @@ export const App: React.FC = () => {
 
     const unsubChat = multiplayerSocket.onChatMessage((msg) => {
       setMpChatMessages((prev) => [...prev.slice(-30), msg]);
+
+      // Detect Table Gift Projectile Event
+      if (msg.emoji && msg.emoji.startsWith('gift:')) {
+        const parts = msg.emoji.split(':');
+        const giftId = parts[1];
+        const targetIdx = parseInt(parts[2], 10);
+        const gift = TABLE_GIFTS.find((g) => g.id === giftId);
+        if (gift) {
+          setActiveGiftAnimation({
+            id: msg.id,
+            gift,
+            senderName: msg.senderName,
+            senderIndex: msg.senderIndex,
+            targetIndex: isNaN(targetIdx) ? 0 : targetIdx
+          });
+        }
+      }
     });
 
     return () => {
@@ -392,6 +421,63 @@ export const App: React.FC = () => {
     setMpGameState(null);
     setMpIsHost(false);
     setIsMultiplayer(false);
+  };
+
+  // Send interactive table gift (armudu tea, tomato splatter, baklava, etc.)
+  const handleSendTableGift = (gift: TableGiftDef, targetIndex: number) => {
+    if (stats.coins < gift.cost) return;
+
+    if (gift.cost > 0) {
+      handleUpdateStats({
+        ...stats,
+        coins: Math.max(0, stats.coins - gift.cost)
+      });
+    }
+
+    const myName = effectivePlayers[localPlayerIndex]?.name || 'Sən';
+
+    // Local animated projectile & impact
+    setActiveGiftAnimation({
+      id: Date.now().toString(),
+      gift,
+      senderName: myName,
+      senderIndex: localPlayerIndex,
+      targetIndex
+    });
+
+    // In multiplayer: broadcast event via chat channel
+    if (effectiveInMultiplayer) {
+      multiplayerSocket.sendChatMessage(undefined, `gift:${gift.id}:${targetIndex}`);
+    } else {
+      // In singleplayer: bot humorous response
+      const targetP = effectivePlayers[targetIndex];
+      if (targetP && targetP.isAI) {
+        setTimeout(() => {
+          let botReply = '';
+          if (gift.impactType === 'steam') {
+            botReply = 'Çox sağ ol qardaş, çay yerinə düşdü! ☕';
+          } else if (gift.impactType === 'splash_red') {
+            botReply = 'Ə pomidoru niyə atırsan, daşını oyna! 🍅😅';
+          } else if (gift.impactType === 'splash_egg') {
+            botReply = 'Yumurta vuran əlin var olsun! 🍳';
+          } else if (gift.impactType === 'applause') {
+            botReply = 'Çox sağ ol, sənətə qiymət verirsən! 👏';
+          } else {
+            botReply = 'Nuşi-can, bərəkətli olsun! 🥟';
+          }
+          setMpChatMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              senderName: targetP.name,
+              senderIndex: targetIndex,
+              text: botReply,
+              timestamp: Date.now()
+            }
+          ]);
+        }, 1100);
+      }
+    }
   };
 
   const t = translations[lang];
@@ -702,7 +788,30 @@ export const App: React.FC = () => {
   };
 
   // Award match gold coins
+  const recordRecentOpponents = (playerList: Player[]) => {
+    try {
+      const existing: Array<{ name: string; avatarId?: string; date: string }> =
+        JSON.parse(localStorage.getItem('domino_recent_players') || '[]');
+      const newOnes = playerList
+        .filter((_, idx) => idx !== localPlayerIndex)
+        .map((p) => ({
+          name: p.name,
+          avatarId: p.avatarId || 'avatar_tea_master',
+          date: new Date().toLocaleDateString('az-AZ')
+        }));
+      const merged = [
+        ...newOnes,
+        ...existing.filter((e) => !newOnes.some((n) => n.name === e.name))
+      ].slice(0, 10);
+      localStorage.setItem('domino_recent_players', JSON.stringify(merged));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const awardMatchCoins = (userWon: boolean) => {
+    triggerHaptic('success');
+    recordRecentOpponents(players);
     const coinReward = userWon ? 5 : 3;
     handleUpdateStats({
       ...stats,
@@ -787,12 +896,14 @@ export const App: React.FC = () => {
 
     sounds.playTileClack(scored > 0);
     if (scored > 0) {
+      triggerHaptic('medium');
       sounds.playScorePoints(scored);
       setLastScoredPoints({
         playerName: players[playerIndex].name,
         points: scored
       });
     } else {
+      triggerHaptic('light');
       setLastScoredPoints(null);
     }
 
@@ -860,12 +971,14 @@ export const App: React.FC = () => {
     const scored = combo.expectedScore;
     sounds.playTileClack(scored > 0);
     if (scored > 0) {
+      triggerHaptic('medium');
       sounds.playScorePoints(scored);
       setLastScoredPoints({
         playerName: players[playerIndex].name,
         points: scored
       });
     } else {
+      triggerHaptic('light');
       setLastScoredPoints(null);
     }
 
@@ -1275,6 +1388,7 @@ export const App: React.FC = () => {
     setSelectedTile(tile);
     setDraggedTile(tile);
     setDragPosition(point);
+    triggerHaptic('light');
   };
 
   // Global Pointer tracking for Drag and Drop
@@ -1574,20 +1688,21 @@ export const App: React.FC = () => {
               >
                 <AvatarView
                   avatarId={stats.equippedAvatar || DEFAULT_AVATAR_ID}
-                  size={32}
+                  frameId={stats.equippedFrame}
+                  size={34}
                   showBorder={true}
                 />
                 <div className="flex flex-col text-left">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-black text-amber-300 group-hover:text-amber-200">
-                      {PLAYER_AVATARS.find((a) => a.id === stats.equippedAvatar)?.name[lang] || 'Bakı Cənabı'}
+                      {googleUser?.name || 'Siz'}
                     </span>
                     <span className="text-[9px] bg-amber-500/20 text-amber-300 font-bold px-1.5 py-0.2 rounded border border-amber-500/30">
                       Dəyiş
                     </span>
                   </div>
-                  <span className="text-[10px] text-slate-400">
-                    {PLAYER_AVATARS.find((a) => a.id === stats.equippedAvatar)?.title[lang] || 'Profil Şəkli'}
+                  <span className="text-[10px] text-amber-400 font-bold flex items-center gap-1">
+                    {PLAYER_TITLES.find((t) => t.id === stats.equippedTitle)?.icon || '☕'} {PLAYER_TITLES.find((t) => t.id === stats.equippedTitle)?.title[lang] || 'Çayxana Ağsaqqalı'}
                   </span>
                 </div>
               </button>
@@ -1630,7 +1745,7 @@ export const App: React.FC = () => {
               {/* Online Multiplayer Hero Action */}
               <button
                 onClick={() => setShowMultiplayerLobby(true)}
-                className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-[0_0_30px_rgba(20,184,166,0.35)] transition-all flex items-center justify-between group transform hover:-translate-y-0.5 border-2 border-white/40 mb-3"
+                className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-[0_0_30px_rgba(20,184,166,0.35)] transition-all flex items-center justify-between group transform hover:-translate-y-0.5 border-2 border-white/40 mb-2.5"
               >
                 <div className="flex items-center gap-2.5">
                   <div className="p-1.5 bg-slate-950/20 rounded-xl">
@@ -1649,6 +1764,31 @@ export const App: React.FC = () => {
                   Multiplayer
                 </span>
               </button>
+
+              {/* Quick Actions Row: ⚡ Tələsik Oyun (Quick Match) & ☕ Mərc Çayxanaları (Teahouse Stakes) */}
+              <div className="grid grid-cols-2 gap-2 w-full mb-3">
+                <button
+                  onClick={() => {
+                    triggerHaptic('medium');
+                    handleQuickMatch('2p_solo', googleUser?.name || 'Siz');
+                  }}
+                  className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:brightness-110 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition"
+                >
+                  <Sparkles className="w-4 h-4 fill-slate-950" />
+                  <span>⚡ Tələsik Oyun</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setShowTeahousesModal(true);
+                  }}
+                  className="py-2.5 px-3 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-amber-500/40 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition"
+                >
+                  <span className="text-sm">☕</span>
+                  <span>Çayxanalar & Mərclər</span>
+                </button>
+              </div>
 
               {/* Mode Buttons */}
               <div className="w-full space-y-2.5">
@@ -1746,6 +1886,8 @@ export const App: React.FC = () => {
                 lang={lang}
                 roundNumber={effectiveRoundNumber}
                 lastScoredPoints={effectiveLastScored}
+                equippedFrame={stats.equippedFrame}
+                equippedTitle={stats.equippedTitle}
               />
             </div>
 
@@ -1857,11 +1999,18 @@ export const App: React.FC = () => {
             {/* Opponent Hands Indicators (Positioned safely away from the domino line) */}
             {/* 1. In 2P Solo: Single Opponent at TOP CENTER facing player */}
             {effectivePlayers.length === 2 && (() => {
-              const opponent =
-                effectivePlayers.find((_, i) => i !== localPlayerIndex) || effectivePlayers[1];
+              const oppIdx = effectivePlayers.findIndex((_, i) => i !== localPlayerIndex);
+              const opponent = effectivePlayers[oppIdx] || effectivePlayers[1];
               return (
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center">
-                  <div className="flex items-center gap-1.5 mb-1 bg-slate-900/80 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-slate-700/60 shadow">
+                  <div
+                    onClick={() => {
+                      triggerHaptic('light');
+                      if (opponent) setGiftTargetPlayer({ index: oppIdx >= 0 ? oppIdx : 1, name: opponent.name });
+                    }}
+                    className="flex items-center gap-1.5 mb-1 bg-slate-900/80 hover:bg-slate-800/90 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-slate-700/60 shadow cursor-pointer active:scale-95 transition-all group"
+                    title={`${opponent?.name} üçün hədiyyə göndər`}
+                  >
                     <AvatarView
                       avatarId={opponent?.avatarId || 'avatar_tea_master'}
                       size={20}
@@ -1870,6 +2019,7 @@ export const App: React.FC = () => {
                     <span className="text-[11px] font-bold text-slate-300">
                       {opponent?.name} ({opponent?.hand.length} daş)
                     </span>
+                    <span className="text-xs group-hover:scale-125 transition-transform">🎁</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     {opponent?.hand.map((tile, i) => (
@@ -1948,14 +2098,24 @@ export const App: React.FC = () => {
 
             {/* 3. In 4P (Duo or Solo): Partner at Top, Opponents at Upper-Left and Upper-Right */}
             {effectivePlayers.length === 4 && (() => {
-              const topPartner = effectivePlayers[(localPlayerIndex + 2) % 4];
-              const leftOpponent = effectivePlayers[(localPlayerIndex + 1) % 4];
-              const rightOpponent = effectivePlayers[(localPlayerIndex + 3) % 4];
+              const topIdx = (localPlayerIndex + 2) % 4;
+              const leftIdx = (localPlayerIndex + 1) % 4;
+              const rightIdx = (localPlayerIndex + 3) % 4;
+              const topPartner = effectivePlayers[topIdx];
+              const leftOpponent = effectivePlayers[leftIdx];
+              const rightOpponent = effectivePlayers[rightIdx];
               return (
                 <>
                   {/* Top Partner */}
                   <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center">
-                    <div className="flex items-center gap-1.5 mb-1 bg-slate-900/80 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-slate-700/60 shadow">
+                    <div
+                      onClick={() => {
+                        triggerHaptic('light');
+                        if (topPartner) setGiftTargetPlayer({ index: topIdx, name: topPartner.name });
+                      }}
+                      className="flex items-center gap-1.5 mb-1 bg-slate-900/80 hover:bg-slate-800/90 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-slate-700/60 shadow cursor-pointer active:scale-95 transition-all group"
+                      title={`${topPartner?.name} üçün hədiyyə göndər`}
+                    >
                       <AvatarView
                         avatarId={topPartner?.avatarId || 'avatar_sheki_guest'}
                         size={20}
@@ -1964,6 +2124,7 @@ export const App: React.FC = () => {
                       <span className="text-[11px] font-bold text-slate-300">
                         {topPartner?.name} ({topPartner?.hand.length} daş)
                       </span>
+                      <span className="text-xs group-hover:scale-125 transition-transform">🎁</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       {topPartner?.hand.map((tile, i) => (
@@ -1981,7 +2142,14 @@ export const App: React.FC = () => {
 
                   {/* Upper Left Opponent */}
                   <div className="absolute left-3 top-16 z-10 flex flex-col items-center">
-                    <div className="flex items-center gap-1 mb-0.5 bg-slate-900/80 px-2 py-0.5 rounded-full border border-slate-700 shadow">
+                    <div
+                      onClick={() => {
+                        triggerHaptic('light');
+                        if (leftOpponent) setGiftTargetPlayer({ index: leftIdx, name: leftOpponent.name });
+                      }}
+                      className="flex items-center gap-1 mb-0.5 bg-slate-900/80 hover:bg-slate-800/90 px-2 py-0.5 rounded-full border border-slate-700 shadow cursor-pointer active:scale-95 transition-all group"
+                      title={`${leftOpponent?.name} üçün hədiyyə göndər`}
+                    >
                       <AvatarView
                         avatarId={leftOpponent?.avatarId || 'avatar_tea_master'}
                         size={18}
@@ -1990,6 +2158,7 @@ export const App: React.FC = () => {
                       <span className="text-[10px] font-bold text-slate-300">
                         {leftOpponent?.name} ({leftOpponent?.hand.length})
                       </span>
+                      <span className="text-[10px] group-hover:scale-125 transition-transform">🎁</span>
                     </div>
                     <div className="flex flex-col items-center gap-1">
                       {leftOpponent?.hand.map((tile, i) => (
@@ -2007,7 +2176,14 @@ export const App: React.FC = () => {
 
                   {/* Upper Right Opponent */}
                   <div className="absolute right-3 top-16 z-10 flex flex-col items-center">
-                    <div className="flex items-center gap-1 mb-0.5 bg-slate-900/80 px-2 py-0.5 rounded-full border border-slate-700 shadow">
+                    <div
+                      onClick={() => {
+                        triggerHaptic('light');
+                        if (rightOpponent) setGiftTargetPlayer({ index: rightIdx, name: rightOpponent.name });
+                      }}
+                      className="flex items-center gap-1 mb-0.5 bg-slate-900/80 hover:bg-slate-800/90 px-2 py-0.5 rounded-full border border-slate-700 shadow cursor-pointer active:scale-95 transition-all group"
+                      title={`${rightOpponent?.name} üçün hədiyyə göndər`}
+                    >
                       <AvatarView
                         avatarId={rightOpponent?.avatarId || 'avatar_icherisheher_sage'}
                         size={18}
@@ -2016,6 +2192,7 @@ export const App: React.FC = () => {
                       <span className="text-[10px] font-bold text-slate-300">
                         {rightOpponent?.name} ({rightOpponent?.hand.length})
                       </span>
+                      <span className="text-[10px] group-hover:scale-125 transition-transform">🎁</span>
                     </div>
                     <div className="flex flex-col items-center gap-1">
                       {rightOpponent?.hand.map((tile, i) => (
@@ -2054,6 +2231,7 @@ export const App: React.FC = () => {
               <BoardView
                 board={effectiveBoard}
                 skin={activeSkin}
+                tableThemeId={stats.equippedTableTheme || DEFAULT_TABLE_THEME_ID}
                 selectedTile={selectedTile}
                 playableBranches={playableBranches}
                 onSelectBranch={handleSelectBranch}
@@ -2065,17 +2243,29 @@ export const App: React.FC = () => {
               />
             </div>
 
-            {/* Teahouse Chat Overlay during multiplayer match */}
-            {effectiveInMultiplayer && (
-              <TeahouseChatOverlay
-                recentMessages={mpChatMessages}
-                myPlayerIndex={localPlayerIndex}
-                myPlayerName={effectivePlayers[localPlayerIndex]?.name || 'Sən'}
-                onSendChat={(text?: string, emoji?: string) =>
-                  multiplayerSocket.sendChat(text, emoji)
+            {/* Teahouse Chat Overlay during both singleplayer and multiplayer matches */}
+            <TeahouseChatOverlay
+              recentMessages={mpChatMessages}
+              myPlayerIndex={localPlayerIndex}
+              myPlayerName={effectivePlayers[localPlayerIndex]?.name || 'Sən'}
+              onSendChat={(text?: string, emoji?: string) => {
+                if (effectiveInMultiplayer) {
+                  multiplayerSocket.sendChat(text, emoji);
+                } else {
+                  setMpChatMessages((prev) => [
+                    ...prev,
+                    {
+                      id: Date.now().toString(),
+                      senderName: googleUser?.name || 'Sən',
+                      senderIndex: localPlayerIndex,
+                      text,
+                      emoji,
+                      timestamp: Date.now()
+                    }
+                  ]);
                 }
-              />
-            )}
+              }}
+            />
 
             {/* Player Hands & Action Controls (Bottom) */}
             <PlayerControls
@@ -2211,6 +2401,34 @@ export const App: React.FC = () => {
           setShowGuestWarning(true);
           setGuestNoticeDismissed(false);
         }}
+      />
+
+      {/* Interactive Table Gift Projectile & Splatter Overlay */}
+      <TableGiftAnimationOverlay
+        activeAnimation={activeGiftAnimation}
+        onFinished={() => setActiveGiftAnimation(null)}
+        playerCount={effectivePlayers.length}
+      />
+
+      {/* Table Gift Picker Popover */}
+      {giftTargetPlayer && (
+        <TableGiftPicker
+          isOpen={Boolean(giftTargetPlayer)}
+          onClose={() => setGiftTargetPlayer(null)}
+          targetPlayerName={giftTargetPlayer.name}
+          targetPlayerIndex={giftTargetPlayer.index}
+          onSendGift={handleSendTableGift}
+          userCoins={stats.coins}
+          lang={lang}
+        />
+      )}
+
+      {/* Baku Teahouses & Stakes Modal (Novxanı, İçərişəhər, Tarqovı) [Coming Soon] */}
+      <TeahousesModal
+        isOpen={showTeahousesModal}
+        onClose={() => setShowTeahousesModal(false)}
+        lang={lang}
+        userCoins={stats.coins}
       />
     </div>
   );
