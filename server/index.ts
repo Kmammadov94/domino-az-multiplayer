@@ -25,7 +25,13 @@ const distPath = fs.existsSync(path.resolve(__dirname, '../dist'))
   ? path.resolve(process.cwd(), 'dist')
   : path.resolve(__dirname, 'dist');
 
-app.use(express.static(distPath));
+app.use(express.static(distPath, {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+  }
+}));
 
 // Health check endpoint for zero-downtime hosting pings (Render / Koyeb / Railway)
 app.get('/health', (_req, res) => {
@@ -532,6 +538,7 @@ io.on('connection', (socket: Socket) => {
 
 // Single SPA fallback for all other routes
 app.use((_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(distPath, 'index.html'), (err) => {
     if (err) {
       res.status(200).send('Domino PRO API & Realtime Server Running');

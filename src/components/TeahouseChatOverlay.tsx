@@ -33,42 +33,43 @@ export const TeahouseChatOverlay: React.FC<TeahouseChatOverlayProps> = ({
   const [customText, setCustomText] = useState('');
   const [activeTab, setActiveTab] = useState<'chat' | 'phrases'>('chat');
   const [unreadCount, setUnreadCount] = useState(0);
-  const [visibleToasts, setVisibleToasts] = useState<ChatMessage[]>([]);
+  const [activeToast, setActiveToast] = useState<ChatMessage | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const lastSeenMsgIdRef = useRef<string | null>(null);
+  const lastProcessedMsgIdRef = useRef<string | null>(null);
 
-  // Auto-scroll chat history to bottom
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
+  // Auto-scroll chat history to bottom when opened or on new messages
   useEffect(() => {
     if (isOpen) {
-      scrollToBottom();
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       setUnreadCount(0);
-      if (recentMessages.length > 0) {
-        lastSeenMsgIdRef.current = recentMessages[recentMessages.length - 1].id;
-      }
     }
-  }, [isOpen, recentMessages]);
+  }, [isOpen, recentMessages.length]);
 
-  // Track unread messages and temporary floating toasts
+  // Handle incoming messages: unread badge + brief 3.5s toast at top corner
   useEffect(() => {
     if (recentMessages.length === 0) return;
     const latest = recentMessages[recentMessages.length - 1];
 
-    if (!isOpen && latest.id !== lastSeenMsgIdRef.current) {
-      setUnreadCount((prev) => prev + 1);
+    // Avoid duplicate processing of the same message
+    if (latest.id === lastProcessedMsgIdRef.current) return;
+    lastProcessedMsgIdRef.current = latest.id;
+
+    if (!isOpen) {
+      setUnreadCount((c) => c + 1);
     }
 
-    // Show floating toast safely in upper area of table for 5 seconds
-    setVisibleToasts((prev) => [...prev.slice(-2), latest]);
-    const timer = setTimeout(() => {
-      setVisibleToasts((prev) => prev.filter((m) => m.id !== latest.id));
-    }, 5000);
+    // Only show temporary floating toast if the message is fresh (sent within last 12 seconds)
+    const isRecent = Date.now() - latest.timestamp < 12000;
+    if (isRecent) {
+      setActiveToast(latest);
+      const timer = setTimeout(() => {
+        setActiveToast(null);
+      }, 3500); // Automatically disappears after 3.5 seconds!
 
-    return () => clearTimeout(timer);
-  }, [recentMessages.length, isOpen]);
+      return () => clearTimeout(timer);
+    }
+  }, [recentMessages, isOpen]);
 
   const handleSendPhrase = (phrase: string) => {
     onSendChat(phrase);
@@ -98,35 +99,35 @@ export const TeahouseChatOverlay: React.FC<TeahouseChatOverlayProps> = ({
 
   return (
     <>
-      {/* 1. Floating In-Game Toast Notifications:
-          Positioned at TOP-RIGHT, safely away from the domino hand at the bottom!
-          pointer-events-none ensures it NEVER intercepts clicks/touches on tiles or board. */}
-      <div className="absolute top-20 right-3 sm:top-24 sm:right-6 z-30 flex flex-col gap-2 pointer-events-none max-w-[240px] sm:max-w-xs transition-all">
-        {visibleToasts.map((msg) => {
-          const isMe = msg.senderIndex === myPlayerIndex || msg.senderName === myPlayerName;
-          return (
-            <div
-              key={msg.id}
-              className="bg-slate-900/95 border border-amber-400/80 text-white rounded-2xl px-3 py-1.5 shadow-[0_4px_25px_rgba(0,0,0,0.85)] animate-fade-in flex items-center gap-2 pointer-events-none backdrop-blur-md"
+      {/* 1. Brief Floating In-Game Toast Notification:
+          Positioned exclusively at TOP-RIGHT (top-16/top-20), completely away from the bottom domino tiles!
+          pointer-events-none guarantees it NEVER blocks taps or drags on the board.
+          Auto-dismisses in 3.5 seconds. */}
+      {activeToast && (
+        <div className="absolute top-16 right-3 sm:top-20 sm:right-6 z-30 pointer-events-none max-w-[220px] sm:max-w-xs transition-opacity duration-300 animate-fade-in">
+          <div className="bg-slate-900/95 border border-amber-400/90 text-white rounded-2xl px-3 py-1.5 shadow-[0_4px_25px_rgba(0,0,0,0.9)] flex items-center gap-2 backdrop-blur-md">
+            <span
+              className={`text-[11px] font-black truncate max-w-[85px] ${
+                activeToast.senderIndex === myPlayerIndex || activeToast.senderName === myPlayerName
+                  ? 'text-emerald-400'
+                  : 'text-amber-300'
+              }`}
             >
-              <span
-                className={`text-[11px] font-black truncate max-w-[90px] ${
-                  isMe ? 'text-emerald-400' : 'text-amber-300'
-                }`}
-              >
-                {isMe ? 'Sən' : msg.senderName}:
-              </span>
-              <span className="text-xs font-semibold truncate flex-1">
-                {msg.emoji ? (
-                  <span className="text-xl inline-block">{msg.emoji}</span>
-                ) : (
-                  msg.text
-                )}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+              {activeToast.senderIndex === myPlayerIndex || activeToast.senderName === myPlayerName
+                ? 'Sən'
+                : activeToast.senderName}
+              :
+            </span>
+            <span className="text-xs font-semibold truncate flex-1">
+              {activeToast.emoji ? (
+                <span className="text-xl inline-block">{activeToast.emoji}</span>
+              ) : (
+                activeToast.text
+              )}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* 2. Floating Chat Trigger Button:
           Positioned on the side/bottom-left, clear of domino racks */}
