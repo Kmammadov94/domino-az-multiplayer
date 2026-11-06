@@ -36,7 +36,7 @@ interface MultiplayerLobbyModalProps {
   initialRoomCode?: string;
   initialError?: string | null;
   isAutoJoining?: boolean;
-  onCreateRoom: (mode: GameMode, playerName: string, isLocked?: boolean) => Promise<void>;
+  onCreateRoom: (mode: GameMode, playerName: string, isLocked?: boolean, turnDuration?: number) => Promise<void>;
   onJoinRoom: (roomCode: string, playerName: string) => Promise<void>;
   onQuickMatch: (mode: GameMode, playerName: string) => Promise<void>;
   onAddBot: () => Promise<void>;
@@ -69,6 +69,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
   );
   const [selectedMode, setSelectedMode] = useState<GameMode>('2p_solo');
   const [isLocked, setIsLocked] = useState<boolean>(false);
+  const [turnDuration, setTurnDuration] = useState<number>(30); // 30, 60, 120 seconds
   const [roomCodeInput, setRoomCodeInput] = useState(initialRoomCode || '');
   const [playerName, setPlayerName] = useState(() => {
     let saved = '';
@@ -175,7 +176,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     setLoading(true);
     setErrorMsg(null);
     try {
-      await onCreateRoom(selectedMode, nameCheck.sanitizedName, isLocked);
+      await onCreateRoom(selectedMode, nameCheck.sanitizedName, isLocked, turnDuration);
     } catch (e: any) {
       setErrorMsg(e.message || 'Xəta baş verdi');
     } finally {
@@ -345,6 +346,18 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                     <Unlock className="w-3.5 h-3.5" />
                   )}
                   <span>{currentRoom.isLocked ? 'Şəxsi Masa (Kilidli)' : 'Açıq Masa (Hər kəsə)'}</span>
+                </div>
+
+                <div className="bg-slate-800/80 border border-slate-700 rounded-xl px-3.5 py-1.5 text-xs text-slate-300 font-semibold flex items-center gap-1">
+                  <span>⏱</span>
+                  <span>Vaxt:</span>
+                  <span className="text-amber-300 font-bold font-mono">
+                    {currentRoom.turnDuration === 60
+                      ? '1 dəq'
+                      : currentRoom.turnDuration === 120
+                      ? '2 dəq'
+                      : '30 san'}
+                  </span>
                 </div>
               </div>
 
@@ -650,6 +663,56 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                     </div>
                   </div>
 
+                  {/* Turn Duration Selector (Choice of 30 seconds, 1 minute, 2 minutes) */}
+                  <div className="flex flex-col gap-1.5 text-left">
+                    <label className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                      <span>Gediş Vaxtı (Düşünmə vaxtı):</span>
+                      <span className="text-amber-400 font-mono text-[11px] font-bold">
+                        {turnDuration === 30 ? '30 saniyə' : turnDuration === 60 ? '1 dəqiqə' : '2 dəqiqə'}
+                      </span>
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTurnDuration(30)}
+                        className={`py-2 px-1 rounded-xl border flex flex-col items-center gap-0.5 text-center transition ${
+                          turnDuration === 30
+                            ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-bold shadow-[0_0_10px_rgba(251,191,36,0.25)]'
+                            : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:border-slate-600'
+                        }`}
+                      >
+                        <span className="text-xs font-bold">⚡ 30 Saniyə</span>
+                        <span className="text-[9px] text-slate-400">Standart</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setTurnDuration(60)}
+                        className={`py-2 px-1 rounded-xl border flex flex-col items-center gap-0.5 text-center transition ${
+                          turnDuration === 60
+                            ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-bold shadow-[0_0_10px_rgba(251,191,36,0.25)]'
+                            : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:border-slate-600'
+                        }`}
+                      >
+                        <span className="text-xs font-bold">⏱ 1 Dəqiqə</span>
+                        <span className="text-[9px] text-slate-400">Orta</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setTurnDuration(120)}
+                        className={`py-2 px-1 rounded-xl border flex flex-col items-center gap-0.5 text-center transition ${
+                          turnDuration === 120
+                            ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-bold shadow-[0_0_10px_rgba(251,191,36,0.25)]'
+                            : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:border-slate-600'
+                        }`}
+                      >
+                        <span className="text-xs font-bold">⏳ 2 Dəqiqə</span>
+                        <span className="text-[9px] text-slate-400">Rahat</span>
+                      </button>
+                    </div>
+                  </div>
+
                   <button
                     onClick={handleCreate}
                     disabled={loading}
@@ -777,7 +840,11 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                                   <span className="text-amber-400 font-semibold">{modeLabel}</span>
                                   <span>•</span>
                                   <span className="text-emerald-400 font-bold">
-                                    {r.playerCount}/{r.maxPlayers} oyunçu
+                                    {r.playerCount}/{r.maxPlayers}
+                                  </span>
+                                  <span>•</span>
+                                  <span className="text-amber-300 font-mono text-[9px] bg-slate-900/80 px-1 py-0.5 rounded border border-slate-700/60">
+                                    ⏱ {r.turnDuration === 60 ? '1 dəq' : r.turnDuration === 120 ? '2 dəq' : '30s'}
                                   </span>
                                 </div>
                               </div>

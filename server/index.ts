@@ -166,7 +166,8 @@ const getRoomSummary = (room: GameRoom): MultiplayerRoomSummary => ({
   playerCount: room.players.length,
   maxPlayers: room.maxPlayers,
   players: room.players,
-  isLocked: Boolean(room.isLocked)
+  isLocked: Boolean(room.isLocked),
+  turnDuration: room.turnDuration || 30
 });
 
 // Broadcast personalized state to each player in room
@@ -210,7 +211,7 @@ io.on('connection', (socket: Socket) => {
   // 1. Create Room
   socket.on(
     'create_room',
-    (data: { mode: GameMode; playerName: string; skinId: string; avatarId?: string; sessionToken?: string; isLocked?: boolean }, callback) => {
+    (data: { mode: GameMode; playerName: string; skinId: string; avatarId?: string; sessionToken?: string; isLocked?: boolean; turnDuration?: number }, callback) => {
       try {
         const nameValidation = validatePlayerName(data.playerName || 'Oyunçu 1');
         if (!nameValidation.isValid) {
@@ -229,7 +230,8 @@ io.on('connection', (socket: Socket) => {
           () => broadcastRoom(room),
           data.avatarId || 'avatar_baku_classic',
           sessionToken,
-          Boolean(data.isLocked)
+          Boolean(data.isLocked),
+          data.turnDuration || 30
         );
 
         rooms.set(roomCode, room);
@@ -447,7 +449,8 @@ io.on('connection', (socket: Socket) => {
             hostAvatar: hostP?.avatarId || 'avatar_tea_master',
             playerCount: r.players.length,
             maxPlayers: r.maxPlayers,
-            isLocked: Boolean(r.isLocked)
+            isLocked: Boolean(r.isLocked),
+            turnDuration: r.turnDuration || 30
           };
         });
 

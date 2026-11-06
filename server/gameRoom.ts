@@ -39,7 +39,8 @@ export class GameRoom {
 
   public roundNumber: number = 1;
   public currentTurn: number = 0;
-  public turnTimeRemaining: number = 20;
+  public turnDuration: number = 30;
+  public turnTimeRemaining: number = 30;
   public consecutivePasses: number = 0;
   public forcedTile: TileData | null = null;
   public lastScoredPoints: { playerName: string; points: number } | null = null;
@@ -66,11 +67,14 @@ export class GameRoom {
     onStateChange: () => void,
     hostAvatar?: string,
     hostSessionToken?: string,
-    isLocked: boolean = false
+    isLocked: boolean = false,
+    turnDuration: number = 30
   ) {
     this.code = code;
     this.mode = mode;
     this.isLocked = isLocked;
+    this.turnDuration = turnDuration || 30;
+    this.turnTimeRemaining = this.turnDuration;
     this.hostSocketId = hostSocketId;
     this.maxPlayers = mode === '2p_solo' ? 2 : mode === '3p_solo' ? 3 : 4;
     this.onStateChangeCallback = onStateChange;
@@ -658,7 +662,7 @@ export class GameRoom {
 
   private resetTurnTimer(): void {
     this.clearTurnTimer();
-    this.turnTimeRemaining = 20;
+    this.turnTimeRemaining = this.turnDuration || 30;
 
     this.turnTimerInterval = setInterval(() => {
       this.turnTimeRemaining--;
@@ -741,6 +745,7 @@ export class GameRoom {
       roundNumber: this.roundNumber,
       currentTurn: this.currentTurn,
       turnTimeRemaining: this.turnTimeRemaining,
+      turnDuration: this.turnDuration,
       myPlayerIndex,
       myHand,
       forcedTile: this.forcedTile,

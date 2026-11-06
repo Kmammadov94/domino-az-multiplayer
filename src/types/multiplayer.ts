@@ -28,6 +28,7 @@ export interface MultiplayerRoomSummary {
   maxPlayers: number;
   players: MultiplayerPlayerSlot[];
   isLocked?: boolean;
+  turnDuration?: number;
 }
 
 export interface PublicRoomInfo {
@@ -38,6 +39,7 @@ export interface PublicRoomInfo {
   playerCount: number;
   maxPlayers: number;
   isLocked: boolean;
+  turnDuration?: number;
 }
 
 export interface MultiplayerClientGameState {
@@ -47,6 +49,7 @@ export interface MultiplayerClientGameState {
   roundNumber: number;
   currentTurn: number;
   turnTimeRemaining: number;
+  turnDuration?: number;
   myPlayerIndex: number;
   myHand: TileData[];
   forcedTile: TileData | null;

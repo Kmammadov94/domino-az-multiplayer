@@ -98,7 +98,8 @@ class MultiplayerSocketService {
     skinId: string,
     avatarId?: string,
     sessionToken?: string,
-    isLocked?: boolean
+    isLocked?: boolean,
+    turnDuration?: number
   ): Promise<{
     success: boolean;
     roomCode?: string;
@@ -108,7 +109,7 @@ class MultiplayerSocketService {
     summary?: MultiplayerRoomSummary;
     error?: string;
   }> {
-    return this.emitWithTimeout('create_room', { mode, playerName, skinId, avatarId, sessionToken, isLocked });
+    return this.emitWithTimeout('create_room', { mode, playerName, skinId, avatarId, sessionToken, isLocked, turnDuration });
   }
 
   public getPublicRooms(): Promise<{

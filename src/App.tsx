@@ -340,14 +340,20 @@ export const App: React.FC = () => {
     }
   }, [isMultiplayer, mpGameState?.handRevealed, mpGameState?.roundNumber]);
 
-  const handleCreateRoom = async (roomMode: GameMode, playerName: string, isLocked?: boolean) => {
+  const handleCreateRoom = async (
+    roomMode: GameMode,
+    playerName: string,
+    isLocked?: boolean,
+    turnDuration?: number
+  ) => {
     const res = await multiplayerSocket.createRoom(
       roomMode,
       playerName,
       stats.equippedSkin,
       stats.equippedAvatar || DEFAULT_AVATAR_ID,
       undefined,
-      isLocked
+      isLocked,
+      turnDuration
     );
     if (!res.success) {
       throw new Error(res.error || 'Otaq yaradıla bilmədi');
