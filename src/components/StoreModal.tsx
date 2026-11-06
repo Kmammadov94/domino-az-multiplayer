@@ -216,9 +216,9 @@ export const StoreModal: React.FC<StoreModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-      <div className="bg-slate-900 border-2 border-amber-500/40 rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+      <div className="bg-slate-900 border-2 border-amber-500/40 rounded-3xl w-full max-w-4xl h-[88vh] max-h-[780px] flex flex-col shadow-2xl overflow-hidden min-h-0">
         {/* Top Header */}
-        <div className="p-3 sm:p-4 bg-gradient-to-r from-amber-950/70 via-slate-900 to-amber-950/70 border-b border-amber-500/20 flex items-center justify-between">
+        <div className="p-3 sm:p-4 flex-shrink-0 bg-gradient-to-r from-amber-950/70 via-slate-900 to-amber-950/70 border-b border-amber-500/20 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="p-2 bg-amber-500/20 rounded-xl border border-amber-500/30">
               <ShoppingBag className="w-5 h-5 text-amber-400" />
@@ -252,10 +252,10 @@ export const StoreModal: React.FC<StoreModalProps> = ({
         </div>
 
         {/* Primary Store Tab Switcher (5 Tabs: Skins, Avatars, Frames, Titles, Tables) */}
-        <div className="grid grid-cols-5 p-1.5 bg-slate-950 border-b border-slate-800 gap-1.5 overflow-x-auto text-[11px] sm:text-xs">
+        <div className="grid grid-cols-5 p-1.5 flex-shrink-0 bg-slate-950 border-b border-slate-800 gap-1 sm:gap-1.5 text-[11px] sm:text-xs">
           <button
             onClick={() => setStoreTab('skins')}
-            className={`py-2 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-2 px-1 sm:px-2 rounded-xl font-bold flex items-center justify-center gap-1 sm:gap-1.5 transition-all min-w-0 ${
               storeTab === 'skins'
                 ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md font-black'
                 : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
@@ -267,7 +267,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
 
           <button
             onClick={() => setStoreTab('avatars')}
-            className={`py-2 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-2 px-1 sm:px-2 rounded-xl font-bold flex items-center justify-center gap-1 sm:gap-1.5 transition-all min-w-0 ${
               storeTab === 'avatars'
                 ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-md font-black'
                 : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
@@ -279,7 +279,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
 
           <button
             onClick={() => setStoreTab('frames')}
-            className={`py-2 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-2 px-1 sm:px-2 rounded-xl font-bold flex items-center justify-center gap-1 sm:gap-1.5 transition-all min-w-0 ${
               storeTab === 'frames'
                 ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-md font-black'
                 : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
@@ -291,7 +291,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
 
           <button
             onClick={() => setStoreTab('titles')}
-            className={`py-2 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-2 px-1 sm:px-2 rounded-xl font-bold flex items-center justify-center gap-1 sm:gap-1.5 transition-all min-w-0 ${
               storeTab === 'titles'
                 ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-slate-950 shadow-md font-black'
                 : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
@@ -303,7 +303,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
 
           <button
             onClick={() => setStoreTab('tables')}
-            className={`py-2 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-2 px-1 sm:px-2 rounded-xl font-bold flex items-center justify-center gap-1 sm:gap-1.5 transition-all min-w-0 ${
               storeTab === 'tables'
                 ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-slate-950 shadow-md font-black'
                 : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
@@ -316,7 +316,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
 
         {/* Feedback message banner */}
         {feedback && (
-          <div className="bg-rose-500/20 border-b border-rose-500/40 px-4 py-2 text-center text-xs sm:text-sm font-semibold text-rose-300 animate-fade-in">
+          <div className="flex-shrink-0 bg-rose-500/20 border-b border-rose-500/40 px-4 py-2 text-center text-xs sm:text-sm font-semibold text-rose-300 animate-fade-in">
             {feedback}
           </div>
         )}
@@ -325,9 +325,9 @@ export const StoreModal: React.FC<StoreModalProps> = ({
         {/* TAB 1: DOMINO SKINS STORE                               */}
         {/* ======================================================== */}
         {storeTab === 'skins' && (
-          <>
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
             {/* Category Tabs */}
-            <div className="flex items-center gap-2 p-2.5 bg-slate-950/70 border-b border-slate-800/80 overflow-x-auto">
+            <div className="flex-shrink-0 flex items-center gap-2 p-2.5 bg-slate-950/70 border-b border-slate-800/80 overflow-x-auto no-scrollbar">
               {skinCategories.map((c) => (
                 <button
                   key={c.id}
@@ -344,7 +344,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             </div>
 
             {/* Skins Grid */}
-            <div className="flex-1 overflow-y-auto p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
+            <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
               {filteredSkins.map((skin) => {
                 const isUnlocked = stats.unlockedSkins.includes(skin.id) || !!skin.unlockedByDefault;
                 const isEquipped = stats.equippedSkin === skin.id;
@@ -422,16 +422,16 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                 );
               })}
             </div>
-          </>
+          </div>
         )}
 
         {/* ======================================================== */}
         {/* TAB 2: PROFILE PICTURES (AVATARS) STORE                  */}
         {/* ======================================================== */}
         {storeTab === 'avatars' && (
-          <>
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
             {/* Category Tabs */}
-            <div className="flex items-center gap-2 p-2.5 bg-slate-950/70 border-b border-slate-800/80 overflow-x-auto">
+            <div className="flex-shrink-0 flex items-center gap-2 p-2.5 bg-slate-950/70 border-b border-slate-800/80 overflow-x-auto no-scrollbar">
               {avatarCategories.map((c) => (
                 <button
                   key={c.id}
@@ -448,7 +448,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             </div>
 
             {/* Avatars Grid - Pictures Only */}
-            <div className="flex-1 overflow-y-auto p-3 sm:p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               {filteredAvatars.map((avatar) => {
                 const isUnlocked = currentUnlockedAvatars.includes(avatar.id);
                 const isEquipped = currentEquippedAvatar === avatar.id;
@@ -532,12 +532,12 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                 );
               })}
             </div>
-          </>
+          </div>
         )}
 
         {/* 3. Avatar Frames Tab */}
         {storeTab === 'frames' && (
-          <div className="flex-1 overflow-y-auto p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {AVATAR_FRAMES.map((frame) => {
               const isEquipped = currentEquippedFrame === frame.id;
               const isUnlocked = currentUnlockedFrames.includes(frame.id) || frame.price === 0;
@@ -603,7 +603,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
 
         {/* 4. Player Titles Tab */}
         {storeTab === 'titles' && (
-          <div className="flex-1 overflow-y-auto p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
             {PLAYER_TITLES.map((title) => {
               const isEquipped = currentEquippedTitle === title.id;
               const isUnlocked = currentUnlockedTitles.includes(title.id) || title.price === 0;
@@ -665,7 +665,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
 
         {/* 5. Table Themes Tab */}
         {storeTab === 'tables' && (
-          <div className="flex-1 overflow-y-auto p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {TABLE_THEMES.map((theme) => {
               const isEquipped = currentEquippedTable === theme.id;
 
