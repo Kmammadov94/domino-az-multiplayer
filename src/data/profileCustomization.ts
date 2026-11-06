@@ -121,6 +121,20 @@ export const PLAYER_TITLES: PlayerTitle[] = [
     price: 1200,
     badgeColor: 'bg-amber-500/30 text-amber-200 border-amber-400 shadow-sm',
     icon: '🦁'
+  },
+  {
+    id: 'title_six_table',
+    title: { az: 'Altılı Masa', ru: 'Шестиместный Стол', en: 'The Six-Table' },
+    price: 450,
+    badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40',
+    icon: '🏛️'
+  },
+  {
+    id: 'title_shesh_nemesis',
+    title: { az: 'Şeşin Qənimi', ru: 'Гроза Шестёрок', en: 'Nemesis of Sixes' },
+    price: 750,
+    badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/40 shadow-sm',
+    icon: '⚡'
   }
 ];
 
