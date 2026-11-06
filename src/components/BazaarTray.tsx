@@ -5,7 +5,8 @@ import { DominoTile } from './DominoTile';
 import { Layers, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface BazaarTrayProps {
-  boneyard: TileData[];
+  boneyard?: TileData[];
+  count?: number;
   skin: DominoSkin;
   isMyTurn: boolean;
   canDraw: boolean;
@@ -15,6 +16,7 @@ interface BazaarTrayProps {
 
 export const BazaarTray: React.FC<BazaarTrayProps> = ({
   boneyard,
+  count,
   skin,
   isMyTurn,
   canDraw,
@@ -30,8 +32,20 @@ export const BazaarTray: React.FC<BazaarTrayProps> = ({
     }
   }, [canDraw]);
 
-  if (!boneyard || boneyard.length === 0) return null;
+  const totalCount = typeof count === 'number' ? count : (boneyard?.length ?? 0);
+  if (totalCount === 0) return null;
+
   const t = translations[lang];
+
+  // Visual tiles array (uses real boneyard in singleplayer, or generated facedown tiles in multiplayer)
+  const displayTiles: TileData[] =
+    boneyard && boneyard.length > 0
+      ? boneyard
+      : Array.from({ length: totalCount }, (_, i) => ({
+          id: `mp-bz-${i}`,
+          left: 0,
+          right: 0
+        }));
 
   return (
     <div
@@ -52,7 +66,7 @@ export const BazaarTray: React.FC<BazaarTrayProps> = ({
         </div>
         <div className="flex items-center gap-1">
           <span className="text-[11px] font-black bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30">
-            {boneyard.length}
+            {totalCount}
           </span>
           {isExpanded ? (
             <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
@@ -75,7 +89,7 @@ export const BazaarTray: React.FC<BazaarTrayProps> = ({
 
           {/* Visual Spread of Facedown Domino Tiles in Bazaar */}
           <div className="grid grid-cols-2 gap-1.5 max-h-[220px] overflow-y-auto pr-1 scrollbar-thin">
-            {boneyard.map((tile, idx) => (
+            {displayTiles.map((tile, idx) => (
               <div
                 key={tile.id || idx}
                 onClick={() => {

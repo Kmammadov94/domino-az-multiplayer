@@ -1940,6 +1940,7 @@ export const App: React.FC = () => {
               <div className="absolute right-3 top-2 z-20 pointer-events-auto">
                 <BazaarTray
                   boneyard={boneyard}
+                  count={effectiveBoneyardCount}
                   skin={activeSkin}
                   isMyTurn={isMyTurn}
                   canDraw={isMyTurn && !humanHasPlayableMove && effectiveBoneyardCount > 0}
