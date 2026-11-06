@@ -158,7 +158,6 @@ export const App: React.FC = () => {
   const [handBonusPoints, setHandBonusPoints] = useState<number>(0);
   const [isMatchOver, setIsMatchOver] = useState<boolean>(false);
   const [isInstant35, setIsInstant35] = useState<boolean>(false);
-  const [allowDoubleCombo, setAllowDoubleCombo] = useState<boolean>(true);
   const [reshuffleNotice, setReshuffleNotice] = useState<string | null>(null);
 
   // 101 Game Mode State
@@ -166,6 +165,9 @@ export const App: React.FC = () => {
   const [match101State, setMatch101State] = useState<Match101State>(createInitial101State);
   const [is101Seka, setIs101Seka] = useState<boolean>(false);
   const [is101AyazCaught, setIs101AyazCaught] = useState<boolean>(false);
+
+  // In Telefon 365, Double Combo is a permanent default rule; in 101 mode it never exists.
+  const allowDoubleCombo = gameVariant === '365';
 
   // Multiplayer State
   const [showMultiplayerLobby, setShowMultiplayerLobby] = useState<boolean>(false);
@@ -2015,26 +2017,6 @@ export const App: React.FC = () => {
             <BookOpen className="w-4 h-4 text-sky-400" />
           </button>
 
-          {/* Double Combo Option Toggle in Navbar */}
-          <button
-            onClick={() => setAllowDoubleCombo(!allowDoubleCombo)}
-            title={`${t.doubleCombo}: ${allowDoubleCombo ? 'Aktiv' : 'Deaktiv'}`}
-            className={`px-2 py-1 rounded-lg border text-xs font-bold transition flex items-center gap-1 ${
-              allowDoubleCombo
-                ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-sm'
-                : 'bg-slate-800 border-slate-700 text-slate-500'
-            }`}
-          >
-            <Sparkles
-              className={`w-3.5 h-3.5 ${
-                allowDoubleCombo ? 'text-amber-400' : 'text-slate-500'
-              }`}
-            />
-            <span className="hidden sm:inline text-[11px]">
-              {t.doubleCombo}
-            </span>
-          </button>
-
           {/* Sound Toggle */}
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
@@ -2411,39 +2393,6 @@ export const App: React.FC = () => {
                     </button>
                   </>
                 )}
-              </div>
-
-              {/* Double Combo Rule Toggle in Lobby */}
-              <div
-                onClick={() => setAllowDoubleCombo(!allowDoubleCombo)}
-                className="w-full mt-3 p-3 rounded-2xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 cursor-pointer flex items-center justify-between text-xs transition select-none"
-              >
-                <div className="flex items-center gap-2.5 text-left">
-                  <Sparkles
-                    className={`w-4 h-4 flex-shrink-0 ${
-                      allowDoubleCombo ? 'text-amber-400' : 'text-slate-500'
-                    }`}
-                  />
-                  <div>
-                    <span className="font-bold text-slate-200 block">
-                      {t.doubleComboRule}
-                    </span>
-                    <span className="text-[10px] text-slate-400 block leading-tight">
-                      {t.doubleComboDesc}
-                    </span>
-                  </div>
-                </div>
-                <div
-                  className={`w-10 h-5 rounded-full p-0.5 flex-shrink-0 transition-colors ${
-                    allowDoubleCombo ? 'bg-amber-500' : 'bg-slate-700'
-                  }`}
-                >
-                  <div
-                    className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                      allowDoubleCombo ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </div>
               </div>
 
               {/* Equipped Skin Pill */}
