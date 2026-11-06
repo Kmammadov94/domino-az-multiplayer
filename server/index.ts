@@ -68,7 +68,22 @@ const saveUserDatabase = (db: Record<string, any>): void => {
   }
 };
 
+// Special VIP / Creator coin grants
+const VIP_ACCOUNTS: Record<string, number> = {
+  'karammammadov.94@gmail.com': 10000
+};
+
 let userDatabase = loadUserDatabase();
+
+// Ensure existing VIP accounts in database have their granted coins
+for (const record of Object.values(userDatabase)) {
+  const uEmail = (record?.profile?.email || '').toLowerCase().trim();
+  if (VIP_ACCOUNTS[uEmail]) {
+    if (!record.stats) record.stats = {};
+    record.stats.coins = Math.max(record.stats.coins || 0, VIP_ACCOUNTS[uEmail]);
+  }
+}
+saveUserDatabase(userDatabase);
 
 // Sync user stats endpoint
 app.post('/api/user-stats', (req, res) => {
@@ -86,6 +101,12 @@ app.post('/api/user-stats', (req, res) => {
   let finalCoins = typeof stats?.coins === 'number' ? Math.max(0, stats.coins) : (existingStats.coins ?? 20);
   if (isInitialLogin && existingStats.coins !== undefined) {
     finalCoins = Math.max(existingStats.coins, finalCoins);
+  }
+
+  // Grant VIP coins if applicable
+  const normalizedEmail = (email || existing.profile?.email || '').toLowerCase().trim();
+  if (VIP_ACCOUNTS[normalizedEmail]) {
+    finalCoins = Math.max(finalCoins, VIP_ACCOUNTS[normalizedEmail]);
   }
 
   // Merge stats intelligently (union of unlocked cosmetics, max streak, etc.)

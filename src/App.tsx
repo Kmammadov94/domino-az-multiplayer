@@ -674,6 +674,18 @@ export const App: React.FC = () => {
     }
   }, [googleUser?.googleId]);
 
+  // Special VIP account coin grant for karammammadov.94@gmail.com
+  useEffect(() => {
+    if (googleUser && googleUser.email?.toLowerCase().trim() === 'karammammadov.94@gmail.com') {
+      if (stats.coins < 10000) {
+        handleUpdateStats({
+          ...stats,
+          coins: 10000
+        });
+      }
+    }
+  }, [googleUser?.email, stats.coins]);
+
   // Persist stats whenever changed (and auto-sync with cloud if signed in)
   const handleUpdateStats = (newStats: PlayerStats) => {
     setStats(newStats);

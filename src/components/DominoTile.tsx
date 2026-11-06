@@ -63,7 +63,7 @@ export const DominoTile: React.FC<DominoTileProps> = ({
         }}
         className={`relative rounded-lg border-2 cursor-pointer transition-transform duration-200 select-none overflow-hidden ${className}`}
       >
-        {skin.isFlagSkin && (
+        {skin.isFlagSkin ? (
           <div className="absolute inset-0 flex flex-col pointer-events-none">
             {skin.flagType === 'ukraine' ? (
               <>
@@ -78,7 +78,13 @@ export const DominoTile: React.FC<DominoTileProps> = ({
               </>
             )}
           </div>
-        )}
+        ) : skin.stripes && skin.stripes.length > 0 ? (
+          <div className="absolute inset-0 flex flex-row pointer-events-none rounded-md overflow-hidden z-0">
+            {skin.stripes.map((color, idx) => (
+              <div key={idx} className="flex-1 h-full" style={{ backgroundColor: color }} />
+            ))}
+          </div>
+        ) : null}
         <div className="absolute inset-1.5 rounded border border-dashed border-white/25 flex items-center justify-center opacity-45 z-10">
           <div
             className="w-2.5 h-2.5 rounded-full shadow-inner"
@@ -152,8 +158,8 @@ export const DominoTile: React.FC<DominoTileProps> = ({
         isPlayable ? 'hover:-translate-y-1.5 hover:brightness-105' : ''
       } ${isSelected ? '-translate-y-3' : ''} ${className}`}
     >
-      {/* Background layer for Flag skin */}
-      {skin.isFlagSkin && (
+      {/* Background layer for Flag skin or Striped skin */}
+      {skin.isFlagSkin ? (
         skin.flagType === 'ukraine' ? (
           <div className="absolute inset-0 flex flex-col pointer-events-none rounded-md overflow-hidden z-0">
             <div className="h-1/2 w-full bg-[#0057b7]" />
@@ -191,7 +197,15 @@ export const DominoTile: React.FC<DominoTileProps> = ({
             <div className={isVertical ? "h-1/3 w-full bg-[#009739]" : "w-1/3 h-full bg-[#009739]"} />
           </div>
         )
-      )}
+      ) : skin.stripes && skin.stripes.length > 0 ? (
+        <div className={`absolute inset-0 flex pointer-events-none rounded-md overflow-hidden z-0 ${
+          isVertical ? 'flex-row' : 'flex-col'
+        }`}>
+          {skin.stripes.map((color, idx) => (
+            <div key={idx} className="flex-1 h-full w-full" style={{ backgroundColor: color }} />
+          ))}
+        </div>
+      ) : null}
 
       {/* Half 1 */}
       <div className="flex-1 flex items-center justify-center relative overflow-hidden z-10">

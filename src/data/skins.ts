@@ -155,22 +155,22 @@ export const DOMINO_SKINS: DominoSkin[] = [
     isFlagSkin: true,
     flagType: 'azerbaijan'
   },
-  // 8. Ukraine National Flag Skin (Ukrayna Bayrağı)
+  // 8. Blue & Yellow Duotone Skin (Mavi & Sarı)
   {
     id: 'ukraine_flag',
     name: {
-      az: 'Ukrayna Bayrağı',
-      ru: 'Флаг Украины',
-      en: 'Ukraine Flag'
+      az: 'Mavi & Sarı',
+      ru: 'Синий и Жёлтый',
+      en: 'Blue & Yellow'
     },
     desc: {
-      az: 'Göy səma və bərəkətli sarı buğda zəmilərinin rəmzi olan Ukrayna bayrağı.',
-      ru: 'Символ синего неба и золотых пшеничных полей — флаг Украины.',
-      en: 'Vibrant blue sky and golden wheat fields — Ukraine national flag.'
+      az: 'Göy səma və parlaq sarı rənglərin ahəngi olan xüsusi dəst.',
+      ru: 'Гармония ярко-синего и золотисто-жёлтого цветов.',
+      en: 'Harmony of deep sky blue and golden yellow colors.'
     },
     price: 0,
     unlockedByDefault: true,
-    category: 'baku',
+    category: 'modern',
     bgGradient: 'from-blue-600 via-sky-500 to-yellow-400',
     tileFace: '#0057b7',
     tileBorder: '#0f172a',
@@ -612,5 +612,238 @@ export const DOMINO_SKINS: DominoSkin[] = [
     pipColor: '#10b981',
     spinnerColor: '#fef08a',
     glowEffect: '0 0 16px rgba(16, 185, 129, 0.6)'
+  },
+  // ==========================================
+  // ARENA & DUAL-COLOR STRIKER SKINS
+  // ==========================================
+  // 27. Crimson & Amber (Sarı & Qırmızı)
+  {
+    id: 'skin_amber_crimson',
+    name: {
+      az: 'Al-Qırmızı & Kəhrəba',
+      ru: 'Ало-Красный и Янтарь',
+      en: 'Crimson & Amber'
+    },
+    desc: {
+      az: 'Alovlu al-qırmızı və parlaq qızılı kəhrəba zolaqlarının ehtiraslı harmoniyası.',
+      ru: 'Страстное сочетание огненно-красного и золотистого янтаря.',
+      en: 'Fiery crimson and golden amber stripes with intense energy.'
+    },
+    price: 400,
+    category: 'modern',
+    bgGradient: 'from-red-600 via-amber-500 to-yellow-500',
+    tileFace: '#a90432',
+    tileBorder: '#3b0710',
+    pipColor: '#ffffff',
+    spinnerColor: '#fdb912',
+    glowEffect: '0 0 14px rgba(253, 185, 18, 0.5)',
+    stripes: ['#a90432', '#fdb912']
+  },
+  // 28. Navy & Canary (Sarı & Lacivərd)
+  {
+    id: 'skin_navy_canary',
+    name: {
+      az: 'Gecə Mavisi & Parlaq Sarı',
+      ru: 'Тёмно-Синий и Ярко-Жёлтый',
+      en: 'Midnight Navy & Canary'
+    },
+    desc: {
+      az: 'Dərin lacivərd gecə mavisi ilə parıldayan sarının əzəmətli zolaqları.',
+      ru: 'Величественные полосы полуночно-синего и сияющего жёлтого.',
+      en: 'Noble navy blue paired with vibrant sunny yellow stripes.'
+    },
+    price: 400,
+    category: 'modern',
+    bgGradient: 'from-blue-900 via-indigo-900 to-yellow-400',
+    tileFace: '#002d72',
+    tileBorder: '#0f172a',
+    pipColor: '#ffffff',
+    spinnerColor: '#fed100',
+    glowEffect: '0 0 14px rgba(254, 209, 0, 0.5)',
+    stripes: ['#002d72', '#fed100']
+  },
+  // 29. Black & White Stripes (Qara & Ağ Qartal)
+  {
+    id: 'skin_black_white_stripes',
+    name: {
+      az: 'Qara & Bəyaz Zolaqlar',
+      ru: 'Чёрно-Белые Полосы',
+      en: 'Black & White Stripes'
+    },
+    desc: {
+      az: 'Klassik qara və xalis ağ şaquli zolaqlar, möhtəşəm qartal kontrastı.',
+      ru: 'Классические чёрно-белые полосы с орлиным контрастом.',
+      en: 'Classic black and pure white vertical stripes with eagle contrast.'
+    },
+    price: 350,
+    category: 'modern',
+    bgGradient: 'from-zinc-900 via-slate-700 to-white',
+    tileFace: '#111111',
+    tileBorder: '#000000',
+    pipColor: '#e11d48',
+    spinnerColor: '#e11d48',
+    glowEffect: '0 0 14px rgba(255, 255, 255, 0.45)',
+    stripes: ['#111111', '#ffffff', '#111111']
+  },
+  // 30. Bordeaux & Sky Blue (Bordo & Mavi Dalğa)
+  {
+    id: 'skin_bordeaux_sky',
+    name: {
+      az: 'Tünd Bordo & Dəniz Mavisi',
+      ru: 'Бордо и Морская Лазурь',
+      en: 'Bordeaux & Sky Blue'
+    },
+    desc: {
+      az: 'Fırtınalı dəniz mavisi ilə dərin tünd bordonun füsunkar qovuşması.',
+      ru: 'Глубокий бордовый и штормовая морская лазурь.',
+      en: 'Deep bordeaux blended with stormy sea azure stripes.'
+    },
+    price: 350,
+    category: 'modern',
+    bgGradient: 'from-rose-950 via-sky-600 to-rose-900',
+    tileFace: '#670020',
+    tileBorder: '#1e1018',
+    pipColor: '#ffffff',
+    spinnerColor: '#1c95d4',
+    glowEffect: '0 0 14px rgba(28, 149, 212, 0.45)',
+    stripes: ['#670020', '#1c95d4']
+  },
+  // 31. Azure & Garnet (Katalon Göyü & Qranat)
+  {
+    id: 'skin_catalan_duo',
+    name: {
+      az: 'Katalon Göyü & Qranat',
+      ru: 'Лазурно-Гранатовый',
+      en: 'Azure & Deep Garnet'
+    },
+    desc: {
+      az: 'Klassik tünd göy və dərin qranat-qırmızı zolaqların əfsanəvi naxışı.',
+      ru: 'Легендарные полосы глубокого синего и насыщенного граната.',
+      en: 'Legendary deep royal navy and rich garnet vertical stripes.'
+    },
+    price: 450,
+    category: 'modern',
+    bgGradient: 'from-blue-900 via-rose-900 to-amber-500',
+    tileFace: '#004d98',
+    tileBorder: '#0d1730',
+    pipColor: '#edbb00',
+    spinnerColor: '#edbb00',
+    glowEffect: '0 0 14px rgba(237, 187, 0, 0.5)',
+    stripes: ['#004d98', '#a50044', '#004d98']
+  },
+  // 32. Royal Pearl & Gold (Kral Bəyazı & Qızılı)
+  {
+    id: 'skin_royal_merengue',
+    name: {
+      az: 'Kral Bəyazı & Qızılı Tac',
+      ru: 'Королевский Белый и Золото',
+      en: 'Royal Pearl & Gold'
+    },
+    desc: {
+      az: 'Mərmər xalis bəyaz zəmin üzərində zərif qızılı və bənövşəyi kral xətləri.',
+      ru: 'Белоснежная мраморная основа с благородными золотыми и пурпурными акцентами.',
+      en: 'Pristine royal pearl white with noble gold and subtle violet trims.'
+    },
+    price: 500,
+    category: 'luxury',
+    bgGradient: 'from-slate-100 via-amber-100 to-indigo-100',
+    tileFace: '#ffffff',
+    tileBorder: '#d97706',
+    pipColor: '#4f46e5',
+    spinnerColor: '#f59e0b',
+    glowEffect: '0 0 16px rgba(245, 158, 11, 0.55)',
+    stripes: ['#ffffff', '#f1f5f9', '#ffffff']
+  },
+  // 33. Black Onyx & Silver Steed (Qara Cövhər & Gümüş Bəyaz - Qarabağ)
+  {
+    id: 'skin_karabakh_steed',
+    name: {
+      az: 'Qara Cövhər & Gümüş Bəyaz',
+      ru: 'Чёрный Жемчуг и Серебро',
+      en: 'Black Onyx & Silver Crest'
+    },
+    desc: {
+      az: 'Qafqazın məğrur qara kəhər atlarının və gümüşü ağ qələbənin zolaqları.',
+      ru: 'Символ гордости: благородные чёрные и серебристо-белые полосы.',
+      en: 'Proud black onyx and silver white stripes of indomitable spirit.'
+    },
+    price: 450,
+    category: 'baku',
+    bgGradient: 'from-zinc-950 via-slate-800 to-white',
+    tileFace: '#09090b',
+    tileBorder: '#e2e8f0',
+    pipColor: '#e2e8f0',
+    spinnerColor: '#fbbf24',
+    glowEffect: '0 0 15px rgba(251, 191, 36, 0.45)',
+    stripes: ['#09090b', '#ffffff', '#09090b']
+  },
+  // 34. Ocean Navy & Neon Magenta (Göy Okean & Neon Çəhrayı - Sabah)
+  {
+    id: 'skin_neon_pink_blue',
+    name: {
+      az: 'Göy Okean & Neon Çəhrayı',
+      ru: 'Синий Океан и Неон-Розовый',
+      en: 'Ocean Blue & Neon Magenta'
+    },
+    desc: {
+      az: 'Müasir dəniz mavisi ilə parlaq neon çəhrayı xətlərin dinamik vəhdəti.',
+      ru: 'Динамичное сочетание глубокого синего и неоново-розового цветов.',
+      en: 'Modern ocean navy with striking neon magenta and pink accents.'
+    },
+    price: 400,
+    category: 'modern',
+    bgGradient: 'from-blue-900 via-pink-600 to-fuchsia-500',
+    tileFace: '#1e3a8a',
+    tileBorder: '#be185d',
+    pipColor: '#ffffff',
+    spinnerColor: '#ec4899',
+    glowEffect: '0 0 15px rgba(236, 72, 153, 0.5)',
+    stripes: ['#1e3a8a', '#ec4899']
+  },
+  // 35. Charcoal & Scarlet (Qara Kömür & Al Alov - Milan)
+  {
+    id: 'skin_rosso_nero',
+    name: {
+      az: 'Qara Kömür & Al Alov',
+      ru: 'Чёрный Уголь и Алое Пламя',
+      en: 'Charcoal & Scarlet'
+    },
+    desc: {
+      az: 'Qara kömür və qızmar qırmızı zolaqların cəsarətli kontrastı.',
+      ru: 'Смелый контраст глубокого чёрного и пламенно-красного.',
+      en: 'Bold vertical stripes of deep charcoal black and scarlet red.'
+    },
+    price: 350,
+    category: 'modern',
+    bgGradient: 'from-black via-red-900 to-red-600',
+    tileFace: '#111111',
+    tileBorder: '#450a0a',
+    pipColor: '#ffffff',
+    spinnerColor: '#dc2626',
+    glowEffect: '0 0 14px rgba(220, 38, 38, 0.45)',
+    stripes: ['#111111', '#dc2626', '#111111']
+  },
+  // 36. Black Granite & Sapphire (Qara Qranit & Safir Göyü - Inter)
+  {
+    id: 'skin_nerazzurri',
+    name: {
+      az: 'Qara Qranit & Safir Göyü',
+      ru: 'Чёрный Гранит и Сапфир',
+      en: 'Black Granite & Sapphire'
+    },
+    desc: {
+      az: 'Qara qranit və parlaq safir mavisi zolaqların klassik harmoniyası.',
+      ru: 'Классическая гармония чёрного гранита и сапфирового синего.',
+      en: 'Classic harmony of granite black and brilliant sapphire blue.'
+    },
+    price: 350,
+    category: 'modern',
+    bgGradient: 'from-black via-blue-900 to-sky-500',
+    tileFace: '#0a0a0a',
+    tileBorder: '#0369a1',
+    pipColor: '#f8fafc',
+    spinnerColor: '#f59e0b',
+    glowEffect: '0 0 14px rgba(2, 132, 199, 0.45)',
+    stripes: ['#0a0a0a', '#0284c7', '#0a0a0a']
   }
 ];
