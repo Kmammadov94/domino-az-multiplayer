@@ -676,17 +676,21 @@ export const App: React.FC = () => {
     }
   }, [googleUser?.googleId]);
 
-  // Special VIP account coin grant for karammammadov.94@gmail.com
+  // Special VIP account one-time coin grant for karammammadov.94@gmail.com
   useEffect(() => {
     if (googleUser && googleUser.email?.toLowerCase().trim() === 'karammammadov.94@gmail.com') {
-      if (stats.coins < 10000) {
+      const grantKey = 'domino_vip_10k_granted_' + (googleUser.googleId || 'vip');
+      if (!localStorage.getItem(grantKey)) {
+        localStorage.setItem(grantKey, 'true');
+        // Grant +10,000 coins once without locking the balance
+        const updatedCoins = (stats.coins || 0) + 10000;
         handleUpdateStats({
           ...stats,
-          coins: 10000
+          coins: updatedCoins
         });
       }
     }
-  }, [googleUser?.email, stats.coins]);
+  }, [googleUser?.email, googleUser?.googleId]);
 
   // Persist stats whenever changed (and auto-sync with cloud if signed in)
   const handleUpdateStats = (newStats: PlayerStats) => {
