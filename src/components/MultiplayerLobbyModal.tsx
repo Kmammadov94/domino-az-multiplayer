@@ -32,6 +32,10 @@ interface MultiplayerLobbyModalProps {
   currentRoom: MultiplayerRoomSummary | null;
   myPlayerIndex: number;
   isHost: boolean;
+  defaultPlayerName?: string;
+  initialRoomCode?: string;
+  initialError?: string | null;
+  isAutoJoining?: boolean;
   onCreateRoom: (mode: GameMode, playerName: string, isLocked?: boolean) => Promise<void>;
   onJoinRoom: (roomCode: string, playerName: string) => Promise<void>;
   onQuickMatch: (mode: GameMode, playerName: string) => Promise<void>;
@@ -48,6 +52,10 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
   currentRoom,
   myPlayerIndex,
   isHost,
+  defaultPlayerName,
+  initialRoomCode,
+  initialError,
+  isAutoJoining,
   onCreateRoom,
   onJoinRoom,
   onQuickMatch,
@@ -56,16 +64,43 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
   onStartGame,
   onLeaveRoom
 }) => {
-  const [tab, setTab] = useState<'create' | 'tables' | 'join' | 'quick'>('create');
+  const [tab, setTab] = useState<'create' | 'tables' | 'join' | 'quick'>(() =>
+    initialRoomCode ? 'join' : 'create'
+  );
   const [selectedMode, setSelectedMode] = useState<GameMode>('2p_solo');
   const [isLocked, setIsLocked] = useState<boolean>(false);
-  const [roomCodeInput, setRoomCodeInput] = useState('');
-  const [playerName, setPlayerName] = useState('Siz');
+  const [roomCodeInput, setRoomCodeInput] = useState(initialRoomCode || '');
+  const [playerName, setPlayerName] = useState(() => {
+    let saved = '';
+    try {
+      saved = localStorage.getItem('domino_player_name') || '';
+    } catch {}
+    return defaultPlayerName || saved || 'Siz';
+  });
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [loading, setLoading] = useState(false);
   const [startingGame, setStartingGame] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(initialError || null);
+
+  useEffect(() => {
+    if (initialRoomCode) {
+      setRoomCodeInput(initialRoomCode);
+      setTab('join');
+    }
+  }, [initialRoomCode]);
+
+  useEffect(() => {
+    if (initialError) {
+      setErrorMsg(initialError);
+    }
+  }, [initialError]);
+
+  useEffect(() => {
+    if (defaultPlayerName && (playerName === 'Siz' || !playerName)) {
+      setPlayerName(defaultPlayerName);
+    }
+  }, [defaultPlayerName]);
 
   // Table browser states (Durak Online style)
   const [publicRooms, setPublicRooms] = useState<PublicRoomInfo[]>([]);
@@ -192,11 +227,26 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
-  const handleCopyLink = (code: string) => {
-    const url = `${window.location.origin}?room=${code}`;
-    navigator.clipboard.writeText(url);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
+  const handleCopyLink = async (code: string) => {
+    const url = `${window.location.origin}${window.location.pathname}?room=${code}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Domino AZ — Otaq Dəvəti',
+          text: `Gəl bir yerdə Domino oynayaq! Otaq kodu: ${code}`,
+          url
+        });
+        return;
+      } catch (err) {}
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
   };
 
   return (
@@ -220,6 +270,13 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-5 overflow-y-auto flex-1 flex flex-col gap-4">
+          {isAutoJoining && (
+            <div className="bg-amber-500/20 border border-amber-500/50 text-amber-300 text-xs p-3 rounded-xl font-bold text-center flex items-center justify-center gap-2 animate-pulse">
+              <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
+              <span>Dəvət linki aşkarlandı... #{roomCodeInput || initialRoomCode} otağına birbaşa daxil olunur...</span>
+            </div>
+          )}
+
           {errorMsg && (
             <div className="bg-rose-950/60 border border-rose-500/50 text-rose-300 text-xs p-3 rounded-xl font-semibold text-center animate-bounce">
               {errorMsg}
@@ -441,7 +498,11 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                   type="text"
                   value={playerName}
                   onChange={(e) => {
-                    setPlayerName(e.target.value);
+                    const val = e.target.value;
+                    setPlayerName(val);
+                    try {
+                      localStorage.setItem('domino_player_name', val);
+                    } catch {}
                     if (errorMsg) setErrorMsg(null);
                   }}
                   maxLength={16}

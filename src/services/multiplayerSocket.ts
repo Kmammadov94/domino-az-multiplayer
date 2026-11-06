@@ -61,7 +61,7 @@ class MultiplayerSocketService {
     return !!this.socket && this.socket.connected;
   }
 
-  private emitWithTimeout<T>(event: string, data?: any, timeoutMs = 8000): Promise<T> {
+  private emitWithTimeout<T>(event: string, data?: any, timeoutMs = 15000): Promise<T> {
     const s = this.connect();
     return new Promise((resolve, reject) => {
       let done = false;
@@ -70,7 +70,7 @@ class MultiplayerSocketService {
           done = true;
           reject(
             new Error(
-              'Serverlə əlaqə qurulmadı (Port 3001). Zəhmət olmasa arxa plan serverinin işlədiyindən əmin olun.'
+              'Serverlə əlaqə qurulmadı. Zəhmət olmasa internet və ya server bağlantınızı yoxlayın.'
             )
           );
         }

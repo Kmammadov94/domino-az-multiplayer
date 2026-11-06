@@ -156,6 +156,9 @@ export const App: React.FC = () => {
   const [mpChatMessages, setMpChatMessages] = useState<ChatMessage[]>([]);
   const [mpMyIndex, setMpMyIndex] = useState<number>(0);
   const [mpIsHost, setMpIsHost] = useState<boolean>(false);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [isAutoJoining, setIsAutoJoining] = useState<boolean>(false);
 
   // Teahouse Rooms & Interactive Table Gifts State
   const [showTeahousesModal, setShowTeahousesModal] = useState<boolean>(false);
@@ -200,9 +203,62 @@ export const App: React.FC = () => {
         }
       } else if (typeof window !== 'undefined') {
         const params = new URLSearchParams(window.location.search);
-        const code = params.get('room');
+        const code = (params.get('room') || params.get('invite') || '').trim().toUpperCase();
         if (code) {
           setShowMultiplayerLobby(true);
+          setInviteCode(code);
+          setIsAutoJoining(true);
+
+          let savedName = '';
+          try {
+            savedName = localStorage.getItem('domino_player_name') || '';
+          } catch {}
+          const resolvedName =
+            googleUser?.name ||
+            savedName ||
+            `Qonaq ${Math.floor(100 + Math.random() * 900)}`;
+
+          multiplayerSocket.connect();
+          multiplayerSocket
+            .joinRoom(
+              code,
+              resolvedName,
+              stats.equippedSkin,
+              stats.equippedAvatar || DEFAULT_AVATAR_ID
+            )
+            .then((res) => {
+              setIsAutoJoining(false);
+              if (res.success) {
+                setMpIsHost(Boolean(res.isHost));
+                if (res.roomCode && res.sessionToken) {
+                  try {
+                    localStorage.setItem(
+                      'domino_mp_session',
+                      JSON.stringify({
+                        roomCode: res.roomCode,
+                        sessionToken: res.sessionToken,
+                        playerName: resolvedName,
+                        isHost: res.isHost ?? false
+                      })
+                    );
+                  } catch (e) {
+                    console.error(e);
+                  }
+                }
+                if (res.summary) {
+                  setMpRoom(res.summary);
+                  const mySocketId = multiplayerSocket.getSocket()?.id;
+                  const mySlot = res.summary.players.find((p) => p.socketId === mySocketId);
+                  if (mySlot) setMpMyIndex(mySlot.id);
+                }
+              } else {
+                setInviteError(res.error || 'Otaq tapılmadı və ya artıq dolub.');
+              }
+            })
+            .catch((err) => {
+              setIsAutoJoining(false);
+              setInviteError(err?.message || 'Otağa qoşulmaq mümkün olmadı');
+            });
         }
       }
     } catch (e) {
@@ -2392,7 +2448,11 @@ export const App: React.FC = () => {
 
       <MultiplayerLobbyModal
         isOpen={showMultiplayerLobby}
-        onClose={() => setShowMultiplayerLobby(false)}
+        onClose={() => {
+          setShowMultiplayerLobby(false);
+          setInviteCode(null);
+          setInviteError(null);
+        }}
         lang={lang}
         currentRoom={mpRoom}
         myPlayerIndex={mpMyIndex}
@@ -2402,6 +2462,10 @@ export const App: React.FC = () => {
             ? mpRoom.players.find((p) => p.id === mpMyIndex)?.isHost ?? (mpMyIndex === 0)
             : false)
         }
+        defaultPlayerName={googleUser?.name}
+        initialRoomCode={inviteCode || undefined}
+        initialError={inviteError}
+        isAutoJoining={isAutoJoining}
         onCreateRoom={handleCreateRoom}
         onJoinRoom={handleJoinRoom}
         onQuickMatch={handleQuickMatch}
