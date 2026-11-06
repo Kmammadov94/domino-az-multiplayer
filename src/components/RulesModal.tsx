@@ -78,7 +78,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose, lang })
                   <CheckCircle2 className="w-4 h-4 text-amber-400" /> 5. 300 Qaydası və 365 Qələbəsi
                 </h3>
                 <p>
-                  <strong>300 xaldan sonra</strong> əl bitərkən rəqibin əlindəki xallar hesablanmır (yalnız masadakı 5-liklərdən xal yazılır).
+                  <strong>300 xaldan sonra</strong> əl bitərkən rəqibin əlindəki xallar hesablanmır (yalnız masadakı 5-liklərdən xal yazılır) və ələ qoşa 5-lə ([5:5]) başlayanda 10 xal verilmir (0 xal yazılır).
                   Hədəf <strong>365 xaldır</strong>. 365 keçilsə belə əl yarımçıq dayanmır, sona qədər oynanılır. Əgər 365 keçildikdən sonra əl "Bağlandı" ilə bitərsə, qalib elan olunmur — mütləq əlavə əl oynanılır!
                 </p>
               </section>
@@ -141,7 +141,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose, lang })
                   <CheckCircle2 className="w-4 h-4 text-amber-400" /> 5. Правило 300 и Победа в 365
                 </h3>
                 <p>
-                  <strong>После 300 очков</strong> бонус за оставшиеся на руках кости соперника не начисляется.
+                  <strong>После 300 очков</strong> бонус за оставшиеся на руках кости соперника не начисляется, а при начале с дубля 5:5 10 очков не даются (0 очков).
                   Игра идет до <strong>365 очков</strong>, сдача доигрывается до конца. Если набрано $\ge 365$, но сдача завершилась «Багланды», играется следующая сдача до чистого выигрыша!
                 </p>
               </section>
@@ -194,7 +194,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose, lang })
                   <CheckCircle2 className="w-4 h-4 text-amber-400" /> 5. The 300 Rule & 365 Victory
                 </h3>
                 <p>
-                  <strong>After 300 points</strong>, opponents' remaining hand pips are not added (table points only). The match target is <strong>365 points</strong>. Play never halts mid-hand; if 365 is crossed but hand ends in Baglandi, another hand is played.
+                  <strong>After 300 points</strong>, opponents' remaining hand pips are not added (table points only), and opening the hand with double [5:5] awards 0 points instead of 10. The match target is <strong>365 points</strong>. Play never halts mid-hand; if 365 is crossed but hand ends in Baglandi, another hand is played.
                 </p>
               </section>
             </>

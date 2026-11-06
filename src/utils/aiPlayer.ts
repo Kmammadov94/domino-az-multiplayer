@@ -33,7 +33,8 @@ export interface AIMove {
 
 export const selectBestAIMove = (
   hand: TileData[],
-  board: GameBoard
+  board: GameBoard,
+  currentScore: number = 0
 ): AIMove | null => {
   if (hand.length === 0) return null;
 
@@ -41,12 +42,16 @@ export const selectBestAIMove = (
   if (board.tiles.length === 0) {
     // In Baku Telefon 365, only opening doubles score (e.g. [5:5] -> 10 pts).
     // Non-doubles (e.g. [3:2], [4:1]) NEVER score at opening.
+    // Also, after 300 points, starting with [5:5] awards 0 points!
     let bestOpening: TileData = hand[0];
     let maxScore = -1;
 
     for (const tile of hand) {
       const isDouble = tile.left === tile.right;
-      const initialScore = isDouble && (tile.left * 2) % 5 === 0 ? tile.left * 2 : 0;
+      const initialScore =
+        isDouble && currentScore < 300 && (tile.left * 2) % 5 === 0
+          ? tile.left * 2
+          : 0;
       if (initialScore > maxScore) {
         maxScore = initialScore;
         bestOpening = tile;

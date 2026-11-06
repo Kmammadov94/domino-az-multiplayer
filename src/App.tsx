@@ -767,7 +767,13 @@ export const App: React.FC = () => {
       const isDouble = tile.left === tile.right;
       // In Baku Telefon 365 rules: non-doubles (e.g. [3:2], [4:1]) NEVER score at the start!
       // Only opening doubles (e.g. [5:5] -> 10) score points on an empty board.
-      if (isDouble) {
+      // 300 Rule: If the player's score (or team score in 4p_duo) is >= 300, starting with double 5 does NOT give 10 points!
+      const currentScore =
+        mode === '4p_duo'
+          ? players.find((p) => p.team === players[playerIndex].team)?.score || 0
+          : players[playerIndex].score;
+
+      if (isDouble && currentScore < 300) {
         const doubleSum = tile.left * 2;
         scored = doubleSum % 5 === 0 ? doubleSum : 0;
       } else {
@@ -1050,7 +1056,11 @@ export const App: React.FC = () => {
       }
 
       // Check best move
-      const bestMove = selectBestAIMove(activePlayer.hand, board);
+      const aiScore =
+        mode === '4p_duo'
+          ? players.find((p) => p.team === activePlayer.team)?.score || 0
+          : activePlayer.score;
+      const bestMove = selectBestAIMove(activePlayer.hand, board, aiScore);
 
       // If Double Combos are enabled, check if AI can score with a combo!
       if (allowDoubleCombo) {

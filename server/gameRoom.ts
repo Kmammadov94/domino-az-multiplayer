@@ -330,7 +330,13 @@ export class GameRoom {
       nextBoard = placeFirstTile(this.board, tile);
       const isDouble = tile.left === tile.right;
       // Baku Telefon 365 Rule: opening non-doubles (e.g. 3:2) do NOT score!
-      if (isDouble) {
+      // Also after 300 points, starting with double 5 does NOT give 10 points!
+      const currentScore =
+        this.mode === '4p_duo'
+          ? this.players.find((p) => p.team === player.team)?.score || 0
+          : player.score;
+
+      if (isDouble && currentScore < 300) {
         const doubleSum = tile.left * 2;
         scored = doubleSum % 5 === 0 ? doubleSum : 0;
       } else {
@@ -680,7 +686,12 @@ export class GameRoom {
       return;
     }
 
-    let bestMove = selectBestAIMove(hand, this.board);
+    const botScore =
+      this.mode === '4p_duo'
+        ? this.players.find((p) => p.team === activePlayer.team)?.score || 0
+        : activePlayer.score;
+
+    let bestMove = selectBestAIMove(hand, this.board, botScore);
 
     // If player has no playable move, auto-draw from bazaar until a matching tile is found or bazaar is empty!
     while (!bestMove && this.secretBoneyard.length > 0) {
@@ -688,7 +699,7 @@ export class GameRoom {
       hand.push(drawn);
       this.secretHands.set(activePlayer.id, hand);
       activePlayer.handCount = hand.length;
-      bestMove = selectBestAIMove(hand, this.board);
+      bestMove = selectBestAIMove(hand, this.board, botScore);
     }
 
     if (bestMove) {
