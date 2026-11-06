@@ -47,8 +47,10 @@ import { TeahousesModal } from './components/TeahousesModal';
 import { TableGiftPicker } from './components/TableGiftPicker';
 import { TableGiftAnimationOverlay, ActiveGiftAnimation } from './components/TableGiftAnimationOverlay';
 import { BoardView } from './components/BoardView';
+import { FloatingScoreOverlay, FloatingScoreItem } from './components/FloatingScoreOverlay';
 import { FriendsModal } from './components/FriendsModal';
-import { recordRecentPlayer, loadRecentPlayers, isBotName } from './utils/friendsStorage';
+import { recordRecentPlayer, loadRecentPlayers, isBotName, addFriend } from './utils/friendsStorage';
+import { getMyPlayerIdentity } from './utils/playerIdentity';
 import { ScoreBoard } from './components/ScoreBoard';
 import { PlayerControls } from './components/PlayerControls';
 import { DominoTile } from './components/DominoTile';
@@ -164,8 +166,10 @@ export const App: React.FC = () => {
   // Teahouse Rooms & Interactive Table Gifts State
   const [showTeahousesModal, setShowTeahousesModal] = useState<boolean>(false);
   const [showFriendsModal, setShowFriendsModal] = useState<boolean>(false);
-  const [giftTargetPlayer, setGiftTargetPlayer] = useState<{ index: number; name: string; isBot?: boolean } | null>(null);
+  const [giftTargetPlayer, setGiftTargetPlayer] = useState<{ index: number; name: string; isBot?: boolean; playerTag?: string; playerId?: string } | null>(null);
   const [activeGiftAnimation, setActiveGiftAnimation] = useState<ActiveGiftAnimation | null>(null);
+  const [floatingScore, setFloatingScore] = useState<FloatingScoreItem | null>(null);
+  const [isScreenShaking, setIsScreenShaking] = useState<boolean>(false);
 
   // Setup multiplayer socket events & query param auto-join / session reconnection
   useEffect(() => {
@@ -204,6 +208,21 @@ export const App: React.FC = () => {
         }
       } else if (typeof window !== 'undefined') {
         const params = new URLSearchParams(window.location.search);
+
+        // Check incoming friend invite link (?friend_id=DOM-XXXX&name=Murad)
+        const friendId = params.get('friend_id') || params.get('add_friend');
+        if (friendId) {
+          const friendName = params.get('name') || 'Dost';
+          const friendTag = params.get('tag') || undefined;
+          addFriend({
+            name: decodeURIComponent(friendName),
+            playerId: friendId,
+            playerTag: friendTag,
+            title: 'Dəvət Edilən Dost'
+          });
+          setShowFriendsModal(true);
+        }
+
         const code = (params.get('room') || params.get('invite') || '').trim().toUpperCase();
         if (code) {
           setShowMultiplayerLobby(true);
@@ -289,7 +308,33 @@ export const App: React.FC = () => {
     });
 
     const unsubState = multiplayerSocket.onRoomState((state) => {
-      setMpGameState(state);
+      setMpGameState((prevState) => {
+        if (
+          state.lastScoredPoints &&
+          (!prevState?.lastScoredPoints ||
+            prevState.lastScoredPoints.points !== state.lastScoredPoints.points ||
+            prevState.lastScoredPoints.playerName !== state.lastScoredPoints.playerName)
+        ) {
+          const pts = state.lastScoredPoints.points;
+          const isInstant35 = pts === 35;
+          setFloatingScore({
+            id: `mp_sc_${Date.now()}_${Math.random()}`,
+            points: pts,
+            playerName: state.lastScoredPoints.playerName,
+            isInstant35
+          });
+          if (pts >= 20 || isInstant35) {
+            triggerHaptic('heavy');
+            setIsScreenShaking(true);
+            setTimeout(() => setIsScreenShaking(false), 450);
+            sounds.playTileSlam();
+          } else if (pts > 0) {
+            triggerHaptic('medium');
+            sounds.playScorePoints(pts);
+          }
+        }
+        return state;
+      });
       setMpMyIndex(state.myPlayerIndex);
       if (state.status === 'in_game') {
         setIsMultiplayer(true);
@@ -370,6 +415,7 @@ export const App: React.FC = () => {
     isLocked?: boolean,
     turnDuration?: number
   ) => {
+    const myId = getMyPlayerIdentity(googleUser, stats);
     const res = await multiplayerSocket.createRoom(
       roomMode,
       playerName,
@@ -377,7 +423,11 @@ export const App: React.FC = () => {
       stats.equippedAvatar || DEFAULT_AVATAR_ID,
       undefined,
       isLocked,
-      turnDuration
+      turnDuration,
+      myId.id,
+      myId.tag,
+      stats.equippedFrame,
+      stats.equippedTitle
     );
     if (!res.success) {
       throw new Error(res.error || 'Otaq yaradıla bilmədi');
@@ -408,11 +458,17 @@ export const App: React.FC = () => {
   };
 
   const handleJoinRoom = async (roomCode: string, playerName: string) => {
+    const myId = getMyPlayerIdentity(googleUser, stats);
     const res = await multiplayerSocket.joinRoom(
       roomCode,
       playerName,
       stats.equippedSkin,
-      stats.equippedAvatar || DEFAULT_AVATAR_ID
+      stats.equippedAvatar || DEFAULT_AVATAR_ID,
+      undefined,
+      myId.id,
+      myId.tag,
+      stats.equippedFrame,
+      stats.equippedTitle
     );
     if (!res.success) {
       throw new Error(res.error || 'Otağa qoşulmaq mümkün olmadı');
@@ -443,11 +499,17 @@ export const App: React.FC = () => {
   };
 
   const handleQuickMatch = async (roomMode: GameMode, playerName: string) => {
+    const myId = getMyPlayerIdentity(googleUser, stats);
     const res = await multiplayerSocket.quickMatch(
       roomMode,
       playerName,
       stats.equippedSkin,
-      stats.equippedAvatar || DEFAULT_AVATAR_ID
+      stats.equippedAvatar || DEFAULT_AVATAR_ID,
+      undefined,
+      myId.id,
+      myId.tag,
+      stats.equippedFrame,
+      stats.equippedTitle
     );
     if (!res.success) {
       throw new Error(res.error || 'Sürətli oyun tapılmadı');
@@ -993,13 +1055,35 @@ export const App: React.FC = () => {
       scored = res.scoredPoints;
     }
 
-    sounds.playTileClack(scored > 0);
+    const isDouble = tile.left === tile.right;
+    if (scored > 0 || isDouble) {
+      if (scored >= 15 || isDouble) {
+        sounds.playTileSlam();
+      } else {
+        sounds.playTileClack(true);
+      }
+    } else {
+      sounds.playTileClack(false);
+    }
+
     if (scored > 0) {
-      triggerHaptic('medium');
+      if (scored >= 20 || scored === 35) {
+        triggerHaptic('heavy');
+        setIsScreenShaking(true);
+        setTimeout(() => setIsScreenShaking(false), 450);
+      } else {
+        triggerHaptic('medium');
+      }
       sounds.playScorePoints(scored);
       setLastScoredPoints({
         playerName: players[playerIndex].name,
         points: scored
+      });
+      setFloatingScore({
+        id: `sc_${Date.now()}_${Math.random()}`,
+        points: scored,
+        playerName: players[playerIndex].name,
+        isInstant35: scored === 35
       });
     } else {
       triggerHaptic('light');
@@ -1068,13 +1152,35 @@ export const App: React.FC = () => {
     }
 
     const scored = combo.expectedScore;
-    sounds.playTileClack(scored > 0);
+    const isDouble = true; // All combo moves are doubles!
+    if (scored > 0 || isDouble) {
+      if (scored >= 15 || isDouble) {
+        sounds.playTileSlam();
+      } else {
+        sounds.playTileClack(true);
+      }
+    } else {
+      sounds.playTileClack(false);
+    }
+
     if (scored > 0) {
-      triggerHaptic('medium');
+      if (scored >= 20 || scored === 35) {
+        triggerHaptic('heavy');
+        setIsScreenShaking(true);
+        setTimeout(() => setIsScreenShaking(false), 450);
+      } else {
+        triggerHaptic('medium');
+      }
       sounds.playScorePoints(scored);
       setLastScoredPoints({
         playerName: players[playerIndex].name,
         points: scored
+      });
+      setFloatingScore({
+        id: `sc_${Date.now()}_${Math.random()}`,
+        points: scored,
+        playerName: players[playerIndex].name,
+        isInstant35: scored === 35
       });
     } else {
       triggerHaptic('light');
@@ -2195,7 +2301,16 @@ export const App: React.FC = () => {
                   <div
                     onClick={() => {
                       triggerHaptic('light');
-                      if (opponent) setGiftTargetPlayer({ index: oppIdx >= 0 ? oppIdx : 1, name: opponent.name, isBot: opponent.isAI || !effectiveInMultiplayer });
+                      if (opponent) {
+                        const targetSlot = mpGameState?.players[oppIdx];
+                        setGiftTargetPlayer({
+                          index: oppIdx >= 0 ? oppIdx : 1,
+                          name: opponent.name,
+                          isBot: opponent.isAI || !effectiveInMultiplayer,
+                          playerTag: targetSlot?.playerTag,
+                          playerId: targetSlot?.playerId
+                        });
+                      }
                     }}
                     className="flex items-center gap-1.5 mb-1 bg-slate-900/80 hover:bg-slate-800/90 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-slate-700/60 shadow cursor-pointer active:scale-95 transition-all group"
                     title={`${opponent?.name} üçün hədiyyə göndər`}
@@ -2300,7 +2415,16 @@ export const App: React.FC = () => {
                     <div
                       onClick={() => {
                         triggerHaptic('light');
-                        if (topPartner) setGiftTargetPlayer({ index: topIdx, name: topPartner.name, isBot: topPartner.isAI || !effectiveInMultiplayer });
+                        if (topPartner) {
+                          const targetSlot = mpGameState?.players[topIdx];
+                          setGiftTargetPlayer({
+                            index: topIdx,
+                            name: topPartner.name,
+                            isBot: topPartner.isAI || !effectiveInMultiplayer,
+                            playerTag: targetSlot?.playerTag,
+                            playerId: targetSlot?.playerId
+                          });
+                        }
                       }}
                       className="flex items-center gap-1.5 mb-1 bg-slate-900/80 hover:bg-slate-800/90 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-slate-700/60 shadow cursor-pointer active:scale-95 transition-all group"
                       title={`${topPartner?.name} üçün hədiyyə göndər`}
@@ -2334,7 +2458,16 @@ export const App: React.FC = () => {
                     <div
                       onClick={() => {
                         triggerHaptic('light');
-                        if (leftOpponent) setGiftTargetPlayer({ index: leftIdx, name: leftOpponent.name, isBot: leftOpponent.isAI || !effectiveInMultiplayer });
+                        if (leftOpponent) {
+                          const targetSlot = mpGameState?.players[leftIdx];
+                          setGiftTargetPlayer({
+                            index: leftIdx,
+                            name: leftOpponent.name,
+                            isBot: leftOpponent.isAI || !effectiveInMultiplayer,
+                            playerTag: targetSlot?.playerTag,
+                            playerId: targetSlot?.playerId
+                          });
+                        }
                       }}
                       className="flex items-center gap-1 mb-0.5 bg-slate-900/80 hover:bg-slate-800/90 px-2 py-0.5 rounded-full border border-slate-700 shadow cursor-pointer active:scale-95 transition-all group"
                       title={`${leftOpponent?.name} üçün hədiyyə göndər`}
@@ -2368,7 +2501,16 @@ export const App: React.FC = () => {
                     <div
                       onClick={() => {
                         triggerHaptic('light');
-                        if (rightOpponent) setGiftTargetPlayer({ index: rightIdx, name: rightOpponent.name, isBot: rightOpponent.isAI || !effectiveInMultiplayer });
+                        if (rightOpponent) {
+                          const targetSlot = mpGameState?.players[rightIdx];
+                          setGiftTargetPlayer({
+                            index: rightIdx,
+                            name: rightOpponent.name,
+                            isBot: rightOpponent.isAI || !effectiveInMultiplayer,
+                            playerTag: targetSlot?.playerTag,
+                            playerId: targetSlot?.playerId
+                          });
+                        }
                       }}
                       className="flex items-center gap-1 mb-0.5 bg-slate-900/80 hover:bg-slate-800/90 px-2 py-0.5 rounded-full border border-slate-700 shadow cursor-pointer active:scale-95 transition-all group"
                       title={`${rightOpponent?.name} üçün hədiyyə göndər`}
@@ -2416,7 +2558,7 @@ export const App: React.FC = () => {
             )}
 
             {/* The Domino Table Canvas / Board View */}
-            <div className="flex-1 w-full h-full">
+            <div className={`flex-1 w-full h-full transition-transform ${isScreenShaking ? 'animate-shake' : ''}`}>
               <BoardView
                 board={effectiveBoard}
                 skin={activeSkin}
@@ -2619,10 +2761,15 @@ export const App: React.FC = () => {
           userCoins={stats.coins}
           lang={lang}
           isBot={giftTargetPlayer.isBot}
+          playerTag={giftTargetPlayer.playerTag}
+          playerId={giftTargetPlayer.playerId}
         />
       )}
 
-      {/* Baku Teahouses & Stakes Modal (Novxanı, İçərişəhər, Tarqovı) [Coming Soon] */}
+      {/* Floating Animated Score Badges */}
+      <FloatingScoreOverlay scoreItem={floatingScore} />
+
+      {/* Teahouses & Stakes Modal [Coming Soon] */}
       <TeahousesModal
         isOpen={showTeahousesModal}
         onClose={() => setShowTeahousesModal(false)}
@@ -2635,6 +2782,8 @@ export const App: React.FC = () => {
         isOpen={showFriendsModal}
         onClose={() => setShowFriendsModal(false)}
         lang={lang}
+        googleUser={googleUser}
+        stats={stats}
         onInviteFriend={() => {
           handleCreateRoom('2p_solo', googleUser?.name || 'Siz');
           setShowMultiplayerLobby(true);

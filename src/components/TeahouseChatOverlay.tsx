@@ -10,7 +10,7 @@ interface TeahouseChatOverlayProps {
   myPlayerName?: string;
 }
 
-const BAKU_PHRASES = [
+const TEAHOUSE_PHRASES = [
   'Çay süz, qardaş! ☕',
   'Telefon açıldı! 📞',
   'Bazar bomboşdur! 🎲',
@@ -137,7 +137,7 @@ export const TeahouseChatOverlay: React.FC<TeahouseChatOverlayProps> = ({
             setIsOpen(true);
             setUnreadCount(0);
           }}
-          title="Bakı Çayxana Çatı & Tarixçə"
+          title="Çayxana Çatı & Tarixçə"
           className="relative p-2.5 sm:p-3 rounded-full bg-slate-900/90 hover:bg-slate-800 text-amber-300 border border-amber-500/60 shadow-[0_4px_16px_rgba(0,0,0,0.6)] transition-all active:scale-95 flex items-center justify-center group"
         >
           <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform text-amber-400" />
@@ -269,10 +269,10 @@ export const TeahouseChatOverlay: React.FC<TeahouseChatOverlayProps> = ({
               <div className="flex-1 overflow-y-auto py-2 space-y-3 pr-1">
                 <div>
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
-                    Sürətli Bakı Çayxana İfadələri
+                    Sürətli Çayxana İfadələri
                   </span>
                   <div className="grid grid-cols-2 gap-2">
-                    {BAKU_PHRASES.map((phrase) => (
+                    {TEAHOUSE_PHRASES.map((phrase) => (
                       <button
                         key={phrase}
                         onClick={() => handleSendPhrase(phrase)}

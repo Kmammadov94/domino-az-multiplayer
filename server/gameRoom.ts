@@ -68,7 +68,11 @@ export class GameRoom {
     hostAvatar?: string,
     hostSessionToken?: string,
     isLocked: boolean = false,
-    turnDuration: number = 30
+    turnDuration: number = 30,
+    hostPlayerId?: string,
+    hostPlayerTag?: string,
+    hostFrameId?: string,
+    hostTitle?: string
   ) {
     this.code = code;
     this.mode = mode;
@@ -84,6 +88,10 @@ export class GameRoom {
       socketId: hostSocketId,
       id: 0,
       name: hostName || 'Oyunçu 1',
+      playerId: hostPlayerId,
+      playerTag: hostPlayerTag,
+      frameId: hostFrameId,
+      title: hostTitle,
       isAI: false,
       team: mode === '4p_duo' ? 1 : undefined,
       isHost: true,
@@ -103,7 +111,11 @@ export class GameRoom {
     name: string,
     skinId: string,
     avatarId?: string,
-    sessionToken?: string
+    sessionToken?: string,
+    playerId?: string,
+    playerTag?: string,
+    frameId?: string,
+    title?: string
   ): { success: boolean; error?: string } {
     if (this.status !== 'waiting') {
       return { success: false, error: 'Oyun artıq başlayıb!' };
@@ -120,6 +132,10 @@ export class GameRoom {
       socketId,
       id: newIndex,
       name: name || `Oyunçu ${newIndex + 1}`,
+      playerId,
+      playerTag,
+      frameId,
+      title,
       isAI: false,
       team,
       isHost: false,

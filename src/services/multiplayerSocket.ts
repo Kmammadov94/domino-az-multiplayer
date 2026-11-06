@@ -99,7 +99,11 @@ class MultiplayerSocketService {
     avatarId?: string,
     sessionToken?: string,
     isLocked?: boolean,
-    turnDuration?: number
+    turnDuration?: number,
+    playerId?: string,
+    playerTag?: string,
+    frameId?: string,
+    title?: string
   ): Promise<{
     success: boolean;
     roomCode?: string;
@@ -109,7 +113,19 @@ class MultiplayerSocketService {
     summary?: MultiplayerRoomSummary;
     error?: string;
   }> {
-    return this.emitWithTimeout('create_room', { mode, playerName, skinId, avatarId, sessionToken, isLocked, turnDuration });
+    return this.emitWithTimeout('create_room', {
+      mode,
+      playerName,
+      skinId,
+      avatarId,
+      sessionToken,
+      isLocked,
+      turnDuration,
+      playerId,
+      playerTag,
+      frameId,
+      title
+    });
   }
 
   public getPublicRooms(): Promise<{
@@ -133,7 +149,11 @@ class MultiplayerSocketService {
     playerName: string,
     skinId: string,
     avatarId?: string,
-    sessionToken?: string
+    sessionToken?: string,
+    playerId?: string,
+    playerTag?: string,
+    frameId?: string,
+    title?: string
   ): Promise<{
     success: boolean;
     roomCode?: string;
@@ -143,7 +163,17 @@ class MultiplayerSocketService {
     summary?: MultiplayerRoomSummary;
     error?: string;
   }> {
-    return this.emitWithTimeout('join_room', { roomCode, playerName, skinId, avatarId, sessionToken });
+    return this.emitWithTimeout('join_room', {
+      roomCode,
+      playerName,
+      skinId,
+      avatarId,
+      sessionToken,
+      playerId,
+      playerTag,
+      frameId,
+      title
+    });
   }
 
   public quickMatch(
@@ -151,7 +181,11 @@ class MultiplayerSocketService {
     playerName: string,
     skinId: string,
     avatarId?: string,
-    sessionToken?: string
+    sessionToken?: string,
+    playerId?: string,
+    playerTag?: string,
+    frameId?: string,
+    title?: string
   ): Promise<{
     success: boolean;
     roomCode?: string;
@@ -161,7 +195,35 @@ class MultiplayerSocketService {
     summary?: MultiplayerRoomSummary;
     error?: string;
   }> {
-    return this.emitWithTimeout('quick_match', { mode, playerName, skinId, avatarId, sessionToken });
+    return this.emitWithTimeout('quick_match', {
+      mode,
+      playerName,
+      skinId,
+      avatarId,
+      sessionToken,
+      playerId,
+      playerTag,
+      frameId,
+      title
+    });
+  }
+
+  public lookupPlayer(query: string): Promise<{
+    success: boolean;
+    player?: {
+      name: string;
+      playerId: string;
+      playerTag: string;
+      handle: string;
+      avatarId: string;
+      frameId?: string;
+      title?: string;
+      matchesWon?: number;
+      isOnline: boolean;
+    };
+    error?: string;
+  }> {
+    return this.emitWithTimeout('lookup_player', query);
   }
 
   public reconnectRoom(

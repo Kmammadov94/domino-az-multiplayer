@@ -26,7 +26,7 @@ export const TABLE_THEMES: TableTheme[] = [
       en: 'Classic Green Baize'
     },
     desc: {
-      az: 'Rəsmi domino turniri və Bakı çayxanası stolu',
+      az: 'Rəsmi domino turniri və çayxana masası',
       ru: 'Официальный турнирный стол и чайхана',
       en: 'Official domino tournament felt'
     },

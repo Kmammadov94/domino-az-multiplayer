@@ -64,7 +64,7 @@ export const AVATAR_FRAMES: AvatarFrame[] = [
   {
     id: 'frame_fire',
     name: { az: 'Odlar Yurdu Alovu', ru: 'Огонь Страны Огней', en: 'Land of Fire' },
-    desc: { az: 'Bakının sönməz alovları və parlaq kəhrəba işığı', ru: 'Пламя Баку и янтарь', en: 'Blazing Baku amber flame ring' },
+    desc: { az: 'Azərbaycanın sönməz alovları və parlaq kəhrəba işığı', ru: 'Вечное пламя и янтарь', en: 'Blazing eternal amber flame ring' },
     price: 1500,
     borderClass: 'border-orange-500 ring-2 ring-amber-400 shadow-[0_0_20px_rgba(249,115,22,0.9)] animate-pulse',
     badge: '🔥',
@@ -103,10 +103,10 @@ export const PLAYER_TITLES: PlayerTitle[] = [
   },
   {
     id: 'title_novkhani_guest',
-    title: { az: 'Novxanı Qonağı', ru: 'Гость Новханы', en: 'Novkhani Guest' },
+    title: { az: 'Fəxri Qonaq', ru: 'Почетный Гость', en: 'Honored Guest' },
     price: 200,
     badgeColor: 'bg-teal-500/20 text-teal-300 border-teal-500/40',
-    icon: '🏖️'
+    icon: '☕'
   },
   {
     id: 'title_black_double',
@@ -117,7 +117,7 @@ export const PLAYER_TITLES: PlayerTitle[] = [
   },
   {
     id: 'title_baku_lion',
-    title: { az: 'Bakı Şiri', ru: 'Бакинский Лев', en: 'Baku Lion' },
+    title: { az: 'Masa Aslanı', ru: 'Лев Стола', en: 'Table Lion' },
     price: 1200,
     badgeColor: 'bg-amber-500/30 text-amber-200 border-amber-400 shadow-sm',
     icon: '🦁'

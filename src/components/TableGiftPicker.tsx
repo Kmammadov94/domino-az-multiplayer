@@ -14,6 +14,8 @@ interface TableGiftPickerProps {
   userCoins: number;
   lang: Language;
   isBot?: boolean;
+  playerTag?: string;
+  playerId?: string;
 }
 
 export const TableGiftPicker: React.FC<TableGiftPickerProps> = ({
@@ -24,10 +26,12 @@ export const TableGiftPicker: React.FC<TableGiftPickerProps> = ({
   onSendGift,
   userCoins,
   lang,
-  isBot = false
+  isBot = false,
+  playerTag,
+  playerId
 }) => {
   const canAddFriend = !isBot && !isBotName(targetPlayerName);
-  const [friendAdded, setFriendAdded] = useState(() => isFriend(targetPlayerName));
+  const [friendAdded, setFriendAdded] = useState(() => isFriend({ playerId, playerTag, name: targetPlayerName }));
 
   if (!isOpen) return null;
 
@@ -36,6 +40,8 @@ export const TableGiftPicker: React.FC<TableGiftPickerProps> = ({
     triggerHaptic('success');
     addFriend({
       name: targetPlayerName,
+      playerId,
+      playerTag,
       avatarId: 'avatar_tea_master',
       title: 'Masa Yoldaşı'
     });
@@ -50,9 +56,16 @@ export const TableGiftPicker: React.FC<TableGiftPickerProps> = ({
           <div className="flex items-center gap-2">
             <span className="text-xl">🎁</span>
             <div className="text-left">
-              <h3 className="text-sm font-black text-white">
-                {targetPlayerName}
-              </h3>
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-sm font-black text-white">
+                  {targetPlayerName}
+                </h3>
+                {playerTag && (
+                  <span className="text-[10px] font-extrabold bg-cyan-950 text-cyan-300 border border-cyan-500/40 px-1.5 py-0.2 rounded">
+                    #{playerTag}
+                  </span>
+                )}
+              </div>
               <p className="text-[10px] text-slate-400">
                 Masada əşya at və ya çay süz
               </p>

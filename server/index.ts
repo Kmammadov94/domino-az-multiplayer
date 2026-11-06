@@ -231,7 +231,11 @@ io.on('connection', (socket: Socket) => {
           data.avatarId || 'avatar_baku_classic',
           sessionToken,
           Boolean(data.isLocked),
-          data.turnDuration || 30
+          data.turnDuration || 30,
+          data.playerId,
+          data.playerTag,
+          data.frameId,
+          data.title
         );
 
         rooms.set(roomCode, room);
@@ -257,7 +261,7 @@ io.on('connection', (socket: Socket) => {
   // 2. Join Room
   socket.on(
     'join_room',
-    (data: { roomCode: string; playerName: string; skinId: string; avatarId?: string; sessionToken?: string }, callback) => {
+    (data: { roomCode: string; playerName: string; skinId: string; avatarId?: string; sessionToken?: string; playerId?: string; playerTag?: string; frameId?: string; title?: string }, callback) => {
       try {
         const nameValidation = validatePlayerName(data.playerName || 'Oyunçu');
         if (!nameValidation.isValid) {
@@ -278,7 +282,7 @@ io.on('connection', (socket: Socket) => {
         socketToRoom.set(socket.id, code);
         socket.join(`room_${code}`);
 
-        const res = room.addPlayer(socket.id, nameValidation.sanitizedName, data.skinId, data.avatarId, sessionToken);
+        const res = room.addPlayer(socket.id, nameValidation.sanitizedName, data.skinId, data.avatarId, sessionToken, data.playerId, data.playerTag, data.frameId, data.title);
         if (!res.success) {
           safeAck(callback, { success: false, error: res.error });
           return;
@@ -306,7 +310,7 @@ io.on('connection', (socket: Socket) => {
   // 3. Quick Match (Matchmaking)
   socket.on(
     'quick_match',
-    (data: { mode: GameMode; playerName: string; skinId: string; avatarId?: string; sessionToken?: string }, callback) => {
+    (data: { mode: GameMode; playerName: string; skinId: string; avatarId?: string; sessionToken?: string; playerId?: string; playerTag?: string; frameId?: string; title?: string }, callback) => {
       try {
         const nameValidation = validatePlayerName(data.playerName || 'Oyunçu');
         if (!nameValidation.isValid) {
@@ -335,7 +339,7 @@ io.on('connection', (socket: Socket) => {
           socketToRoom.set(socket.id, targetRoom.code);
           socket.join(`room_${targetRoom.code}`);
 
-          targetRoom.addPlayer(socket.id, nameValidation.sanitizedName, data.skinId, data.avatarId, sessionToken);
+          targetRoom.addPlayer(socket.id, nameValidation.sanitizedName, data.skinId, data.avatarId, sessionToken, data.playerId, data.playerTag, data.frameId, data.title);
           const mySlot = targetRoom.players.find((p) => p.socketId === socket.id);
           const myPlayerIndex = mySlot ? mySlot.id : targetRoom.players.length - 1;
           const summary = getRoomSummary(targetRoom);
@@ -360,7 +364,13 @@ io.on('connection', (socket: Socket) => {
             data.skinId || 'ivory_classic',
             () => broadcastRoom(room),
             data.avatarId || 'avatar_baku_classic',
-            sessionToken
+            sessionToken,
+            false,
+            30,
+            data.playerId,
+            data.playerTag,
+            data.frameId,
+            data.title
           );
 
           rooms.set(roomCode, room);
@@ -383,6 +393,84 @@ io.on('connection', (socket: Socket) => {
       }
     }
   );
+
+  // 3.1 Lookup Player by Tag, ID, or Handle
+  socket.on('lookup_player', (query: string, callback) => {
+    try {
+      const q = (query || '').trim();
+      if (!q) {
+        safeAck(callback, { success: false, error: 'Axtarış üçün kod və ya taq daxil edin.' });
+        return;
+      }
+
+      // Check online players in active rooms
+      for (const room of rooms.values()) {
+        for (const p of room.players) {
+          if (p.isAI) continue;
+          const matchTag = p.playerTag && (q === p.playerTag || q === `#${p.playerTag}` || q.toUpperCase() === `DOM-${p.playerTag}`);
+          const matchId = p.playerId && q.toLowerCase() === p.playerId.toLowerCase();
+          const matchHandle = p.name && p.playerTag && `${p.name}#${p.playerTag}`.toLowerCase() === q.toLowerCase();
+
+          if (matchTag || matchId || matchHandle) {
+            safeAck(callback, {
+              success: true,
+              player: {
+                name: p.name,
+                playerId: p.playerId || `DOM-${p.playerTag || '0000'}`,
+                playerTag: p.playerTag || '0000',
+                handle: `${p.name}#${p.playerTag || '0000'}`,
+                avatarId: p.avatarId || 'avatar_baku_classic',
+                frameId: p.frameId,
+                title: p.title || 'Çayxana Dominocusu',
+                isOnline: true
+              }
+            });
+            return;
+          }
+        }
+      }
+
+      // Check user database
+      for (const [googleId, userRecord] of Object.entries(userDatabase)) {
+        const uProfile = (userRecord as any).profile || {};
+        const uStats = (userRecord as any).stats || {};
+        let hash = 0;
+        for (let i = 0; i < googleId.length; i++) {
+          hash = (hash << 5) - hash + googleId.charCodeAt(i);
+          hash |= 0;
+        }
+        const tag = ((Math.abs(hash) % 9000) + 1000).toString();
+        const pid = `DOM-${googleId.slice(-6).toUpperCase()}`;
+        const handle = `${uProfile.name}#${tag}`;
+
+        const matchTag = q === tag || q === `#${tag}` || q.toUpperCase() === `DOM-${tag}`;
+        const matchId = q.toLowerCase() === pid.toLowerCase();
+        const matchHandle = q.toLowerCase() === handle.toLowerCase();
+
+        if (matchTag || matchId || matchHandle) {
+          safeAck(callback, {
+            success: true,
+            player: {
+              name: uProfile.name || 'Dominocu',
+              playerId: pid,
+              playerTag: tag,
+              handle,
+              avatarId: uStats.equippedAvatar || 'avatar_baku_classic',
+              frameId: uStats.equippedFrame,
+              title: uStats.equippedTitle || 'Çayxana Qonağı',
+              matchesWon: uStats.matchesWon || 0,
+              isOnline: false
+            }
+          });
+          return;
+        }
+      }
+
+      safeAck(callback, { success: false, error: 'Bu kod və ya taqa uyğun oyunçu tapılmadı.' });
+    } catch (e: any) {
+      safeAck(callback, { success: false, error: e.message });
+    }
+  });
 
   // 3.5 Reconnect to Room after F5 / Refresh
   socket.on(

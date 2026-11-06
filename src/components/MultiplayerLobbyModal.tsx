@@ -413,9 +413,16 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                             </div>
                           )}
                           <div className="flex flex-col text-left">
-                            <span className="text-xs font-bold text-slate-200">
-                              {p ? p.name : 'Boş Yer'}
-                            </span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs font-bold text-slate-200">
+                                {p ? p.name : 'Boş Yer'}
+                              </span>
+                              {p && p.playerTag && (
+                                <span className="text-[9px] font-extrabold bg-cyan-950 text-cyan-300 border border-cyan-500/40 px-1 rounded">
+                                  #{p.playerTag}
+                                </span>
+                              )}
+                            </div>
                             {p && (
                               <span className="text-[10px] text-amber-400 font-semibold">
                                 {p.isHost ? '👑 Otaq Sahibi' : p.isAI ? '🤖 Bot' : 'Oyunçu'}
@@ -993,9 +1000,16 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                             showBorder={false}
                           />
                           <div className="flex flex-col">
-                            <span className="text-xs font-bold text-slate-200 truncate max-w-[80px]">
-                              {rp.name}
-                            </span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs font-bold text-slate-200 truncate max-w-[80px]">
+                                {rp.name}
+                              </span>
+                              {rp.playerTag && (
+                                <span className="text-[8px] font-extrabold bg-cyan-950 text-cyan-300 border border-cyan-500/40 px-1 rounded">
+                                  #{rp.playerTag}
+                                </span>
+                              )}
+                            </div>
                             <span className="text-[9px] text-slate-500">{rp.date}</span>
                           </div>
                           <button

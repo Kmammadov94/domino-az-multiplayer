@@ -24,61 +24,61 @@ interface TeahouseRoom {
 
 const TEAHOUSE_ROOMS: TeahouseRoom[] = [
   {
-    id: 'novkhani',
-    name: { az: 'Novxanı Çayxanası', ru: 'Чайхана Новханы', en: 'Novkhani Teahouse' },
-    location: { az: 'Xəzər Dənizi Sahili', ru: 'Побережье Каспия', en: 'Caspian Coast' },
+    id: 'heveskar',
+    name: { az: 'Həvəskarlar Çayxanası', ru: 'Любительская Чайхана', en: 'Amateur Teahouse' },
+    location: { az: 'Samovar Çayı & Səmimi Söhbət', ru: 'Чай у самовара', en: 'Friendly Samovar Tea' },
     desc: {
-      az: 'Dəniz mehi, samovar çayı və başlanğıc səviyyəli həvəskar dominoçular.',
-      ru: 'Морской бриз, самоварный чай и дружеские партии.',
-      en: 'Sea breeze, samovar tea, and casual friendly domino matches.'
+      az: 'Təzə başlayanlar və dostluq partiyaları üçün rahat həvəskar masası.',
+      ru: 'Дружеские матчи и теплое общение для начинающих игроков.',
+      en: 'Friendly casual domino rounds for newcomers and friends.'
     },
     buyIn: 100,
     prizePot: 200,
     minLevel: 1,
     bgGradient: 'from-teal-950/80 via-slate-900 to-teal-900/60',
     borderAccent: 'border-teal-500/40',
-    icon: '🏖️'
+    icon: '☕'
   },
   {
-    id: 'icherisheher',
-    name: { az: 'İçərişəhər Klubu', ru: 'Клуб Ичери-Шехер', en: 'Old City Club' },
-    location: { az: 'Qədim Qala Divarları', ru: 'Крепостные Стены', en: 'Ancient Fortress' },
+    id: 'ustalar',
+    name: { az: 'Ustalar Masası', ru: 'Стол Мастеров', en: 'Masters Table' },
+    location: { az: 'Klassik Masa & Taktiki Oyun', ru: 'Тактическая битва', en: 'Tactical Arena' },
     desc: {
-      az: 'Tarixi Qız Qalası kölgəsində usta oyunçular və gərgin taktiki mübarizə.',
-      ru: 'У Девичьей Башни, опытные мастера и острая тактическая борьба.',
-      en: 'Under the Maiden Tower, experienced masters and tactical duels.'
+      az: 'Təcrübəli dominoçuların və gərgin taktiki mübarizənin masası.',
+      ru: 'Опытные мастера и острая тактическая борьба.',
+      en: 'Experienced players and fierce tactical battles.'
     },
     buyIn: 500,
     prizePot: 1000,
     minLevel: 3,
     bgGradient: 'from-amber-950/80 via-slate-900 to-amber-900/60',
     borderAccent: 'border-amber-500/40',
-    icon: '🏰'
+    icon: '🏆'
   },
   {
-    id: 'targovi',
-    name: { az: 'Tarqovı VIP Zalı', ru: 'VIP Зал Торговой', en: 'Targovi VIP Hall' },
-    location: { az: 'Nizami Küçəsi, Bakı', ru: 'Улица Низами, Баку', en: 'Nizami Street, Baku' },
+    id: 'qizil_zal',
+    name: { az: 'Qızıl Reytinq Zalı', ru: 'Золотой VIP Зал', en: 'Golden VIP Hall' },
+    location: { az: 'Yüksək Mərc & Böyük Turnir', ru: 'Высокие ставки', en: 'High Stakes' },
     desc: {
-      az: 'Paytaxtın ən dəbdəbəli məclisi. Yüksək mərc və parlaq qızıl daşlar.',
-      ru: 'Роскошный центр столицы. Высокие ставки и золотые кости.',
-      en: 'The capital’s most prestigious hall. High stakes and fierce play.'
+      az: 'Ciddi ustalar, yüksək mərc və parlaq mükafatlar üçün nüfuzlu zal.',
+      ru: 'Престижный зал с высокими ставками и крупными наградами.',
+      en: 'Prestigious hall with high stakes and premier prizes.'
     },
     buyIn: 2500,
     prizePot: 5000,
     minLevel: 5,
     bgGradient: 'from-purple-950/80 via-slate-900 to-indigo-950/60',
     borderAccent: 'border-purple-500/40',
-    icon: '🌆'
+    icon: '⭐'
   },
   {
-    id: 'caspian_highroller',
-    name: { az: 'Xəzər Sahili High-Roller', ru: 'Каспийский High-Roller', en: 'Caspian High-Roller' },
-    location: { az: 'Dövlət Bayrağı Meydanı', ru: 'Площадь Флага', en: 'Flag Square' },
+    id: 'elitar_cempionlar',
+    name: { az: 'Çempionlar Klubu', ru: 'Клуб Чемпионов', en: 'Champions Club' },
+    location: { az: 'Qrossmeysterlər Arenası', ru: 'Арена Гроссмейстеров', en: 'Grandmasters Hall' },
     desc: {
-      az: 'Yalnız qocaman qrossmeysterlər və ən böyük uduşlar üçün elit arena.',
+      az: 'Yalnız böyük ustalar və ən böyük uduşlar üçün ali oyun salonu.',
       ru: 'Только для гроссмейстеров и огромных кушей.',
-      en: 'Reserved for grandmasters. Winner takes the massive jackpot.'
+      en: 'Exclusive hall reserved for champion grandmasters.'
     },
     buyIn: 10000,
     prizePot: 20000,
@@ -107,9 +107,9 @@ export const TeahousesModal: React.FC<TeahousesModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg sm:text-xl font-black text-amber-300">
-                  {lang === 'az' && 'Bakı Çayxanaları & Mərc Zalları'}
-                  {lang === 'ru' && 'Чайханы Баку и Залы Ставок'}
-                  {lang === 'en' && 'Baku Teahouses & Stakes'}
+                  {lang === 'az' && 'Çayxanalar & Mərc Zalları'}
+                  {lang === 'ru' && 'Чайханы и Залы Ставок'}
+                  {lang === 'en' && 'Teahouses & Stakes'}
                 </h2>
                 <span className="text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30 flex items-center gap-1">
                   <Sparkles className="w-3 h-3 text-amber-400" />

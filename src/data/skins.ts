@@ -10,9 +10,9 @@ export const DOMINO_SKINS: DominoSkin[] = [
       en: 'Classic Ivory'
     },
     desc: {
-      az: 'Ənənəvi Bakı çayxanası üslubunda fil sümüyü rəngli daşlar.',
-      ru: 'Традиционные кости цвета слоновой кости в стиле бакинских чайхан.',
-      en: 'Traditional ivory-colored dominoes styled for Baku teahouses.'
+      az: 'Ənənəvi çayxana üslubunda fil sümüyü rəngli daşlar.',
+      ru: 'Традиционные кости цвета слоновой кости в стиле классических чайхан.',
+      en: 'Traditional ivory-colored dominoes styled for classic teahouses.'
     },
     price: 0,
     unlockedByDefault: true,
@@ -53,9 +53,9 @@ export const DOMINO_SKINS: DominoSkin[] = [
       en: 'Teahouse Antique'
     },
     desc: {
-      az: 'Köhnə Bakı bağlarının çayxanası ab-havası verən taxta daşlar.',
-      ru: 'Аутентичные деревянные кости с атмосферой старой бакинской чайханы.',
-      en: 'Weathered vintage wood dominoes reminiscent of historic Baku gardens.'
+      az: 'Köhnə çayxanaların nostalji ab-havasını verən taxta daşlar.',
+      ru: 'Аутентичные деревянные кости с атмосферой старинной чайханы.',
+      en: 'Weathered vintage wood dominoes reminiscent of historic teahouses.'
     },
     price: 20,
     category: 'baku',
@@ -65,13 +65,13 @@ export const DOMINO_SKINS: DominoSkin[] = [
     pipColor: '#fde047',
     spinnerColor: '#d97706'
   },
-  // 4. Baku Walnut
+  // 4. Walnut Wood
   {
     id: 'baku_walnut',
     name: {
-      az: 'Bakı Qoz Ağacı',
-      ru: 'Бакинский Орех',
-      en: 'Baku Walnut'
+      az: 'Nəcib Qoz Ağacı',
+      ru: 'Ореховое Дерево',
+      en: 'Noble Walnut'
     },
     desc: {
       az: 'Qoz ağacından oyulmuş qədim usta sənəti.',
@@ -325,18 +325,18 @@ export const DOMINO_SKINS: DominoSkin[] = [
     pipColor: '#f0fdfa',
     spinnerColor: '#facc15'
   },
-  // 15. Baku Black Gold (Neft)
+  // 15. Black Gold
   {
     id: 'baku_black_gold',
     name: {
-      az: 'Bakı Qara Qızılı',
-      ru: 'Бакинское Черное Золото',
-      en: 'Baku Black Gold'
+      az: 'Qara Qızıl',
+      ru: 'Черное Золото',
+      en: 'Black Gold'
     },
     desc: {
-      az: 'Bakı nefti parlaqlığında qara gövdə və xalis qızıl haşiyə.',
-      ru: 'Глянцевый блеск бакинской нефти с отделкой из чистого золота.',
-      en: 'Deep high-gloss petroleum black finished with pure gold borders.'
+      az: 'Parlaq qara cilalanmış gövdə və xalis qızıl haşiyə.',
+      ru: 'Глянцевый черный блеск с отделкой из чистого золота.',
+      en: 'Deep high-gloss polished black finished with pure gold borders.'
     },
     price: 20,
     category: 'baku',
@@ -356,9 +356,9 @@ export const DOMINO_SKINS: DominoSkin[] = [
       en: 'Cyber Neon'
     },
     desc: {
-      az: 'Gələcəyin Bakısı: qaranlıqda parıldayan neon firuzəyi və bənövşəyi xətlər.',
-      ru: 'Футуристический Баку: светящийся в темноте неоновый стиль.',
-      en: 'Futuristic Baku cyberpunk aesthetics with luminous neon pips.'
+      az: 'Gələcəyin Neon Şəhəri: qaranlıqda parıldayan firuzəyi və bənövşəyi xətlər.',
+      ru: 'Футуристический стиль: светящиеся в темноте неоновые линии.',
+      en: 'Futuristic cyberpunk aesthetics with luminous neon pips.'
     },
     price: 20,
     category: 'modern',
@@ -421,9 +421,9 @@ export const DOMINO_SKINS: DominoSkin[] = [
       en: 'Caspian Sunset'
     },
     desc: {
-      az: 'Bakı bulvarından görünən narıncı-çəhrayı axşam qürub rəngləri.',
-      ru: 'Нежные теплые краски вечернего заката над Бакинским бульваром.',
-      en: 'Warm sunset gradient over Baku Boulevard with pearl dots.'
+      az: 'Xəzər sahilindən görünən narıncı-çəhrayı axşam qürub rəngləri.',
+      ru: 'Нежные теплые краски вечернего заката над Каспийским побережьем.',
+      en: 'Warm sunset gradient over the Caspian shore with pearl dots.'
     },
     price: 20,
     category: 'modern',

@@ -44,9 +44,9 @@ export const PLAYER_AVATARS: PlayerAvatar[] = [
   {
     id: 'avatar_baku_classic',
     name: {
-      az: 'Bakı Cənabı',
-      ru: 'Бакинский Джентльмен',
-      en: 'Baku Gentleman'
+      az: 'Klassik Usta',
+      ru: 'Классический Мастер',
+      en: 'Classic Master'
     },
     title: {
       az: 'Klassik Kepkalı',
@@ -54,9 +54,9 @@ export const PLAYER_AVATARS: PlayerAvatar[] = [
       en: 'Classic Cap'
     },
     desc: {
-      az: 'Ənənəvi Bakı aerodrom kepkası və qara bığı ilə məşhur çayxana sakini.',
-      ru: 'Житель бакинской чайханы в знаменитой кепке-аэродроме с классическими усами.',
-      en: 'Traditional Baku teahouse regular sporting the iconic airport cap and neat mustache.'
+      az: 'Ənənəvi kepkası və qara bığı ilə məşhur çayxana sakini.',
+      ru: 'Житель чайханы в классической кепке с аккуратными усами.',
+      en: 'Traditional teahouse regular sporting a classic cap and neat mustache.'
     },
     price: 0,
     unlockedByDefault: true,
@@ -183,9 +183,9 @@ export const PLAYER_AVATARS: PlayerAvatar[] = [
   {
     id: 'avatar_baku_student',
     name: {
-      az: 'Bakı Tələbəsi',
-      ru: 'Бакинский Студент',
-      en: 'Baku Student'
+      az: 'Gənc Dominocu',
+      ru: 'Молодой Доминошник',
+      en: 'Young Tactician'
     },
     title: {
       az: 'Müasir Taktik',
@@ -193,9 +193,9 @@ export const PLAYER_AVATARS: PlayerAvatar[] = [
       en: 'Modern Tactician'
     },
     desc: {
-      az: 'Dərslərdən sonra dostlarla domino stolu arxasında dincələn gənc.',
-      ru: 'Энергичный студент, проводящий свободное время за любимым домино.',
-      en: 'Energetic Baku university student enjoying post-lecture domino rounds.'
+      az: 'Dostlarla domino stolu arxasında dincələn enerjili gənc.',
+      ru: 'Энергичный игрок, проводящий свободное время за любимым домино.',
+      en: 'Energetic player enjoying exciting domino rounds.'
     },
     price: 0,
     unlockedByDefault: true,
@@ -328,7 +328,7 @@ export const PLAYER_AVATARS: PlayerAvatar[] = [
       en: 'Caspian Breeze'
     },
     desc: {
-      az: 'Bakı dənizkənarı parkında zərif gün eynəyi və qüsursuz domino gedişləri.',
+      az: 'Xəzər dənizkənarı parkında zərif gün eynəyi və qüsursuz domino gedişləri.',
       ru: 'Стильный завсегдатай приморского бульвара в тёмных очках с безупречной игрой.',
       en: 'Stylish boulevard gentleman wearing dark shades and placing calculated moves.'
     },
@@ -853,19 +853,19 @@ export const PLAYER_AVATARS: PlayerAvatar[] = [
   {
     id: 'avatar_flame_warrior',
     name: {
-      az: 'Alov Qüllələri Ruhu',
-      ru: 'Пламя Баку',
-      en: 'Baku Flame Warrior'
+      az: 'Alovlar Diyarı Ruhu',
+      ru: 'Вечное Пламя',
+      en: 'Eternal Flame Warrior'
     },
     title: {
-      az: 'Müasir Bakı Rəmzi',
+      az: 'Milli Alov Rəmzi',
       ru: 'Символ Огней',
       en: 'Flame Symbol'
     },
     desc: {
-      az: 'Bakının məşhur Alov Qüllələrinin parıltısını əks etdirən kiber zireh.',
-      ru: 'Футуристический образ, вдохновленный сиянием бакинских Пламенных Башен.',
-      en: 'Futuristic knight adorned in blazing crimson armor inspired by Baku Flame Towers.'
+      az: 'Azərbaycanın əbədi alovlarının parıltısını əks etdirən kiber zireh.',
+      ru: 'Футуристический образ, вдохновленный сиянием вечных огней Азербайджана.',
+      en: 'Futuristic knight adorned in blazing crimson armor inspired by eternal flames.'
     },
     price: 45,
     category: 'luxury',

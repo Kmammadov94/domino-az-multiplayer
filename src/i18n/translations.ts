@@ -70,7 +70,7 @@ export const translations = {
     skinsTabAll: 'Hamısı',
     skinsTabClassic: 'Klassik',
     skinsTabLuxury: 'Lüks',
-    skinsTabBaku: 'Bakı & İrs',
+    skinsTabBaku: 'Milli & İrs',
     skinsTabModern: 'Modern',
     skinsTabPublicDomain: 'Klassik Əfsanələr',
     storeTabs: {
@@ -80,7 +80,7 @@ export const translations = {
     free: 'Pulsuz',
     avatarCategories: {
       all: 'Hamısı (30)',
-      baku: 'Bakı & Çayxana',
+      baku: 'Klassik & Çayxana',
       masters: 'Ustalar',
       legends: 'Əfsanələr',
       luxury: 'Lüks & Kiber'
@@ -157,7 +157,7 @@ export const translations = {
     skinsTabAll: 'Все',
     skinsTabClassic: 'Классика',
     skinsTabLuxury: 'Люкс',
-    skinsTabBaku: 'Баку и Наследие',
+    skinsTabBaku: 'Национальные & Наследие',
     skinsTabModern: 'Модерн',
     skinsTabPublicDomain: 'Легенды (Public Domain)',
     storeTabs: {
@@ -167,7 +167,7 @@ export const translations = {
     free: 'Бесплатно',
     avatarCategories: {
       all: 'Все (30)',
-      baku: 'Баку и Чайхана',
+      baku: 'Классика & Чайхана',
       masters: 'Мастера',
       legends: 'Легенды',
       luxury: 'Люкс и Кибер'
@@ -175,7 +175,7 @@ export const translations = {
   },
   en: {
     title: 'Domino PRO',
-    tagline: 'National Azerbaijani Domino • Baku Teahouse Rules',
+    tagline: 'National Azerbaijani Domino • Telefon 365 Rules',
     play: 'Start Game',
     modes: {
       title: 'Select Game Mode',
@@ -244,7 +244,7 @@ export const translations = {
     skinsTabAll: 'All',
     skinsTabClassic: 'Classic',
     skinsTabLuxury: 'Luxury',
-    skinsTabBaku: 'Baku & Heritage',
+    skinsTabBaku: 'National & Heritage',
     skinsTabModern: 'Modern',
     skinsTabPublicDomain: 'Public Domain Legends',
     storeTabs: {
@@ -254,7 +254,7 @@ export const translations = {
     free: 'Free',
     avatarCategories: {
       all: 'All (30)',
-      baku: 'Baku & Teahouse',
+      baku: 'Classic & Teahouse',
       masters: 'Masters',
       legends: 'Legends',
       luxury: 'Luxury & Cyber'

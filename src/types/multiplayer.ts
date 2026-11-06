@@ -6,6 +6,10 @@ export interface MultiplayerPlayerSlot {
   socketId: string;
   id: number; // 0, 1, 2, 3
   name: string;
+  playerId?: string;
+  playerTag?: string;
+  frameId?: string;
+  title?: string;
   isAI: boolean;
   team?: 1 | 2;
   isHost: boolean;

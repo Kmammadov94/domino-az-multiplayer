@@ -1,9 +1,10 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { TileData, DominoSkin, Language } from '../types/domino';
 import { DoubleComboMove } from '../utils/comboEngine';
 import { translations } from '../i18n/translations';
 import { DominoTile } from './DominoTile';
-import { Layers, ArrowRightCircle, Sparkles } from 'lucide-react';
+import { Layers, ArrowRightCircle, Sparkles, ArrowUpDown } from 'lucide-react';
+import { triggerHaptic } from '../utils/haptics';
 
 interface PlayerControlsProps {
   hand: TileData[];
@@ -41,6 +42,33 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   lang
 }) => {
   const t = translations[lang];
+
+  // Tile sorting mode: 'default' | 'doubles_first' | 'sum_desc'
+  const [sortMode, setSortMode] = useState<'default' | 'doubles_first' | 'sum_desc'>('default');
+
+  const cycleSortMode = () => {
+    triggerHaptic('light');
+    setSortMode((prev) => {
+      if (prev === 'default') return 'doubles_first';
+      if (prev === 'doubles_first') return 'sum_desc';
+      return 'default';
+    });
+  };
+
+  const sortedHand = useMemo(() => {
+    if (sortMode === 'doubles_first') {
+      return [...hand].sort((a, b) => {
+        const aDouble = a.left === a.right ? 1 : 0;
+        const bDouble = b.left === b.right ? 1 : 0;
+        if (aDouble !== bDouble) return bDouble - aDouble;
+        return (b.left + b.right) - (a.left + a.right);
+      });
+    }
+    if (sortMode === 'sum_desc') {
+      return [...hand].sort((a, b) => (b.left + b.right) - (a.left + a.right));
+    }
+    return hand;
+  }, [hand, sortMode]);
 
   // Screen width observer for dynamic portrait mobile tile sizing
   const [windowWidth, setWindowWidth] = useState(
@@ -196,8 +224,26 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
         </div>
       )}
 
-      {/* Action Buttons Bar */}
-      <div className="flex items-center gap-2.5">
+      {/* Action Buttons Bar & Tile Sorter */}
+      <div className="flex items-center gap-2 flex-wrap justify-center">
+        {/* Tile Sorting Toggle Pill */}
+        {hand.length > 1 && (
+          <button
+            onClick={cycleSortMode}
+            title="Əldəki daşları çeşidlə"
+            className="px-2.5 py-1 rounded-xl text-[10px] sm:text-xs font-bold bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-700/80 shadow flex items-center gap-1.5 active:scale-95 transition"
+          >
+            <ArrowUpDown className="w-3.5 h-3.5 text-amber-400" />
+            <span>
+              {sortMode === 'doubles_first'
+                ? 'Qoşalar öndə'
+                : sortMode === 'sum_desc'
+                ? 'Böyükdən kiçiyə'
+                : 'Çeşidləmə'}
+            </span>
+          </button>
+        )}
+
         {/* Draw from Bazar (if bazar has tiles) */}
         {boneyardCount > 0 && (
           <button
@@ -228,6 +274,15 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
         )}
       </div>
 
+      {/* Helpful Hint Banner when player has no valid move */}
+      {isMyTurn && !hasPlayableMove && (
+        <div className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/50 text-amber-300 text-[10px] sm:text-xs font-bold animate-fade-in shadow">
+          {boneyardCount > 0
+            ? '💡 Gedişiniz yoxdur — Bazardan daş çəkin'
+            : '💡 Gedişiniz və bazarda daş yoxdur — Pas keçin'}
+        </div>
+      )}
+
       {/* Hand Domino Tiles Container:
           Dynamically sized so that EVERY domino tile is 100% visible on mobile portrait! */}
       <div
@@ -238,7 +293,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           gap: `${gapPx}px`
         }}
       >
-        {hand.map((tile) => {
+        {sortedHand.map((tile) => {
           const isPlayable = isMyTurn && playableTileIds.includes(tile.id);
           const isSelected = selectedTile?.id === tile.id;
           const isBeingDragged = draggedTile?.id === tile.id;
@@ -257,7 +312,11 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
               onTouchMove={(e) => handleTouchMove(e, tile)}
               onTouchEnd={(e) => handleTouchEnd(e, tile)}
               className={`touch-none transition-all duration-150 rounded-lg flex-shrink-0 ${
-                isPlayable ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
+                isPlayable
+                  ? 'cursor-grab active:cursor-grabbing hover:scale-105'
+                  : isMyTurn
+                  ? 'opacity-65 scale-95 cursor-not-allowed'
+                  : 'cursor-default'
               } ${isBeingDragged ? 'opacity-20 scale-95' : ''} ${
                 isPartOfCombo
                   ? 'ring-2 ring-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.7)] animate-pulse'
