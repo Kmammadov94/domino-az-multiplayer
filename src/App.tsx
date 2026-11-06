@@ -47,6 +47,8 @@ import { TeahousesModal } from './components/TeahousesModal';
 import { TableGiftPicker } from './components/TableGiftPicker';
 import { TableGiftAnimationOverlay, ActiveGiftAnimation } from './components/TableGiftAnimationOverlay';
 import { BoardView } from './components/BoardView';
+import { FriendsModal } from './components/FriendsModal';
+import { recordRecentPlayer } from './utils/friendsStorage';
 import { ScoreBoard } from './components/ScoreBoard';
 import { PlayerControls } from './components/PlayerControls';
 import { DominoTile } from './components/DominoTile';
@@ -85,6 +87,7 @@ import {
   Clock,
   Cloud,
   ShieldAlert,
+  Users,
   X
 } from 'lucide-react';
 
@@ -156,6 +159,7 @@ export const App: React.FC = () => {
 
   // Teahouse Rooms & Interactive Table Gifts State
   const [showTeahousesModal, setShowTeahousesModal] = useState<boolean>(false);
+  const [showFriendsModal, setShowFriendsModal] = useState<boolean>(false);
   const [giftTargetPlayer, setGiftTargetPlayer] = useState<{ index: number; name: string } | null>(null);
   const [activeGiftAnimation, setActiveGiftAnimation] = useState<ActiveGiftAnimation | null>(null);
 
@@ -1562,6 +1566,18 @@ export const App: React.FC = () => {
             <ShoppingBag className="w-4 h-4 text-amber-400" />
           </button>
 
+          {/* Friends & Social Button */}
+          <button
+            onClick={() => {
+              triggerHaptic('light');
+              setShowFriendsModal(true);
+            }}
+            title="Dostlar və Çayxana Yoldaşları"
+            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 hover:text-white transition flex items-center gap-1 active:scale-95"
+          >
+            <Users className="w-4 h-4 text-amber-400" />
+          </button>
+
           {/* Rules Button */}
           <button
             onClick={() => setShowRules(true)}
@@ -1765,17 +1781,28 @@ export const App: React.FC = () => {
                 </span>
               </button>
 
-              {/* Quick Actions Row: ⚡ Tələsik Oyun (Quick Match) & ☕ Mərc Çayxanaları (Teahouse Stakes) */}
-              <div className="grid grid-cols-2 gap-2 w-full mb-3">
+              {/* Quick Actions Row: ⚡ Tələsik Oyun, 👥 Dostlar, ☕ Mərc Çayxanaları */}
+              <div className="grid grid-cols-3 gap-1.5 w-full mb-3 text-[11px]">
                 <button
                   onClick={() => {
                     triggerHaptic('medium');
                     handleQuickMatch('2p_solo', googleUser?.name || 'Siz');
                   }}
-                  className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:brightness-110 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition"
+                  className="py-2.5 px-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:brightness-110 text-slate-950 font-black flex items-center justify-center gap-1 shadow-md active:scale-95 transition"
                 >
-                  <Sparkles className="w-4 h-4 fill-slate-950" />
-                  <span>⚡ Tələsik Oyun</span>
+                  <Sparkles className="w-3.5 h-3.5 fill-slate-950 flex-shrink-0" />
+                  <span className="truncate">⚡ Tələsik</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setShowFriendsModal(true);
+                  }}
+                  className="py-2.5 px-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-teal-500/40 text-teal-300 font-bold flex items-center justify-center gap-1 shadow-md active:scale-95 transition"
+                >
+                  <Users className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />
+                  <span className="truncate">Dostlar</span>
                 </button>
 
                 <button
@@ -1783,10 +1810,10 @@ export const App: React.FC = () => {
                     triggerHaptic('light');
                     setShowTeahousesModal(true);
                   }}
-                  className="py-2.5 px-3 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-amber-500/40 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition"
+                  className="py-2.5 px-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-amber-500/40 text-amber-300 font-bold flex items-center justify-center gap-1 shadow-md active:scale-95 transition"
                 >
-                  <span className="text-sm">☕</span>
-                  <span>Çayxanalar & Mərclər</span>
+                  <span className="text-xs">☕</span>
+                  <span className="truncate">Mərclər</span>
                 </button>
               </div>
 
@@ -2429,6 +2456,17 @@ export const App: React.FC = () => {
         onClose={() => setShowTeahousesModal(false)}
         lang={lang}
         userCoins={stats.coins}
+      />
+
+      {/* Friends & Social Modal */}
+      <FriendsModal
+        isOpen={showFriendsModal}
+        onClose={() => setShowFriendsModal(false)}
+        lang={lang}
+        onInviteFriend={() => {
+          handleCreateRoom('2p_solo', googleUser?.name || 'Siz');
+          setShowMultiplayerLobby(true);
+        }}
       />
     </div>
   );
