@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { TileData, DominoSkin, Language } from '../types/domino';
 import { DoubleComboMove } from '../utils/comboEngine';
 import { translations } from '../i18n/translations';
@@ -42,6 +42,21 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
 }) => {
   const t = translations[lang];
 
+  // Screen width observer for dynamic portrait mobile tile sizing
+  const [windowWidth, setWindowWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : 800
+  );
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, []);
+
   // Ref to distinguish between a fast tap/click and an active drag gesture
   const pointerCandidateRef = useRef<{
     tile: TileData;
@@ -83,8 +98,33 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     pointerCandidateRef.current = null;
   };
 
+  // Dynamic tile dimension calculation:
+  // Ensures ALL tiles in hand fit seamlessly on any phone in portrait mode!
+  const count = hand.length;
+  const isMobile = windowWidth < 640;
+
+  // On very small mobile screens (< 480px), if hand has > 8 tiles, wrap into two rows
+  const shouldWrapRows = isMobile && count > 8;
+  const tilesPerRow = shouldWrapRows ? Math.ceil(count / 2) : Math.max(1, count);
+
+  // Available width for tiles accounting for screen padding
+  const availableWidth = Math.max(260, windowWidth - (isMobile ? 16 : 48));
+  const gapPx = isMobile ? (tilesPerRow > 6 ? 3 : 5) : 8;
+  const totalGaps = Math.max(0, tilesPerRow - 1) * gapPx;
+  const containerPadding = isMobile ? 12 : 24;
+
+  const rawTileWidth = Math.floor(
+    (availableWidth - totalGaps - containerPadding) / Math.max(1, tilesPerRow)
+  );
+
+  // Clamped tile width (from 32px on small phones up to 54px on desktop)
+  const dynamicTileWidth = isMobile
+    ? Math.min(52, Math.max(32, rawTileWidth))
+    : 54;
+  const dynamicTileHeight = dynamicTileWidth * 2;
+
   return (
-    <div className="w-full flex flex-col items-center gap-2 select-none z-20 pb-2">
+    <div className="w-full flex flex-col items-center gap-1.5 sm:gap-2 select-none z-20 pb-2 px-1">
       {/* Available Double Combos Banner / Button */}
       {availableCombos.length > 0 && onExecuteCombo && (
         <div className="flex flex-wrap items-center justify-center gap-2 mb-0.5 animate-fade-in pointer-events-auto">
@@ -92,13 +132,13 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
             <button
               key={combo.id}
               onClick={() => onExecuteCombo(combo)}
-              className="px-4 py-2 rounded-2xl bg-gradient-to-r from-amber-500 via-rose-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs sm:text-sm shadow-[0_0_25px_rgba(251,191,36,0.85)] flex items-center gap-2 border-2 border-amber-200 animate-bounce active:scale-95 transition-transform cursor-pointer"
+              className="px-3.5 py-1.5 rounded-2xl bg-gradient-to-r from-amber-500 via-rose-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs sm:text-sm shadow-[0_0_25px_rgba(251,191,36,0.85)] flex items-center gap-1.5 border-2 border-amber-200 animate-bounce active:scale-95 transition-transform cursor-pointer"
             >
               <Sparkles className="w-4 h-4 fill-slate-950 text-slate-950" />
               <span>
                 ⚡ {t.doubleCombo}: {combo.moves.map((m) => `[${m.tile.left}:${m.tile.right}]`).join(' + ')}
               </span>
-              <span className="bg-slate-950 text-amber-300 text-xs px-2.5 py-0.5 rounded-full font-black border border-amber-400/40">
+              <span className="bg-slate-950 text-amber-300 text-xs px-2 py-0.5 rounded-full font-black border border-amber-400/40">
                 +{combo.expectedScore} Xal!
               </span>
             </button>
@@ -107,13 +147,13 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
       )}
 
       {/* Action Buttons Bar */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
         {/* Draw from Bazar (if bazar has tiles) */}
         {boneyardCount > 0 && (
           <button
             onClick={() => onDrawTile()}
             disabled={!isMyTurn || hasPlayableMove}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-lg ${
+            className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg ${
               isMyTurn && !hasPlayableMove
                 ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 animate-bounce'
                 : 'bg-slate-800/80 text-slate-400 border border-slate-700 cursor-not-allowed'
@@ -130,7 +170,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
         {isMyTurn && !hasPlayableMove && boneyardCount === 0 && (
           <button
             onClick={onPassTurn}
-            className="px-5 py-2 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-500 text-white shadow-lg flex items-center gap-2 animate-pulse"
+            className="px-4 py-1.5 sm:px-5 sm:py-2 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-500 text-white shadow-lg flex items-center gap-2 animate-pulse"
           >
             <ArrowRightCircle className="w-4 h-4" />
             <span>{t.pass}</span>
@@ -138,8 +178,16 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
         )}
       </div>
 
-      {/* Hand Domino Tiles Carousel */}
-      <div className="max-w-full overflow-x-auto px-4 py-2 flex items-center justify-center gap-2 sm:gap-3 bg-slate-950/40 backdrop-blur-sm rounded-2xl border border-white/5 shadow-2xl">
+      {/* Hand Domino Tiles Container:
+          Dynamically sized so that EVERY domino tile is 100% visible on mobile portrait! */}
+      <div
+        className={`w-full max-w-full px-2 sm:px-4 py-1.5 sm:py-2 flex items-center justify-center bg-slate-950/50 backdrop-blur-sm rounded-2xl border border-white/5 shadow-2xl ${
+          shouldWrapRows ? 'flex-wrap gap-1 sm:gap-2' : 'overflow-x-auto overflow-y-hidden'
+        }`}
+        style={{
+          gap: `${gapPx}px`
+        }}
+      >
         {hand.map((tile) => {
           const isPlayable = isMyTurn && playableTileIds.includes(tile.id);
           const isSelected = selectedTile?.id === tile.id;
@@ -155,7 +203,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
               onPointerMove={(e) => handlePointerMove(e, tile)}
               onPointerUp={(e) => handlePointerUp(e, tile)}
               onPointerCancel={handlePointerCancel}
-              className={`touch-none transition-all duration-150 rounded-lg ${
+              className={`touch-none transition-all duration-150 rounded-lg flex-shrink-0 ${
                 isPlayable ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
               } ${isBeingDragged ? 'opacity-20 scale-95' : ''} ${
                 isPartOfCombo
@@ -167,8 +215,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 tile={tile}
                 skin={skin}
                 isVertical={true}
-                customWidth={54}
-                customHeight={108}
+                customWidth={dynamicTileWidth}
+                customHeight={dynamicTileHeight}
                 isPlayable={isPlayable}
                 isSelected={isSelected}
               />
