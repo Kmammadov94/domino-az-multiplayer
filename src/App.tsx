@@ -23,7 +23,9 @@ import {
   createInitialBoard,
   placeFirstTile,
   placeTileOnBranch,
-  getPlayableBranches
+  getPlayableBranches,
+  isBoardGloballyBlocked,
+  canAnyTileBePlayed
 } from './utils/boardEngine';
 import { selectBestAIMove, pickAIPersonas } from './utils/aiPlayer';
 import { sounds } from './utils/sound';
@@ -1136,6 +1138,28 @@ export const App: React.FC = () => {
       return;
     }
 
+    // Check if the board has become globally blocked ("Bağlandı")
+    // (If all 7 of every open end's number have already been played on the table,
+    // or if no remaining unplayed tile anywhere can possibly be played)
+    const isGloballyBlocked = isBoardGloballyBlocked(nextBoard);
+    const noUnplayedMoveExists =
+      !updatedPlayers.some((p) => canAnyTileBePlayed(nextBoard, p.hand)) &&
+      !canAnyTileBePlayed(nextBoard, boneyard);
+
+    if (isGloballyBlocked || noUnplayedMoveExists) {
+      let minPips = 999;
+      let lowestPlayer = 0;
+      updatedPlayers.forEach((p, idx) => {
+        const pips = sumHandPips(p.hand);
+        if (pips < minPips) {
+          minPips = pips;
+          lowestPlayer = idx;
+        }
+      });
+      finishHand(true, lowestPlayer, updatedPlayers);
+      return;
+    }
+
     setPlayers(updatedPlayers);
     // Advance turn
     const nextTurn = (playerIndex + 1) % players.length;
@@ -1230,6 +1254,28 @@ export const App: React.FC = () => {
     // Check if player emptied their hand (DOMINO!)
     if (updatedPlayers[playerIndex].hand.length === 0) {
       finishHand(false, playerIndex, updatedPlayers);
+      return;
+    }
+
+    // Check if the board has become globally blocked ("Bağlandı")
+    // (If all 7 of every open end's number have already been played on the table,
+    // or if no remaining unplayed tile anywhere can possibly be played)
+    const isGloballyBlocked = isBoardGloballyBlocked(nextBoard);
+    const noUnplayedMoveExists =
+      !updatedPlayers.some((p) => canAnyTileBePlayed(nextBoard, p.hand)) &&
+      !canAnyTileBePlayed(nextBoard, boneyard);
+
+    if (isGloballyBlocked || noUnplayedMoveExists) {
+      let minPips = 999;
+      let lowestPlayer = 0;
+      updatedPlayers.forEach((p, idx) => {
+        const pips = sumHandPips(p.hand);
+        if (pips < minPips) {
+          minPips = pips;
+          lowestPlayer = idx;
+        }
+      });
+      finishHand(true, lowestPlayer, updatedPlayers);
       return;
     }
 
@@ -1398,7 +1444,26 @@ export const App: React.FC = () => {
         executeMove(currentTurn, bestMove.tile, bestMove.branchId);
       } else {
         // AI has no move
-        if (boneyard.length > 0) {
+        const isGloballyBlocked = isBoardGloballyBlocked(board);
+        const canBazaarHelp = canAnyTileBePlayed(board, boneyard);
+
+        // If the board is blocked, or neither players nor boneyard has any playable tile,
+        // declare Bağlandı immediately without forcing useless boneyard draws!
+        if (isGloballyBlocked || (!players.some((p) => canAnyTileBePlayed(board, p.hand)) && !canBazaarHelp)) {
+          let minPips = 999;
+          let lowestPlayer = 0;
+          players.forEach((p, idx) => {
+            const pips = sumHandPips(p.hand);
+            if (pips < minPips) {
+              minPips = pips;
+              lowestPlayer = idx;
+            }
+          });
+          finishHand(true, lowestPlayer, players);
+          return;
+        }
+
+        if (boneyard.length > 0 && canBazaarHelp) {
           // AI draws from boneyard
           const drawn = boneyard[0];
           const nextBoneyard = boneyard.slice(1);
@@ -1557,6 +1622,12 @@ export const App: React.FC = () => {
   }
 
   const humanHasPlayableMove = playableTileIds.length > 0;
+  const isCurrentBoardBlocked =
+    isBoardGloballyBlocked(effectiveBoard) ||
+    (!effectiveInMultiplayer &&
+      boneyard.length > 0 &&
+      !canAnyTileBePlayed(effectiveBoard, boneyard) &&
+      !effectivePlayers.some((p) => canAnyTileBePlayed(effectiveBoard, p.hand)));
   const playableBranches = selectedTile
     ? getPlayableBranches(effectiveBoard, selectedTile)
     : [];
@@ -2552,7 +2623,7 @@ export const App: React.FC = () => {
                   count={effectiveBoneyardCount}
                   skin={activeSkin}
                   isMyTurn={isMyTurn}
-                  canDraw={isMyTurn && !humanHasPlayableMove && effectiveBoneyardCount > 0}
+                  canDraw={isMyTurn && !humanHasPlayableMove && effectiveBoneyardCount > 0 && !isCurrentBoardBlocked}
                   onDrawTile={handleDrawTile}
                   lang={lang}
                 />
@@ -2572,7 +2643,7 @@ export const App: React.FC = () => {
                 hoveredBranch={hoveredBranch}
                 boneyardCount={effectiveBoneyardCount}
                 onDrawBazaar={handleDrawTile}
-                canDrawFromBazaar={isMyTurn && !humanHasPlayableMove && effectiveBoneyardCount > 0}
+                canDrawFromBazaar={isMyTurn && !humanHasPlayableMove && effectiveBoneyardCount > 0 && !isCurrentBoardBlocked}
                 isDraggingTile={Boolean(draggedTile)}
               />
             </div>
@@ -2624,6 +2695,7 @@ export const App: React.FC = () => {
               onDrawTile={handleDrawTile}
               onPassTurn={handlePassTurn}
               lang={lang}
+              isBoardBlocked={isCurrentBoardBlocked}
             />
           </div>
         )}

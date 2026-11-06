@@ -20,7 +20,9 @@ import {
   createInitialBoard,
   placeFirstTile,
   placeTileOnBranch,
-  getPlayableBranches
+  getPlayableBranches,
+  isBoardGloballyBlocked,
+  canAnyTileBePlayed
 } from '../src/utils/boardEngine';
 import { DoubleComboMove } from '../src/utils/comboEngine';
 import { selectBestAIMove } from '../src/utils/aiPlayer';
@@ -407,6 +409,28 @@ export class GameRoom {
       return { success: true };
     }
 
+    // Check if board has become globally blocked ("Bağlandı")
+    const allSecretHands = Array.from(this.secretHands.values());
+    const isGloballyBlocked = isBoardGloballyBlocked(this.board);
+    const noMovePossible =
+      !allSecretHands.some((h) => canAnyTileBePlayed(this.board, h)) &&
+      !canAnyTileBePlayed(this.board, this.secretBoneyard);
+
+    if (isGloballyBlocked || noMovePossible) {
+      let minPips = 999;
+      let lowestPlayer = 0;
+      this.players.forEach((p) => {
+        const h = this.secretHands.get(p.id) || [];
+        const pips = sumHandPips(h);
+        if (pips < minPips) {
+          minPips = pips;
+          lowestPlayer = p.id;
+        }
+      });
+      this.finishHand(true, lowestPlayer);
+      return { success: true };
+    }
+
     // Advance turn
     this.currentTurn = (this.currentTurn + 1) % this.players.length;
     this.resetTurnTimer();
@@ -476,6 +500,28 @@ export class GameRoom {
       return { success: true };
     }
 
+    // Check if board has become globally blocked ("Bağlandı")
+    const allSecretHands = Array.from(this.secretHands.values());
+    const isGloballyBlocked = isBoardGloballyBlocked(this.board);
+    const noMovePossible =
+      !allSecretHands.some((h) => canAnyTileBePlayed(this.board, h)) &&
+      !canAnyTileBePlayed(this.board, this.secretBoneyard);
+
+    if (isGloballyBlocked || noMovePossible) {
+      let minPips = 999;
+      let lowestPlayer = 0;
+      this.players.forEach((p) => {
+        const h = this.secretHands.get(p.id) || [];
+        const pips = sumHandPips(h);
+        if (pips < minPips) {
+          minPips = pips;
+          lowestPlayer = p.id;
+        }
+      });
+      this.finishHand(true, lowestPlayer);
+      return { success: true };
+    }
+
     this.currentTurn = (this.currentTurn + 1) % this.players.length;
     this.resetTurnTimer();
     this.notifyState();
@@ -496,6 +542,10 @@ export class GameRoom {
 
     if (this.secretBoneyard.length === 0) {
       return { success: false, error: 'Bazarda daş qalmayıb!' };
+    }
+
+    if (isBoardGloballyBlocked(this.board) || !canAnyTileBePlayed(this.board, this.secretBoneyard)) {
+      return { success: false, error: 'Oyun bağlandı! Bazarda gedilə bilən daş yoxdur.' };
     }
 
     const drawn = this.secretBoneyard.shift()!;
@@ -716,8 +766,11 @@ export class GameRoom {
 
     let bestMove = selectBestAIMove(hand, this.board, botScore);
 
-    // If player has no playable move, auto-draw from bazaar until a matching tile is found or bazaar is empty!
-    while (!bestMove && this.secretBoneyard.length > 0) {
+    const isGloballyBlocked = isBoardGloballyBlocked(this.board);
+    const canBazaarHelp = canAnyTileBePlayed(this.board, this.secretBoneyard);
+
+    // If player has no playable move and bazaar can actually help, draw from bazaar
+    while (!bestMove && this.secretBoneyard.length > 0 && !isGloballyBlocked && canBazaarHelp) {
       const drawn = this.secretBoneyard.shift()!;
       hand.push(drawn);
       this.secretHands.set(activePlayer.id, hand);

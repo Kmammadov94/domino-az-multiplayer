@@ -71,6 +71,9 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose, lang })
                 <p>
                   Oyun bağlandıqda ("Bağlandı"), əldə ən az xalı qalan qalib olur. <strong>Əgər əldə tək [0:0] (boş-boş) qalarsa, 0 yox, 10 xal sayılır!</strong> Qalan rəqiblərin əlindəki xallar <strong>heç vaxt aşağı deyil, həmişə yuxarı 5-in qatına yuvarlaqlaşdırılır</strong> (məsələn: 6 xal $\rightarrow$ 10, 11 xal $\rightarrow$ 15).
                 </p>
+                <p className="mt-2 text-amber-200/90 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20 text-xs">
+                  <strong>Erkən Bağlandı & Bazar Qaydası:</strong> Əgər masadakı bütün açıq ucların daşları artıq oynanılıbsa (məsələn, uclardakı hər bir rəqəmin 7 daşının hamısı artıq masadadırsa və bazarda və ya əllərdə heç bir gediləcək daş qala bilməzsə), oyun dərhal «Bağlandı» elan edilir. Oyunçuların bazardan mənasız yerə daş çəkib əllərinə yığmasına ehtiyac yoxdur.
+                </p>
               </section>
 
               <section className="bg-slate-800/40 p-3 rounded-xl border border-slate-700/50">
@@ -134,6 +137,9 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose, lang })
                 <p>
                   При блокировке («Багланды») побеждает игрок с наименьшей суммой очков. <strong>Если на руках остается только дубль [0:0] без других костей, он считается за 10 очков!</strong> Очки на руках соперников <strong>всегда округляются только ВВЕРХ до ближайшей 5-ки</strong> (6 $\rightarrow$ 10, 11 $\rightarrow$ 15).
                 </p>
+                <p className="mt-2 text-amber-200/90 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20 text-xs">
+                  <strong>Досрочное «Багланды» и Базар:</strong> Если все 7 костей каждого открытого числа на столе уже выложены (и ни в руках, ни в базаре не может быть подходящих костей), сдача немедленно объявляется заблокированной. Игрокам не нужно принудительно вытягивать весь базар.
+                </p>
               </section>
 
               <section className="bg-slate-800/40 p-3 rounded-xl border border-slate-700/50">
@@ -186,6 +192,9 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose, lang })
                 </h3>
                 <p>
                   When blocked ("Baglandi"), the player with lowest pip sum wins. <strong>If [0:0] is left solo with no other dominoes, it counts as 10 points!</strong> Remaining opponent hand pips are <strong>never rounded down, always rounded UP to the higher multiple of 5</strong> (e.g. 6 $\rightarrow$ 10, 11 $\rightarrow$ 15).
+                </p>
+                <p className="mt-2 text-amber-200/90 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20 text-xs">
+                  <strong>Early Blocked & Boneyard Rule:</strong> If all 7 dominoes of every open branch end have already been played on the table (meaning no unplayed tile anywhere can match), the hand is immediately declared Blocked. Players are never forced to draw the entire boneyard into their hands.
                 </p>
               </section>
 

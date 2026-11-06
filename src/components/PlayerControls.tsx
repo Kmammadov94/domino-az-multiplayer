@@ -22,6 +22,7 @@ interface PlayerControlsProps {
   onDrawTile: () => void;
   onPassTurn: () => void;
   lang: Language;
+  isBoardBlocked?: boolean;
 }
 
 export const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -39,7 +40,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   onStartDrag,
   onDrawTile,
   onPassTurn,
-  lang
+  lang,
+  isBoardBlocked = false
 }) => {
   const t = translations[lang];
 
@@ -244,8 +246,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           </button>
         )}
 
-        {/* Draw from Bazar (if bazar has tiles) */}
-        {boneyardCount > 0 && (
+        {/* Draw from Bazar (if bazar has tiles and game is not blocked) */}
+        {boneyardCount > 0 && !isBoardBlocked && (
           <button
             onClick={() => onDrawTile()}
             disabled={!isMyTurn || hasPlayableMove}
@@ -262,8 +264,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           </button>
         )}
 
-        {/* Pass Button (when no moves and bazar empty) */}
-        {isMyTurn && !hasPlayableMove && boneyardCount === 0 && (
+        {/* Pass Button (when no moves and (bazar empty OR board is blocked)) */}
+        {isMyTurn && !hasPlayableMove && (boneyardCount === 0 || isBoardBlocked) && (
           <button
             onClick={onPassTurn}
             className="px-4 py-1.5 sm:px-5 sm:py-2 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-500 text-white shadow-lg flex items-center gap-2 animate-pulse"
@@ -277,7 +279,9 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
       {/* Helpful Hint Banner when player has no valid move */}
       {isMyTurn && !hasPlayableMove && (
         <div className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/50 text-amber-300 text-[10px] sm:text-xs font-bold animate-fade-in shadow">
-          {boneyardCount > 0
+          {isBoardBlocked
+            ? '🔒 Oyun Bağlandı — Bütün açıq ucların daşları masadadır! Pas keçin.'
+            : boneyardCount > 0
             ? '💡 Gedişiniz yoxdur — Bazardan daş çəkin'
             : '💡 Gedişiniz və bazarda daş yoxdur — Pas keçin'}
         </div>

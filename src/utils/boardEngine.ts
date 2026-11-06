@@ -509,3 +509,53 @@ export const getActiveOpenEnds = (board: GameBoard): OpenEnd[] => {
 
   return openEnds;
 };
+
+/**
+ * Checks if the board is mathematically and irrevocably blocked.
+ * The board is blocked if every currently open branch end number has already had
+ * all 7 of its tiles placed on the board.
+ * In this state, neither any player nor the bazaar can possibly contain a playable tile,
+ * so the hand must immediately conclude without forcing players to draw from the boneyard.
+ */
+export const isBoardGloballyBlocked = (board: GameBoard): boolean => {
+  if (!board || board.tiles.length === 0) return false;
+
+  const branchKeys: BranchId[] = ['main_left', 'main_right', 'spinner_top', 'spinner_bottom'];
+  const activeOpenValues = new Set<PipValue>();
+
+  for (const bId of branchKeys) {
+    const branch = board.branches[bId];
+    if (branch && branch.active) {
+      activeOpenValues.add(branch.openValue);
+    }
+  }
+
+  if (activeOpenValues.size === 0) return false;
+
+  // In standard double-six dominoes, there are exactly 7 tiles containing any pip value V:
+  // [V:0], [V:1], [V:2], [V:3], [V:4], [V:5], [V:6].
+  // If for EVERY active openValue on the board, all 7 tiles containing that value
+  // have already been placed on the table, then NO remaining unplayed tile anywhere
+  // (neither in any player's hand nor in the bazaar) can possibly be played.
+  for (const pip of activeOpenValues) {
+    let countOnBoard = 0;
+    for (const boardTile of board.tiles) {
+      if (boardTile.tile.left === pip || boardTile.tile.right === pip) {
+        countOnBoard++;
+      }
+    }
+    if (countOnBoard < 7) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+/**
+ * Checks if ANY tile in the given list can be played on the board.
+ */
+export const canAnyTileBePlayed = (board: GameBoard, tiles: TileData[]): boolean => {
+  if (!board || tiles.length === 0) return false;
+  return tiles.some((tile) => getPlayableBranches(board, tile).length > 0);
+};
