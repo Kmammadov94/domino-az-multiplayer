@@ -250,83 +250,199 @@ export const placeTileOnBranch = (
     }
   }
 
+  // Curving (Snake / 90-degree turn) when a line extends too far
+  let direction = branch.direction;
+  let shouldTurn = false;
+  let nextDirection = direction;
+
+  if (branchId === 'main_left') {
+    if (direction === 'left' && branch.tipX < -230) {
+      shouldTurn = true;
+      nextDirection = 'bottom';
+    } else if (direction === 'bottom' && branch.tipY > 140) {
+      shouldTurn = true;
+      nextDirection = 'right';
+    }
+  } else if (branchId === 'main_right') {
+    if (direction === 'right' && branch.tipX > 230) {
+      shouldTurn = true;
+      nextDirection = 'top';
+    } else if (direction === 'top' && branch.tipY < -140) {
+      shouldTurn = true;
+      nextDirection = 'left';
+    }
+  } else if (branchId === 'spinner_top') {
+    if (direction === 'top' && branch.tipY < -150) {
+      shouldTurn = true;
+      nextDirection = 'right';
+    }
+  } else if (branchId === 'spinner_bottom') {
+    if (direction === 'bottom' && branch.tipY > 150) {
+      shouldTurn = true;
+      nextDirection = 'left';
+    }
+  }
+
   // Calculate coordinates & orientation for the new tile
   let newX = branch.tipX;
   let newY = branch.tipY;
   let isVertical = false;
 
-  // Render tile with correct half facing outward:
-  // For Horizontal tile: left half is on Left, right half is on Right
-  // For Vertical tile: left half is on Top, right half is on Bottom
+  // Render tile with correct half facing outward
   let orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
 
-  switch (branch.direction) {
-    case 'left':
-      // Main horizontal line extending left
-      // Non-double is horizontal (72x36), double is vertical (36x72) crosswise
-      isVertical = isDouble;
+  if (shouldTurn) {
+    if (direction === 'left' && nextDirection === 'bottom') {
+      isVertical = !isDouble;
       if (isDouble) {
         newX = branch.tipX - (TILE_SHORT / 2) - TILE_GAP;
-        newY = branch.tipY;
-        branch.tipX = newX - (TILE_SHORT / 2);
+        newY = branch.tipY + (TILE_SHORT / 2) + TILE_GAP;
+        branch.tipX = newX;
+        branch.tipY = newY + (TILE_SHORT / 2);
+        orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
       } else {
-        newX = branch.tipX - (TILE_LONG / 2) - TILE_GAP;
-        newY = branch.tipY;
-        branch.tipX = newX - (TILE_LONG / 2);
-        // Outward end faces left, matching end touches right
+        newX = branch.tipX - (TILE_SHORT / 2) - TILE_GAP;
+        newY = branch.tipY + (TILE_LONG - TILE_SHORT) / 2;
+        branch.tipX = newX;
+        branch.tipY = newY + (TILE_LONG / 2);
+        orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
+      }
+    } else if (direction === 'right' && nextDirection === 'top') {
+      isVertical = !isDouble;
+      if (isDouble) {
+        newX = branch.tipX + (TILE_SHORT / 2) + TILE_GAP;
+        newY = branch.tipY - (TILE_SHORT / 2) - TILE_GAP;
+        branch.tipX = newX;
+        branch.tipY = newY - (TILE_SHORT / 2);
+        orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
+      } else {
+        newX = branch.tipX + (TILE_SHORT / 2) + TILE_GAP;
+        newY = branch.tipY - (TILE_LONG - TILE_SHORT) / 2;
+        branch.tipX = newX;
+        branch.tipY = newY - (TILE_LONG / 2);
         orientedTile = { id: tile.id, left: newOpenVal, right: matchingVal };
       }
-      break;
-
-    case 'right':
-      // Main horizontal line extending right
+    } else if (direction === 'bottom' && nextDirection === 'right') {
       isVertical = isDouble;
       if (isDouble) {
         newX = branch.tipX + (TILE_SHORT / 2) + TILE_GAP;
-        newY = branch.tipY;
+        newY = branch.tipY + (TILE_SHORT / 2) + TILE_GAP;
         branch.tipX = newX + (TILE_SHORT / 2);
+        branch.tipY = newY;
+        orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
       } else {
-        newX = branch.tipX + (TILE_LONG / 2) + TILE_GAP;
-        newY = branch.tipY;
+        newX = branch.tipX + (TILE_LONG - TILE_SHORT) / 2;
+        newY = branch.tipY + (TILE_SHORT / 2) + TILE_GAP;
         branch.tipX = newX + (TILE_LONG / 2);
-        // Matching end touches left, outward end faces right
+        branch.tipY = newY;
         orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
       }
-      break;
-
-    case 'top':
-      // Vertical branch extending upward
-      // Non-double is vertical (36x72), double is horizontal (72x36) crosswise
-      isVertical = !isDouble;
+    } else if (direction === 'bottom' && nextDirection === 'left') {
+      isVertical = isDouble;
       if (isDouble) {
-        newX = branch.tipX;
-        newY = branch.tipY - (TILE_SHORT / 2) - TILE_GAP;
-        branch.tipY = newY - (TILE_SHORT / 2);
+        newX = branch.tipX - (TILE_SHORT / 2) - TILE_GAP;
+        newY = branch.tipY + (TILE_SHORT / 2) + TILE_GAP;
+        branch.tipX = newX - (TILE_SHORT / 2);
+        branch.tipY = newY;
+        orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
       } else {
-        newX = branch.tipX;
-        newY = branch.tipY - (TILE_LONG / 2) - TILE_GAP;
-        branch.tipY = newY - (TILE_LONG / 2);
-        // Outward end faces top, matching end touches bottom
+        newX = branch.tipX - (TILE_LONG - TILE_SHORT) / 2;
+        newY = branch.tipY + (TILE_SHORT / 2) + TILE_GAP;
+        branch.tipX = newX - (TILE_LONG / 2);
+        branch.tipY = newY;
         orientedTile = { id: tile.id, left: newOpenVal, right: matchingVal };
       }
-      break;
-
-    case 'bottom':
-      // Vertical branch extending downward
-      // Non-double is vertical (36x72), double is horizontal (72x36) crosswise
-      isVertical = !isDouble;
+    } else if (direction === 'top' && nextDirection === 'left') {
+      isVertical = isDouble;
       if (isDouble) {
-        newX = branch.tipX;
-        newY = branch.tipY + (TILE_SHORT / 2) + TILE_GAP;
-        branch.tipY = newY + (TILE_SHORT / 2);
+        newX = branch.tipX - (TILE_SHORT / 2) - TILE_GAP;
+        newY = branch.tipY - (TILE_SHORT / 2) - TILE_GAP;
+        branch.tipX = newX - (TILE_SHORT / 2);
+        branch.tipY = newY;
+        orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
       } else {
-        newX = branch.tipX;
-        newY = branch.tipY + (TILE_LONG / 2) + TILE_GAP;
-        branch.tipY = newY + (TILE_LONG / 2);
-        // Matching end touches top, outward end faces bottom
+        newX = branch.tipX - (TILE_LONG - TILE_SHORT) / 2;
+        newY = branch.tipY - (TILE_SHORT / 2) - TILE_GAP;
+        branch.tipX = newX - (TILE_LONG / 2);
+        branch.tipY = newY;
+        orientedTile = { id: tile.id, left: newOpenVal, right: matchingVal };
+      }
+    } else if (direction === 'top' && nextDirection === 'right') {
+      isVertical = isDouble;
+      if (isDouble) {
+        newX = branch.tipX + (TILE_SHORT / 2) + TILE_GAP;
+        newY = branch.tipY - (TILE_SHORT / 2) - TILE_GAP;
+        branch.tipX = newX + (TILE_SHORT / 2);
+        branch.tipY = newY;
+        orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
+      } else {
+        newX = branch.tipX + (TILE_LONG - TILE_SHORT) / 2;
+        newY = branch.tipY - (TILE_SHORT / 2) - TILE_GAP;
+        branch.tipX = newX + (TILE_LONG / 2);
+        branch.tipY = newY;
         orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
       }
-      break;
+    }
+    branch.direction = nextDirection;
+  } else {
+    // Normal straight extension along branch.direction
+    switch (direction) {
+      case 'left':
+        isVertical = isDouble;
+        if (isDouble) {
+          newX = branch.tipX - (TILE_SHORT / 2) - TILE_GAP;
+          newY = branch.tipY;
+          branch.tipX = newX - (TILE_SHORT / 2);
+        } else {
+          newX = branch.tipX - (TILE_LONG / 2) - TILE_GAP;
+          newY = branch.tipY;
+          branch.tipX = newX - (TILE_LONG / 2);
+          orientedTile = { id: tile.id, left: newOpenVal, right: matchingVal };
+        }
+        break;
+
+      case 'right':
+        isVertical = isDouble;
+        if (isDouble) {
+          newX = branch.tipX + (TILE_SHORT / 2) + TILE_GAP;
+          newY = branch.tipY;
+          branch.tipX = newX + (TILE_SHORT / 2);
+        } else {
+          newX = branch.tipX + (TILE_LONG / 2) + TILE_GAP;
+          newY = branch.tipY;
+          branch.tipX = newX + (TILE_LONG / 2);
+          orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
+        }
+        break;
+
+      case 'top':
+        isVertical = !isDouble;
+        if (isDouble) {
+          newX = branch.tipX;
+          newY = branch.tipY - (TILE_SHORT / 2) - TILE_GAP;
+          branch.tipY = newY - (TILE_SHORT / 2);
+        } else {
+          newX = branch.tipX;
+          newY = branch.tipY - (TILE_LONG / 2) - TILE_GAP;
+          branch.tipY = newY - (TILE_LONG / 2);
+          orientedTile = { id: tile.id, left: newOpenVal, right: matchingVal };
+        }
+        break;
+
+      case 'bottom':
+        isVertical = !isDouble;
+        if (isDouble) {
+          newX = branch.tipX;
+          newY = branch.tipY + (TILE_SHORT / 2) + TILE_GAP;
+          branch.tipY = newY + (TILE_SHORT / 2);
+        } else {
+          newX = branch.tipX;
+          newY = branch.tipY + (TILE_LONG / 2) + TILE_GAP;
+          branch.tipY = newY + (TILE_LONG / 2);
+          orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
+        }
+        break;
+    }
   }
 
   const placed: BoardTile = {
