@@ -2071,34 +2071,26 @@ export const App: React.FC = () => {
               </div>
             )}
 
-            {/* Prominent, Distinct Turn Status Banner */}
+            {/* Sleek, Non-Intrusive Turn Indicator Mini-Pill (Optimized for Mobile visibility) */}
             {!effectiveHandRevealed && !effectiveForcedTile && (
-              <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 pointer-events-none transition-all">
+              <div className="absolute top-2.5 left-1/2 -translate-x-1/2 z-20 pointer-events-none transition-all">
                 {isMyTurn ? (
-                  <div className="bg-gradient-to-r from-emerald-950/95 via-emerald-900/95 to-emerald-950/95 border-2 border-emerald-400/80 text-emerald-200 px-6 py-2 rounded-2xl shadow-[0_0_25px_rgba(52,211,153,0.35)] flex items-center gap-3 animate-fade-in">
-                    <div className="relative flex items-center justify-center">
-                      <div className="w-3.5 h-3.5 bg-emerald-400 rounded-full animate-ping absolute" />
-                      <div className="w-3 h-3 bg-emerald-400 rounded-full relative" />
-                    </div>
-                    <div className="flex flex-col items-center">
-                      <span className="text-sm sm:text-base font-black tracking-wider uppercase text-emerald-300">
-                        {t.yourTurn}
+                  <div className="bg-emerald-950/85 border border-emerald-400/60 text-emerald-300 px-3 py-1 rounded-full shadow-[0_2px_12px_rgba(16,185,129,0.3)] flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider backdrop-blur-md animate-fade-in">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
+                    <span>{t.yourTurn}</span>
+                    {effectiveInMultiplayer && mpGameState?.turnTimeRemaining !== undefined && (
+                      <span className="text-emerald-400 font-mono text-[10px] ml-1 bg-emerald-900/60 px-1.5 py-0.5 rounded-full">
+                        ⏱ {mpGameState.turnTimeRemaining}s
                       </span>
-                      <span className="text-[11px] text-emerald-400/80 font-medium">
-                        {humanHasPlayableMove
-                          ? 'Daş seçib masaya qoyun'
-                          : effectiveBoneyardCount > 0
-                          ? 'Bazardan daş götürün'
-                          : 'Pas keçin'}
-                      </span>
-                    </div>
+                    )}
                   </div>
                 ) : (
-                  <div className="bg-slate-900/95 border border-amber-500/40 text-amber-300 px-5 py-2 rounded-2xl shadow-xl flex items-center gap-2.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
-                    <span className="text-xs sm:text-sm font-extrabold text-slate-100">
-                      <span className="text-amber-400">{effectivePlayers[effectiveTurn]?.name}</span> {t.aiThinking}
+                  <div className="bg-slate-950/80 border border-slate-700/60 text-slate-300 px-2.5 py-1 rounded-full shadow-md flex items-center gap-1.5 text-[11px] font-bold backdrop-blur-md">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse inline-block" />
+                    <span className="text-amber-300 font-bold max-w-[100px] truncate">
+                      {effectivePlayers[effectiveTurn]?.name}
                     </span>
+                    <span className="text-slate-400 text-[10px]">{t.aiThinking}</span>
                   </div>
                 )}
               </div>
