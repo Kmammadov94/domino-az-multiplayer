@@ -5,10 +5,10 @@ export const translations = {
     play: 'Oyuna Başla',
     modes: {
       title: 'Oyun Rejimi Seçin',
-      '2p_solo': '2 Nəfərlik Tək (1 vs 1)',
-      '3p_solo': '3 Nəfərlik Tək (1 vs 2)',
-      '4p_solo': '4 Nəfərlik Tək (1 vs 3)',
-      '4p_duo': '4 Nəfərlik Qoşa (2 vs 2 Cütlük)'
+      '2p_solo': '2 Nəfərlik Tək (1 vs 1 Bot)',
+      '3p_solo': '3 Nəfərlik Tək (1 vs 2 Bot)',
+      '4p_solo': '4 Nəfərlik Tək (1 vs 3 Bot)',
+      '4p_duo': '4 Nəfərlik Qoşa (2 vs 2 Botlar)'
     },
     team1: 'Bizim Komanda',
     team2: 'Rəqib Komanda',
@@ -92,10 +92,10 @@ export const translations = {
     play: 'Начать Игру',
     modes: {
       title: 'Выберите Режим Игры',
-      '2p_solo': '2 Игрока (1 на 1)',
-      '3p_solo': '3 Игрока (1 против 2)',
-      '4p_solo': '4 Игрока Соло (1 против 3)',
-      '4p_duo': '4 Игрока Пара на Пару (2 на 2)'
+      '2p_solo': '2 Игрока (1 на 1 с Ботом)',
+      '3p_solo': '3 Игрока (1 против 2 Ботов)',
+      '4p_solo': '4 Игрока Соло (1 против 3 Ботов)',
+      '4p_duo': '4 Игрока Пара на Пару (2 на 2 с Ботами)'
     },
     team1: 'Наша Команда',
     team2: 'Команда Соперников',
@@ -179,10 +179,10 @@ export const translations = {
     play: 'Start Game',
     modes: {
       title: 'Select Game Mode',
-      '2p_solo': '2 Players Solo (1 vs 1)',
-      '3p_solo': '3 Players Solo (1 vs 2)',
-      '4p_solo': '4 Players Solo (1 vs 3)',
-      '4p_duo': '4 Players Duo (2 vs 2 Teams)'
+      '2p_solo': '2 Players Solo (1 vs 1 Bot)',
+      '3p_solo': '3 Players Solo (1 vs 2 Bots)',
+      '4p_solo': '4 Players Solo (1 vs 3 Bots)',
+      '4p_duo': '4 Players Duo (2 vs 2 with Bots)'
     },
     team1: 'Our Team',
     team2: 'Opponent Team',

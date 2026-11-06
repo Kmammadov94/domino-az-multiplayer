@@ -88,6 +88,7 @@ import {
   Cloud,
   ShieldAlert,
   Users,
+  Bot,
   X
 } from 'lucide-react';
 
@@ -1918,6 +1919,18 @@ export const App: React.FC = () => {
                 </button>
               </div>
 
+              {/* Singleplayer / Offline AI Modes Header */}
+              <div className="flex items-center justify-between w-full px-1 mb-2 mt-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
+                  <Bot className="w-4 h-4 text-amber-400" />
+                  <span>Kompüterə (Botlara) Qarşı:</span>
+                </div>
+                <span className="text-[10px] text-amber-300 font-bold bg-slate-800/90 border border-slate-700 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                  <span>🤖</span>
+                  <span>Oflayn AI</span>
+                </span>
+              </div>
+
               {/* Mode Buttons */}
               <div className="w-full space-y-2.5">
                 <button
@@ -1926,35 +1939,55 @@ export const App: React.FC = () => {
                 >
                   <span className="flex items-center gap-2">
                     <Play className="w-4 h-4 fill-slate-950" />
-                    {t.modes['4p_duo']}
+                    <span>4 Nəfərlik Qoşa (2 vs 2 Cütlük)</span>
                   </span>
-                  <span className="text-[10px] bg-slate-950 text-amber-300 font-bold px-2 py-0.5 rounded-full">
-                    Məşhur
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] bg-slate-950 text-slate-300 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                      🤖 3 Botla
+                    </span>
+                    <span className="text-[10px] bg-slate-950 text-amber-300 font-bold px-2 py-0.5 rounded-full">
+                      Məşhur
+                    </span>
+                  </div>
                 </button>
 
                 <button
                   onClick={() => startMatch('2p_solo')}
                   className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition flex items-center justify-between"
                 >
-                  <span>{t.modes['2p_solo']}</span>
-                  <span className="text-slate-400 text-xs">1 vs 1</span>
+                  <span className="flex items-center gap-1.5">
+                    <span>2 Nəfərlik Tək</span>
+                    <span className="text-slate-400 font-normal text-xs">(Siz vs Bot)</span>
+                  </span>
+                  <span className="text-amber-400/90 text-xs font-semibold bg-slate-900/60 px-2 py-0.5 rounded-md border border-slate-700/60">
+                    🤖 1 vs 1 Bot
+                  </span>
                 </button>
 
                 <button
                   onClick={() => startMatch('3p_solo')}
                   className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition flex items-center justify-between"
                 >
-                  <span>{t.modes['3p_solo']}</span>
-                  <span className="text-slate-400 text-xs">1 vs 2</span>
+                  <span className="flex items-center gap-1.5">
+                    <span>3 Nəfərlik Tək</span>
+                    <span className="text-slate-400 font-normal text-xs">(Siz vs 2 Bot)</span>
+                  </span>
+                  <span className="text-amber-400/90 text-xs font-semibold bg-slate-900/60 px-2 py-0.5 rounded-md border border-slate-700/60">
+                    🤖 1 vs 2 Bot
+                  </span>
                 </button>
 
                 <button
                   onClick={() => startMatch('4p_solo')}
                   className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition flex items-center justify-between"
                 >
-                  <span>{t.modes['4p_solo']}</span>
-                  <span className="text-slate-400 text-xs">1 vs 3</span>
+                  <span className="flex items-center gap-1.5">
+                    <span>4 Nəfərlik Tək</span>
+                    <span className="text-slate-400 font-normal text-xs">(Siz vs 3 Bot)</span>
+                  </span>
+                  <span className="text-amber-400/90 text-xs font-semibold bg-slate-900/60 px-2 py-0.5 rounded-md border border-slate-700/60">
+                    🤖 1 vs 3 Bot
+                  </span>
                 </button>
               </div>
 
