@@ -1,4 +1,5 @@
-import { GameMode, TileData } from './domino';
+import { GameMode, GameVariant, TileData } from './domino';
+import { Match101State } from '../utils/domino101Logic';
 import { GameBoard, BranchId } from '../utils/boardEngine';
 import { DoubleComboMove } from '../utils/comboEngine';
 
@@ -26,6 +27,7 @@ export interface MultiplayerPlayerSlot {
 export interface MultiplayerRoomSummary {
   code: string;
   mode: GameMode;
+  variant: GameVariant;
   status: 'waiting' | 'in_game' | 'finished';
   hostName: string;
   playerCount: number;
@@ -38,6 +40,7 @@ export interface MultiplayerRoomSummary {
 export interface PublicRoomInfo {
   code: string;
   mode: GameMode;
+  variant: GameVariant;
   hostName: string;
   hostAvatar?: string;
   playerCount: number;
@@ -49,6 +52,7 @@ export interface PublicRoomInfo {
 export interface MultiplayerClientGameState {
   roomCode: string;
   mode: GameMode;
+  variant: GameVariant;
   status: 'waiting' | 'in_game' | 'finished';
   roundNumber: number;
   currentTurn: number;
@@ -71,11 +75,13 @@ export interface MultiplayerClientGameState {
     winnerTeam?: 1 | 2;
     bonusPoints: number;
     rawPips: number;
+    blockerIndex?: number;
     revealedHands?: { playerIndex: number; hand: TileData[] }[];
   } | null;
   isMatchOver: boolean;
   matchWinnerIndex: number;
   isInstant35: boolean;
+  match101State?: Match101State;
 }
 
 export interface ChatMessage {

@@ -26,6 +26,18 @@ export interface Match101State {
   isDryDefeat?: boolean;
 }
 
+// Minimum tiles that MUST stay in the boneyard:
+// - In 365 mode: 1 tile remains
+// - In 101 mode: 2 tiles remain, EXCEPT in 3-player mode where only 1 tile remains
+// - 4-player mode has no boneyard (all 28 tiles dealt to players)
+export const getMinBoneyardReserve = (variant: '365' | '101' = '365', mode: string = '4p_duo'): number => {
+  if (mode === '4p_duo' || mode === '4p_solo') return 0;
+  if (variant === '101') {
+    return mode === '3p_solo' ? 1 : 2;
+  }
+  return 1;
+};
+
 export const createInitial101State = (): Match101State => ({
   team1: { isOpen: false, draftScore: 0, mainScore: 0, unopenedAttempts: 0 },
   team2: { isOpen: false, draftScore: 0, mainScore: 0, unopenedAttempts: 0 },
@@ -39,23 +51,26 @@ export const createInitial101State = (): Match101State => ({
 });
 
 // Sum remaining pips in hand for 101 mode:
-// Blank-Blank [0:0] (Ayaz) is severely penalized as 20 points!
+// Blank-Blank [0:0] (Ayaz / Qoşa boş):
+// - If it is the ONLY tile left in hand (tək qalıbsa): writes 10 penalty points (10 yazdırır)!
+// - If it is NOT alone in hand (tək deyilsə): writes 0 points (tək deyilsə 0)!
 export const sumHandPips101 = (hand: TileData[]): number => {
   if (!hand || !Array.isArray(hand) || hand.length === 0) return 0;
+  if (hand.length === 1 && hand[0].left === 0 && hand[0].right === 0) {
+    return 10; // Tək qaldıqda 10 xal yazdırır
+  }
   return hand.reduce((total, tile) => {
     if (!tile) return total;
-    if (tile.left === 0 && tile.right === 0) {
-      return total + 20; // Ayaz 20 penalty points!
-    }
     return total + (tile.left + tile.right);
   }, 0);
 };
 
-// Check if a hand holds the Ayaz (0-0) tile
-export const hasAyazInHand = (hand: TileData[]): boolean => {
-  if (!hand || !Array.isArray(hand)) return false;
-  return hand.some((t) => t && t.left === 0 && t.right === 0);
+// Check if a hand holds the Ayaz (0-0) tile alone (triggers the 10 penalty points)
+export const hasAyazAloneInHand = (hand: TileData[]): boolean => {
+  if (!hand || !Array.isArray(hand) || hand.length !== 1) return false;
+  return hand[0].left === 0 && hand[0].right === 0;
 };
+export const hasAyazInHand = hasAyazAloneInHand;
 
 // First hand starter in 101: Player holding [1:1] (1 qoşa) MUST start
 export const findFirstHandStarter101 = (

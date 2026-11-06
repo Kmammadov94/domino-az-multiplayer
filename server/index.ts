@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
 import { Server, Socket } from 'socket.io';
-import { GameMode } from '../src/types/domino';
+import { GameMode, GameVariant } from '../src/types/domino';
 import { DoubleComboMove } from '../src/utils/comboEngine';
 import { GameRoom } from './gameRoom';
 import { ChatMessage, MultiplayerRoomSummary } from '../src/types/multiplayer';
@@ -68,58 +68,20 @@ const saveUserDatabase = (db: Record<string, any>): void => {
   }
 };
 
-// Special VIP / Creator one-time coin grants
-const ONE_TIME_GRANTS: Record<string, { grantId: string; amount: number }> = {
-  'karammammadov.94@gmail.com': { grantId: 'grant_10000_v1', amount: 10000 }
-};
-
 let userDatabase = loadUserDatabase();
-
-// Ensure existing accounts have their one-time grant registered without re-clamping coins
-for (const record of Object.values(userDatabase)) {
-  const uEmail = (record?.profile?.email || '').toLowerCase().trim();
-  const grant = ONE_TIME_GRANTS[uEmail];
-  if (grant) {
-    if (!record.claimedGrants) record.claimedGrants = {};
-    if (!record.claimedGrants[grant.grantId]) {
-      if (!record.stats) record.stats = {};
-      // If coins are not yet at least grant amount, bump it once
-      if ((record.stats.coins || 0) < grant.amount) {
-        record.stats.coins = (record.stats.coins || 0) + grant.amount;
-      }
-      record.claimedGrants[grant.grantId] = true;
-    }
-  }
-}
-saveUserDatabase(userDatabase);
 
 // Sync user stats endpoint
 app.post('/api/user-stats', (req, res) => {
-  const { googleId, email, name, picture, stats, isInitialLogin } = req.body || {};
+  const { googleId, email, name, picture, stats } = req.body || {};
   if (!googleId) {
     return res.status(400).json({ error: 'googleId is required' });
   }
 
   const existing = userDatabase[googleId] || {};
   const existingStats = existing.stats || {};
-  const existingGrants = existing.claimedGrants || {};
 
-  // Handle coins:
-  // In normal gameplay or store purchases (isInitialLogin !== true), trust the client's current coins!
+  // Handle coins: directly accept the client's coins without hardcoding or floor clamping
   let finalCoins = typeof stats?.coins === 'number' ? Math.max(0, stats.coins) : (existingStats.coins ?? 20);
-  if (isInitialLogin && existingStats.coins !== undefined) {
-    finalCoins = Math.max(existingStats.coins, finalCoins);
-  }
-
-  // Check one-time VIP grant on first login
-  const normalizedEmail = (email || existing.profile?.email || '').toLowerCase().trim();
-  const grant = ONE_TIME_GRANTS[normalizedEmail];
-  if (grant && !existingGrants[grant.grantId]) {
-    if (finalCoins < grant.amount) {
-      finalCoins += grant.amount;
-    }
-    existingGrants[grant.grantId] = true;
-  }
 
   // Merge stats intelligently (union of unlocked cosmetics, max streak, etc.)
   const mergedStats = {
@@ -212,6 +174,7 @@ const generateRoomCode = (): string => {
 const getRoomSummary = (room: GameRoom): MultiplayerRoomSummary => ({
   code: room.code,
   mode: room.mode,
+  variant: room.variant || '365',
   status: room.status,
   hostName: room.players.find((p) => p.isHost)?.name || 'Host',
   playerCount: room.players.length,
@@ -262,7 +225,7 @@ io.on('connection', (socket: Socket) => {
   // 1. Create Room
   socket.on(
     'create_room',
-    (data: { mode: GameMode; playerName: string; skinId: string; avatarId?: string; sessionToken?: string; isLocked?: boolean; turnDuration?: number }, callback) => {
+    (data: { mode: GameMode; variant?: GameVariant; playerName: string; skinId: string; avatarId?: string; sessionToken?: string; isLocked?: boolean; turnDuration?: number; playerId?: string; playerTag?: string; frameId?: string; title?: string }, callback) => {
       try {
         const nameValidation = validatePlayerName(data.playerName || 'Oyunçu 1');
         if (!nameValidation.isValid) {
@@ -286,7 +249,8 @@ io.on('connection', (socket: Socket) => {
           data.playerId,
           data.playerTag,
           data.frameId,
-          data.title
+          data.title,
+          data.variant || '365'
         );
 
         rooms.set(roomCode, room);
@@ -361,7 +325,7 @@ io.on('connection', (socket: Socket) => {
   // 3. Quick Match (Matchmaking)
   socket.on(
     'quick_match',
-    (data: { mode: GameMode; playerName: string; skinId: string; avatarId?: string; sessionToken?: string; playerId?: string; playerTag?: string; frameId?: string; title?: string }, callback) => {
+    (data: { mode: GameMode; variant?: GameVariant; playerName: string; skinId: string; avatarId?: string; sessionToken?: string; playerId?: string; playerTag?: string; frameId?: string; title?: string }, callback) => {
       try {
         const nameValidation = validatePlayerName(data.playerName || 'Oyunçu');
         if (!nameValidation.isValid) {
@@ -370,13 +334,15 @@ io.on('connection', (socket: Socket) => {
         }
 
         const mode = data.mode || '2p_solo';
+        const variant = data.variant || '365';
         const sessionToken = data.sessionToken || `sess_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-        // Find existing open waiting room with same mode (must be public / unlocked)
+        // Find existing open waiting room with same mode & variant (must be public / unlocked)
         let targetRoom: GameRoom | null = null;
         for (const room of rooms.values()) {
           if (
             room.mode === mode &&
+            (room.variant || '365') === variant &&
             room.status === 'waiting' &&
             !room.isLocked &&
             room.players.length < room.maxPlayers
@@ -421,7 +387,8 @@ io.on('connection', (socket: Socket) => {
             data.playerId,
             data.playerTag,
             data.frameId,
-            data.title
+            data.title,
+            variant
           );
 
           rooms.set(roomCode, room);
@@ -584,6 +551,7 @@ io.on('connection', (socket: Socket) => {
           return {
             code: r.code,
             mode: r.mode,
+            variant: r.variant || '365',
             hostName: hostP?.name || 'Oyunçu',
             hostAvatar: hostP?.avatarId || 'avatar_tea_master',
             playerCount: r.players.length,

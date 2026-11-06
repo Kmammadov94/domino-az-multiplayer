@@ -12,7 +12,9 @@ import {
   Match101State,
   createInitial101State,
   findFirstHandStarter101,
-  process101Round
+  process101Round,
+  getMinBoneyardReserve,
+  sumHandPips101
 } from './utils/domino101Logic';
 import { DOMINO_SKINS } from './data/skins';
 import { translations } from './i18n/translations';
@@ -159,6 +161,8 @@ export const App: React.FC = () => {
   const [isMatchOver, setIsMatchOver] = useState<boolean>(false);
   const [isInstant35, setIsInstant35] = useState<boolean>(false);
   const [reshuffleNotice, setReshuffleNotice] = useState<string | null>(null);
+  const [lastTilePlacedPlayerIndex, setLastTilePlacedPlayerIndex] = useState<number>(0);
+  const [nextHandStarterIndex, setNextHandStarterIndex] = useState<number>(0);
 
   // 101 Game Mode State
   const [gameVariant, setGameVariant] = useState<GameVariant>('101');
@@ -305,6 +309,9 @@ export const App: React.FC = () => {
 
     const unsubSummary = multiplayerSocket.onRoomSummary((summary) => {
       setMpRoom(summary);
+      if (summary.variant) {
+        setGameVariant(summary.variant);
+      }
       let savedToken: string | undefined;
       try {
         const raw = localStorage.getItem('domino_mp_session');
@@ -326,6 +333,9 @@ export const App: React.FC = () => {
     });
 
     const unsubState = multiplayerSocket.onRoomState((state) => {
+      if (state.variant) {
+        setGameVariant(state.variant);
+      }
       setMpGameState((prevState) => {
         if (
           state.lastScoredPoints &&
@@ -431,7 +441,8 @@ export const App: React.FC = () => {
     roomMode: GameMode,
     playerName: string,
     isLocked?: boolean,
-    turnDuration?: number
+    turnDuration?: number,
+    roomVariant: GameVariant = gameVariant
   ) => {
     const myId = getMyPlayerIdentity(googleUser, stats);
     const res = await multiplayerSocket.createRoom(
@@ -445,11 +456,13 @@ export const App: React.FC = () => {
       myId.id,
       myId.tag,
       stats.equippedFrame,
-      stats.equippedTitle
+      stats.equippedTitle,
+      roomVariant
     );
     if (!res.success) {
       throw new Error(res.error || 'Otaq yaradıla bilmədi');
     }
+    setGameVariant(roomVariant);
     setMpIsHost(true);
     if (res.roomCode && res.sessionToken) {
       try {
@@ -516,7 +529,11 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleQuickMatch = async (roomMode: GameMode, playerName: string) => {
+  const handleQuickMatch = async (
+    roomMode: GameMode,
+    playerName: string,
+    roomVariant: GameVariant = gameVariant
+  ) => {
     const myId = getMyPlayerIdentity(googleUser, stats);
     const res = await multiplayerSocket.quickMatch(
       roomMode,
@@ -527,11 +544,13 @@ export const App: React.FC = () => {
       myId.id,
       myId.tag,
       stats.equippedFrame,
-      stats.equippedTitle
+      stats.equippedTitle,
+      roomVariant
     );
     if (!res.success) {
       throw new Error(res.error || 'Sürətli oyun tapılmadı');
     }
+    setGameVariant(roomVariant);
     setMpIsHost(Boolean(res.isHost));
     if (res.roomCode && res.sessionToken) {
       try {
@@ -676,21 +695,6 @@ export const App: React.FC = () => {
     }
   }, [googleUser?.googleId]);
 
-  // Special VIP account one-time coin grant for karammammadov.94@gmail.com
-  useEffect(() => {
-    if (googleUser && googleUser.email?.toLowerCase().trim() === 'karammammadov.94@gmail.com') {
-      const grantKey = 'domino_vip_10k_granted_' + (googleUser.googleId || 'vip');
-      if (!localStorage.getItem(grantKey)) {
-        localStorage.setItem(grantKey, 'true');
-        // Grant +10,000 coins once without locking the balance
-        const updatedCoins = (stats.coins || 0) + 10000;
-        handleUpdateStats({
-          ...stats,
-          coins: updatedCoins
-        });
-      }
-    }
-  }, [googleUser?.email, googleUser?.googleId]);
 
   // Persist stats whenever changed (and auto-sync with cloud if signed in)
   const handleUpdateStats = (newStats: PlayerStats) => {
@@ -861,13 +865,19 @@ export const App: React.FC = () => {
   const finishHand = (
     endedInBaglandi: boolean,
     roundWinnerPlayerIndex: number,
-    finalPlayers: Player[]
+    finalPlayers: Player[],
+    blockerIndex?: number
   ) => {
     // Clear any pending AI turn timers immediately
     if (turnTimeoutRef.current) {
       clearTimeout(turnTimeoutRef.current);
       turnTimeoutRef.current = null;
     }
+
+    // Azerbaijani rule: In 101 and 365, whoever blocked the road (placed last tile) starts the next hand!
+    const effectiveBlocker = blockerIndex !== undefined ? blockerIndex : lastTilePlacedPlayerIndex;
+    const nextStarter = endedInBaglandi ? effectiveBlocker : roundWinnerPlayerIndex;
+    setNextHandStarterIndex(nextStarter);
 
     // ==========================================
     // DOMINO 101 MODE FINISH HAND
@@ -1096,7 +1106,7 @@ export const App: React.FC = () => {
   const handleNextHand = () => {
     setShowGameEnd(false);
     setRoundNumber((prev) => prev + 1);
-    startHand(mode, players, roundNumber + 1, false, winnerIndex);
+    startHand(mode, players, roundNumber + 1, false, nextHandStarterIndex);
   };
 
   // Restart match click
@@ -1224,6 +1234,7 @@ export const App: React.FC = () => {
     setSelectedTile(null);
     setForcedTile(null);
     setConsecutivePasses(0);
+    setLastTilePlacedPlayerIndex(playerIndex);
 
     // Check 35-point instant match win rule ("Masada 35 vuran oyunu birbaşa udur!")
     if (scored === 35) {
@@ -1254,22 +1265,24 @@ export const App: React.FC = () => {
     // Check if the board has become globally blocked ("Bağlandı")
     // (If all 7 of every open end's number have already been played on the table,
     // or if no remaining unplayed tile anywhere can possibly be played)
+    const minReserve = getMinBoneyardReserve(gameVariant, mode);
+    const drawableBoneyard = boneyard.slice(0, Math.max(0, boneyard.length - minReserve));
     const isGloballyBlocked = isBoardGloballyBlocked(nextBoard);
     const noUnplayedMoveExists =
       !updatedPlayers.some((p) => canAnyTileBePlayed(nextBoard, p.hand)) &&
-      !canAnyTileBePlayed(nextBoard, boneyard);
+      !canAnyTileBePlayed(nextBoard, drawableBoneyard);
 
     if (isGloballyBlocked || noUnplayedMoveExists) {
       let minPips = 999;
       let lowestPlayer = 0;
       updatedPlayers.forEach((p, idx) => {
-        const pips = sumHandPips(p.hand);
+        const pips = gameVariant === '101' ? sumHandPips101(p.hand) : sumHandPips(p.hand);
         if (pips < minPips) {
           minPips = pips;
           lowestPlayer = idx;
         }
       });
-      finishHand(true, lowestPlayer, updatedPlayers);
+      finishHand(true, lowestPlayer, updatedPlayers, playerIndex);
       return;
     }
 
@@ -1364,6 +1377,9 @@ export const App: React.FC = () => {
       return;
     }
 
+    setConsecutivePasses(0);
+    setLastTilePlacedPlayerIndex(playerIndex);
+
     // Check if player emptied their hand (DOMINO!)
     if (updatedPlayers[playerIndex].hand.length === 0) {
       finishHand(false, playerIndex, updatedPlayers);
@@ -1373,22 +1389,24 @@ export const App: React.FC = () => {
     // Check if the board has become globally blocked ("Bağlandı")
     // (If all 7 of every open end's number have already been played on the table,
     // or if no remaining unplayed tile anywhere can possibly be played)
+    const minReserve = getMinBoneyardReserve(gameVariant, mode);
+    const drawableBoneyard = boneyard.slice(0, Math.max(0, boneyard.length - minReserve));
     const isGloballyBlocked = isBoardGloballyBlocked(nextBoard);
     const noUnplayedMoveExists =
       !updatedPlayers.some((p) => canAnyTileBePlayed(nextBoard, p.hand)) &&
-      !canAnyTileBePlayed(nextBoard, boneyard);
+      !canAnyTileBePlayed(nextBoard, drawableBoneyard);
 
     if (isGloballyBlocked || noUnplayedMoveExists) {
       let minPips = 999;
       let lowestPlayer = 0;
       updatedPlayers.forEach((p, idx) => {
-        const pips = sumHandPips(p.hand);
+        const pips = gameVariant === '101' ? sumHandPips101(p.hand) : sumHandPips(p.hand);
         if (pips < minPips) {
           minPips = pips;
           lowestPlayer = idx;
         }
       });
-      finishHand(true, lowestPlayer, updatedPlayers);
+      finishHand(true, lowestPlayer, updatedPlayers, playerIndex);
       return;
     }
 
@@ -1460,9 +1478,11 @@ export const App: React.FC = () => {
       return;
     }
 
-    if (currentTurn !== 0 || boneyard.length === 0 || handRevealed) return;
+    const minReserve = getMinBoneyardReserve(gameVariant, mode);
+    const availableToDraw = Math.max(0, boneyard.length - minReserve);
+    if (currentTurn !== 0 || availableToDraw === 0 || handRevealed) return;
     // In 101 mode: players draw 2 tiles at a time from bazaar ("2 daş 2 daş gedirsən")!
-    const countToDraw = gameVariant === '101' ? Math.min(2, boneyard.length) : 1;
+    const countToDraw = gameVariant === '101' ? Math.min(2, availableToDraw) : 1;
     let nextBoneyard = [...boneyard];
     const drawnTiles: TileData[] = [];
     for (let c = 0; c < countToDraw; c++) {
@@ -1560,28 +1580,30 @@ export const App: React.FC = () => {
         executeMove(currentTurn, bestMove.tile, bestMove.branchId);
       } else {
         // AI has no move
+        const minReserve = getMinBoneyardReserve(gameVariant, mode);
+        const drawableBoneyard = boneyard.slice(0, Math.max(0, boneyard.length - minReserve));
         const isGloballyBlocked = isBoardGloballyBlocked(board);
-        const canBazaarHelp = canAnyTileBePlayed(board, boneyard);
+        const canBazaarHelp = canAnyTileBePlayed(board, drawableBoneyard);
 
-        // If the board is blocked, or neither players nor boneyard has any playable tile,
+        // If the board is blocked, or neither players nor drawable boneyard has any playable tile,
         // declare Bağlandı immediately without forcing useless boneyard draws!
         if (isGloballyBlocked || (!players.some((p) => canAnyTileBePlayed(board, p.hand)) && !canBazaarHelp)) {
           let minPips = 999;
           let lowestPlayer = 0;
           players.forEach((p, idx) => {
-            const pips = sumHandPips(p.hand);
+            const pips = gameVariant === '101' ? sumHandPips101(p.hand) : sumHandPips(p.hand);
             if (pips < minPips) {
               minPips = pips;
               lowestPlayer = idx;
             }
           });
-          finishHand(true, lowestPlayer, players);
+          finishHand(true, lowestPlayer, players, lastTilePlacedPlayerIndex);
           return;
         }
 
-        if (boneyard.length > 0 && canBazaarHelp) {
+        if (drawableBoneyard.length > 0 && canBazaarHelp) {
           // AI draws from boneyard (2 tiles in 101 mode, 1 tile in other modes)
-          const countToDraw = gameVariant === '101' ? Math.min(2, boneyard.length) : 1;
+          const countToDraw = gameVariant === '101' ? Math.min(2, drawableBoneyard.length) : 1;
           const drawn = boneyard.slice(0, countToDraw);
           const nextBoneyard = boneyard.slice(countToDraw);
           setBoneyard(nextBoneyard);
@@ -1604,13 +1626,13 @@ export const App: React.FC = () => {
             let minPips = 999;
             let lowestPlayer = 0;
             players.forEach((p, idx) => {
-              const pips = sumHandPips(p.hand);
+              const pips = gameVariant === '101' ? sumHandPips101(p.hand) : sumHandPips(p.hand);
               if (pips < minPips) {
                 minPips = pips;
                 lowestPlayer = idx;
               }
             });
-            finishHand(true, lowestPlayer, players);
+            finishHand(true, lowestPlayer, players, lastTilePlacedPlayerIndex);
             return;
           }
 
@@ -1739,11 +1761,16 @@ export const App: React.FC = () => {
   }
 
   const humanHasPlayableMove = playableTileIds.length > 0;
+  const currentMinReserve = getMinBoneyardReserve(
+    effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant,
+    effectiveInMultiplayer ? (mpGameState?.mode || '4p_duo') : mode
+  );
+  const currentDrawableBoneyard = boneyard.slice(0, Math.max(0, boneyard.length - currentMinReserve));
   const isCurrentBoardBlocked =
     isBoardGloballyBlocked(effectiveBoard) ||
     (!effectiveInMultiplayer &&
-      boneyard.length > 0 &&
-      !canAnyTileBePlayed(effectiveBoard, boneyard) &&
+      currentDrawableBoneyard.length > 0 &&
+      !canAnyTileBePlayed(effectiveBoard, currentDrawableBoneyard) &&
       !effectivePlayers.some((p) => canAnyTileBePlayed(effectiveBoard, p.hand)));
   const playableBranches = selectedTile
     ? getPlayableBranches(effectiveBoard, selectedTile)
@@ -2283,17 +2310,17 @@ export const App: React.FC = () => {
                     {/* 4 Player Duo */}
                     <button
                       onClick={() => startMatch('4p_duo', '101')}
-                      className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-xl transition-all flex items-center justify-between group transform hover:-translate-y-0.5 border border-amber-300/80 active:scale-95 text-left"
+                      className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-xl transition-all flex items-center justify-between group transform hover:-translate-y-0.5"
                     >
-                      <div className="flex items-center gap-2">
+                      <span className="flex items-center gap-2">
                         <Play className="w-4 h-4 fill-slate-950" />
-                        <span className="text-xs sm:text-sm font-black">4 Nəfərlik Qoşa (2 vs 2 Cütlük)</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <span className="text-[10px] bg-slate-950 text-slate-300 font-bold px-2 py-0.5 rounded-full">
-                          Bazar yoxdur
+                        <span>4 Nəfərlik Qoşa (2 vs 2 Cütlük)</span>
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] bg-slate-950 text-slate-300 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                          🤖 3 Botla
                         </span>
-                        <span className="text-[10px] bg-slate-950 text-amber-300 font-black px-2 py-0.5 rounded-full shadow">
+                        <span className="text-[10px] bg-slate-950 text-amber-300 font-bold px-2 py-0.5 rounded-full">
                           101 XAL
                         </span>
                       </div>
@@ -2302,17 +2329,18 @@ export const App: React.FC = () => {
                     {/* 3 Player Solo */}
                     <button
                       onClick={() => startMatch('3p_solo', '101')}
-                      className="w-full py-3.5 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition-all flex items-center justify-between group transform hover:-translate-y-0.5 active:scale-95 text-left shadow-lg"
+                      className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition flex items-center justify-between"
                     >
-                      <div className="flex items-center gap-2">
+                      <span className="flex items-center gap-2">
                         <Users className="w-4 h-4 text-amber-400" />
-                        <span className="text-xs sm:text-sm font-bold text-white">3 Nəfərlik Tək (Hərəyə 7 daş)</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <span className="text-[10px] bg-slate-950 text-slate-300 font-bold px-2 py-0.5 rounded-full">
-                          7 daş bazarda
+                        <span>3 Nəfərlik Tək</span>
+                        <span className="text-slate-400 font-normal text-xs">(3 Oyunçu)</span>
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] bg-slate-950 text-slate-300 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                          🤖 2 Botla
                         </span>
-                        <span className="text-[10px] bg-slate-950 text-amber-300 font-black px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] bg-slate-950 text-amber-300 font-bold px-2 py-0.5 rounded-full">
                           101 XAL
                         </span>
                       </div>
@@ -2321,17 +2349,17 @@ export const App: React.FC = () => {
                     {/* 2 Player Solo */}
                     <button
                       onClick={() => startMatch('2p_solo', '101')}
-                      className="w-full py-3.5 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition-all flex items-center justify-between group transform hover:-translate-y-0.5 active:scale-95 text-left shadow-lg"
+                      className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition flex items-center justify-between"
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">👤</span>
-                        <span className="text-xs sm:text-sm font-bold text-white">2 Nəfərlik Tək (Hərəyə 7 daş)</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <span className="text-[10px] bg-slate-950 text-slate-300 font-bold px-2 py-0.5 rounded-full">
-                          14 daş bazarda
+                      <span className="flex items-center gap-1.5">
+                        <span>2 Nəfərlik Tək</span>
+                        <span className="text-slate-400 font-normal text-xs">(Siz vs Bot)</span>
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] bg-slate-950 text-slate-300 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                          🤖 1 vs 1 Bot
                         </span>
-                        <span className="text-[10px] bg-slate-950 text-amber-300 font-black px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] bg-slate-950 text-amber-300 font-bold px-2 py-0.5 rounded-full">
                           101 XAL
                         </span>
                       </div>
@@ -2424,7 +2452,7 @@ export const App: React.FC = () => {
                 lastScoredPoints={effectiveLastScored}
                 equippedFrame={stats.equippedFrame}
                 equippedTitle={stats.equippedTitle}
-                variant={effectiveInMultiplayer ? '365' : gameVariant}
+                variant={effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant}
                 match101State={match101State}
               />
             </div>
@@ -2785,7 +2813,7 @@ export const App: React.FC = () => {
                   count={effectiveBoneyardCount}
                   skin={activeSkin}
                   isMyTurn={isMyTurn}
-                  canDraw={isMyTurn && !humanHasPlayableMove && effectiveBoneyardCount > 0 && !isCurrentBoardBlocked}
+                  canDraw={isMyTurn && !humanHasPlayableMove && effectiveBoneyardCount > currentMinReserve && !isCurrentBoardBlocked}
                   onDrawTile={handleDrawTile}
                   lang={lang}
                 />
@@ -2805,8 +2833,9 @@ export const App: React.FC = () => {
                 hoveredBranch={hoveredBranch}
                 boneyardCount={effectiveBoneyardCount}
                 onDrawBazaar={handleDrawTile}
-                canDrawFromBazaar={isMyTurn && !humanHasPlayableMove && effectiveBoneyardCount > 0 && !isCurrentBoardBlocked}
+                canDrawFromBazaar={isMyTurn && !humanHasPlayableMove && effectiveBoneyardCount > getMinBoneyardReserve(gameVariant, mode) && !isCurrentBoardBlocked}
                 isDraggingTile={Boolean(draggedTile)}
+                variant={effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant}
               />
             </div>
 
@@ -2858,7 +2887,8 @@ export const App: React.FC = () => {
               onPassTurn={handlePassTurn}
               lang={lang}
               isBoardBlocked={isCurrentBoardBlocked}
-              variant={effectiveInMultiplayer ? '365' : gameVariant}
+              variant={effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant}
+              minBoneyardReserve={currentMinReserve}
             />
           </div>
         )}
@@ -2928,7 +2958,7 @@ export const App: React.FC = () => {
         isHost={effectiveInMultiplayer ? mpIsHost : true}
         onNextHand={handleNextHandAction}
         onRestartMatch={handleRestartMatchAction}
-        variant={effectiveInMultiplayer ? '365' : gameVariant}
+        variant={effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant}
         match101State={match101State}
         isSeka={is101Seka}
         ayazCaught={is101AyazCaught}

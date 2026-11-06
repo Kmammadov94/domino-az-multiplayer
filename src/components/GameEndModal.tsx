@@ -286,11 +286,11 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
               </div>
             )}
 
-            {/* Ayaz [0:0] 20 Penalty Callout */}
+            {/* Ayaz [0:0] 10 Penalty Callout when caught alone */}
             {variant === '101' && ayazCaught && (
               <div className="p-2 rounded-xl bg-rose-500/20 border border-rose-500/50 mb-2.5 text-xs text-rose-300 font-extrabold flex items-center justify-center gap-2">
-                <span>❄️ Ayaz [0:0] Tələsi:</span>
-                <span className="text-white">+20 Cərimə Xalı!</span>
+                <span>❄️ Tək Qoşa [0:0] Qaldı:</span>
+                <span className="text-white">+10 Cərimə Xalı!</span>
               </div>
             )}
 

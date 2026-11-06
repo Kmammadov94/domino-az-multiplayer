@@ -24,6 +24,7 @@ interface PlayerControlsProps {
   lang: Language;
   isBoardBlocked?: boolean;
   variant?: GameVariant;
+  minBoneyardReserve?: number;
 }
 
 export const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -43,9 +44,12 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   onPassTurn,
   lang,
   isBoardBlocked = false,
-  variant = '365'
+  variant = '365',
+  minBoneyardReserve = 1
 }) => {
   const t = translations[lang];
+  const canDrawFromReserve = boneyardCount > minBoneyardReserve && !isBoardBlocked;
+  const availableToDraw = Math.max(0, boneyardCount - minBoneyardReserve);
 
   // Tile sorting mode: 'default' | 'doubles_first' | 'sum_desc'
   const [sortMode, setSortMode] = useState<'default' | 'doubles_first' | 'sum_desc'>('default');
@@ -248,8 +252,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           </button>
         )}
 
-        {/* Draw from Bazar (if bazar has tiles and game is not blocked) */}
-        {boneyardCount > 0 && !isBoardBlocked && (
+        {/* Draw from Bazar (if bazar has tiles exceeding minimum reserve and game is not blocked) */}
+        {canDrawFromReserve && (
           <button
             onClick={() => onDrawTile()}
             disabled={!isMyTurn || hasPlayableMove}
@@ -262,16 +266,16 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
             <Layers className="w-4 h-4" />
             <span>
               {variant === '101'
-                ? boneyardCount >= 2
+                ? availableToDraw >= 2
                   ? `${t.drawTile} (+2 daş • cəmi ${boneyardCount})`
-                  : `${t.drawTile} (${boneyardCount})`
+                  : `${t.drawTile} (+1 daş • cəmi ${boneyardCount})`
                 : `${t.drawTile} (${boneyardCount})`}
             </span>
           </button>
         )}
 
-        {/* Pass Button (when no moves and (bazar empty OR board is blocked)) */}
-        {isMyTurn && !hasPlayableMove && (boneyardCount === 0 || isBoardBlocked) && (
+        {/* Pass Button (when no moves and (bazar reached reserve OR board is blocked)) */}
+        {isMyTurn && !hasPlayableMove && (!canDrawFromReserve || isBoardBlocked) && (
           <button
             onClick={onPassTurn}
             className="px-4 py-1.5 sm:px-5 sm:py-2 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-500 text-white shadow-lg flex items-center gap-2 animate-pulse"
@@ -287,9 +291,9 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
         <div className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/50 text-amber-300 text-[10px] sm:text-xs font-bold animate-fade-in shadow">
           {isBoardBlocked
             ? '🔒 Oyun Bağlandı — Bütün açıq ucların daşları masadadır! Pas keçin.'
-            : boneyardCount > 0
+            : canDrawFromReserve
             ? '💡 Gedişiniz yoxdur — Bazardan daş çəkin'
-            : '💡 Gedişiniz və bazarda daş yoxdur — Pas keçin'}
+            : '💡 Gedişiniz yoxdur və bazarda rezerv qalıb — Pas keçin'}
         </div>
       )}
 

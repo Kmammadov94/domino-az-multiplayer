@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import { GameMode } from '../types/domino';
+import { GameMode, GameVariant } from '../types/domino';
 import { DoubleComboMove } from '../utils/comboEngine';
 import {
   MultiplayerClientGameState,
@@ -103,7 +103,8 @@ class MultiplayerSocketService {
     playerId?: string,
     playerTag?: string,
     frameId?: string,
-    title?: string
+    title?: string,
+    variant: GameVariant = '365'
   ): Promise<{
     success: boolean;
     roomCode?: string;
@@ -115,6 +116,7 @@ class MultiplayerSocketService {
   }> {
     return this.emitWithTimeout('create_room', {
       mode,
+      variant,
       playerName,
       skinId,
       avatarId,
@@ -185,7 +187,8 @@ class MultiplayerSocketService {
     playerId?: string,
     playerTag?: string,
     frameId?: string,
-    title?: string
+    title?: string,
+    variant: GameVariant = '365'
   ): Promise<{
     success: boolean;
     roomCode?: string;
@@ -197,6 +200,7 @@ class MultiplayerSocketService {
   }> {
     return this.emitWithTimeout('quick_match', {
       mode,
+      variant,
       playerName,
       skinId,
       avatarId,

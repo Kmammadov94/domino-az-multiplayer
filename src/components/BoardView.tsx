@@ -18,6 +18,7 @@ interface BoardViewProps {
   onDrawBazaar?: () => void;
   canDrawFromBazaar?: boolean;
   isDraggingTile?: boolean;
+  variant?: '365' | '101';
 }
 
 export const BoardView: React.FC<BoardViewProps> = ({
@@ -29,7 +30,8 @@ export const BoardView: React.FC<BoardViewProps> = ({
   onSelectBranch,
   branchExpectedScores = {} as Record<BranchId, number>,
   hoveredBranch = null,
-  isDraggingTile = false
+  isDraggingTile = false,
+  variant = '365'
 }) => {
   const tableTheme: TableTheme =
     TABLE_THEMES.find((t) => t.id === tableThemeId) || TABLE_THEMES[0];
@@ -300,7 +302,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
                     className={`rounded-full border-2 flex items-center justify-center shadow-lg transition-all duration-200 pointer-events-none ${
                       isHovered
                         ? 'w-16 h-16 border-amber-300 bg-amber-400 text-slate-950 scale-125 ring-8 ring-amber-400/50 shadow-[0_0_35px_rgba(251,191,36,0.95)]'
-                        : expectedScore > 0
+                        : variant !== '101' && expectedScore > 0
                         ? 'w-12 h-12 border-amber-300 bg-amber-500/80 ring-4 ring-amber-400/50 shadow-[0_0_20px_rgba(251,191,36,0.8)] animate-bounce group-hover:scale-125'
                         : 'w-12 h-12 border-emerald-400 bg-emerald-500/40 shadow-[0_0_12px_rgba(52,211,153,0.8)] animate-pulse group-hover:scale-125'
                     }`}
@@ -314,8 +316,8 @@ export const BoardView: React.FC<BoardViewProps> = ({
                     </span>
                   </div>
 
-                  {/* Expected Points Badge (+5, +10, etc.) */}
-                  {expectedScore > 0 && (
+                  {/* Expected Points Badge (+5, +10, etc.) - Only shown in 365 mode */}
+                  {variant !== '101' && expectedScore > 0 && (
                     <div
                       className={`absolute bg-amber-400 text-slate-950 text-xs font-black px-2 py-0.5 rounded-full shadow-xl border border-amber-200 pointer-events-none ${
                         isHovered ? '-top-8 scale-110' : '-top-6 animate-bounce'

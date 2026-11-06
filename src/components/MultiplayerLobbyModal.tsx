@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GameMode, Language } from '../types/domino';
+import { GameMode, GameVariant, Language } from '../types/domino';
 import {
   MultiplayerRoomSummary,
   MultiplayerPlayerSlot,
@@ -37,9 +37,9 @@ interface MultiplayerLobbyModalProps {
   initialRoomCode?: string;
   initialError?: string | null;
   isAutoJoining?: boolean;
-  onCreateRoom: (mode: GameMode, playerName: string, isLocked?: boolean, turnDuration?: number) => Promise<void>;
+  onCreateRoom: (mode: GameMode, playerName: string, isLocked?: boolean, turnDuration?: number, variant?: GameVariant) => Promise<void>;
   onJoinRoom: (roomCode: string, playerName: string) => Promise<void>;
-  onQuickMatch: (mode: GameMode, playerName: string) => Promise<void>;
+  onQuickMatch: (mode: GameMode, playerName: string, variant?: GameVariant) => Promise<void>;
   onAddBot: () => Promise<void>;
   onToggleReady: (isReady: boolean) => void;
   onStartGame: () => Promise<void>;
@@ -69,6 +69,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     initialRoomCode ? 'join' : 'create'
   );
   const [selectedMode, setSelectedMode] = useState<GameMode>('2p_solo');
+  const [selectedVariant, setSelectedVariant] = useState<GameVariant>('365');
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const [turnDuration, setTurnDuration] = useState<number>(30); // 30, 60, 120 seconds
   const [roomCodeInput, setRoomCodeInput] = useState(initialRoomCode || '');
@@ -177,7 +178,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     setLoading(true);
     setErrorMsg(null);
     try {
-      await onCreateRoom(selectedMode, nameCheck.sanitizedName, isLocked, turnDuration);
+      await onCreateRoom(selectedMode, nameCheck.sanitizedName, isLocked, turnDuration, selectedVariant);
     } catch (e: any) {
       setErrorMsg(e.message || 'Xəta baş verdi');
     } finally {
@@ -215,7 +216,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     setLoading(true);
     setErrorMsg(null);
     try {
-      await onQuickMatch(selectedMode, nameCheck.sanitizedName);
+      await onQuickMatch(selectedMode, nameCheck.sanitizedName, selectedVariant);
     } catch (e: any) {
       setErrorMsg(e.message || 'Xəta baş verdi');
     } finally {
@@ -323,6 +324,13 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
 
               {/* Room Mode & Lock Badges */}
               <div className="flex flex-wrap items-center justify-center gap-2">
+                <div className="bg-slate-800/80 border border-slate-700 rounded-xl px-3.5 py-1.5 text-xs text-slate-300 font-semibold">
+                  Qayda:{' '}
+                  <span className={`font-bold ${currentRoom.variant === '101' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    {currentRoom.variant === '101' ? 'Klassik 101' : 'Telefon 365'}
+                  </span>
+                </div>
+
                 <div className="bg-slate-800/80 border border-slate-700 rounded-xl px-3.5 py-1.5 text-xs text-slate-300 font-semibold">
                   Rejim:{' '}
                   <span className="text-amber-300 font-bold">
@@ -588,6 +596,50 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
               {/* Tab 1: Create Room */}
               {tab === 'create' && (
                 <div className="flex flex-col gap-3.5 animate-fade-in">
+                  {/* Variant Selector: Telefon 365 vs Domino 101 */}
+                  <div className="flex flex-col gap-1.5 text-left">
+                    <label className="text-xs font-bold text-slate-300">
+                      Domino Rejimi:
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedVariant('365')}
+                        className={`p-2.5 rounded-xl border flex items-center justify-between text-left transition ${
+                          selectedVariant === '365'
+                            ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 font-bold shadow-[0_0_12px_rgba(16,185,129,0.2)]'
+                            : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:border-slate-600'
+                        }`}
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-xs font-black">Telefon 365</span>
+                          <span className="text-[10px] text-slate-400">Bakı qaydaları</span>
+                        </div>
+                        <span className="text-[10px] bg-slate-950 px-2 py-0.5 rounded-full text-emerald-300 font-bold">
+                          365 XAL
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedVariant('101')}
+                        className={`p-2.5 rounded-xl border flex items-center justify-between text-left transition ${
+                          selectedVariant === '101'
+                            ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-bold shadow-[0_0_12px_rgba(245,158,11,0.2)]'
+                            : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:border-slate-600'
+                        }`}
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-xs font-black">Domino 101</span>
+                          <span className="text-[10px] text-slate-400">Klassik Çayxana</span>
+                        </div>
+                        <span className="text-[10px] bg-slate-950 px-2 py-0.5 rounded-full text-amber-300 font-bold">
+                          101 XAL
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="flex flex-col gap-1.5 text-left">
                     <label className="text-xs font-bold text-slate-300">
                       Oyun Rejimi:
@@ -843,6 +895,9 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                                   <span className="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-1 rounded">
                                     #{r.code}
                                   </span>
+                                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${r.variant === '101' ? 'bg-amber-500/20 text-amber-300 border border-amber-400/40' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'}`}>
+                                    {r.variant === '101' ? '101 XAL' : '365 XAL'}
+                                  </span>
                                 </div>
                                 <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
                                   <span className="text-amber-400 font-semibold">{modeLabel}</span>
@@ -936,6 +991,34 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                   <p className="text-xs text-slate-300 leading-relaxed">
                     Sistem sizi avtomatik olaraq eyni vaxtda onlayn olan digər real oyunçularla bir masaya otuzduracaq.
                   </p>
+
+                  {/* Variant Choice for Quick Match */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedVariant('365')}
+                      className={`p-2 rounded-xl border flex items-center justify-between text-left transition ${
+                        selectedVariant === '365'
+                          ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 font-bold shadow-[0_0_10px_rgba(16,185,129,0.2)]'
+                          : 'bg-slate-800/60 border-slate-700 text-slate-400'
+                      }`}
+                    >
+                      <span className="text-xs font-black">Telefon 365</span>
+                      <span className="text-[10px] bg-slate-950 px-1.5 py-0.5 rounded text-emerald-300 font-bold">365 XAL</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedVariant('101')}
+                      className={`p-2 rounded-xl border flex items-center justify-between text-left transition ${
+                        selectedVariant === '101'
+                          ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-bold shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+                          : 'bg-slate-800/60 border-slate-700 text-slate-400'
+                      }`}
+                    >
+                      <span className="text-xs font-black">Domino 101</span>
+                      <span className="text-[10px] bg-slate-950 px-1.5 py-0.5 rounded text-amber-300 font-bold">101 XAL</span>
+                    </button>
+                  </div>
 
                   <div className="grid grid-cols-2 gap-2">
                     <button

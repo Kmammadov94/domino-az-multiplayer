@@ -192,7 +192,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
         {/* 101 Ayaz Reminder Badge */}
         <div className="text-[10px] text-slate-400 flex items-center justify-between px-1 pt-0.5 border-t border-white/5">
           <span>Hədəf: 101</span>
-          <span className="text-amber-400/90 font-semibold">Ayaz [0:0] = 20 xal</span>
+          <span className="text-amber-400/90 font-semibold">Tək [0:0] = 10 xal (tək deyilsə 0)</span>
         </div>
       </div>
     );
