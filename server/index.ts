@@ -165,7 +165,8 @@ const getRoomSummary = (room: GameRoom): MultiplayerRoomSummary => ({
   hostName: room.players.find((p) => p.isHost)?.name || 'Host',
   playerCount: room.players.length,
   maxPlayers: room.maxPlayers,
-  players: room.players
+  players: room.players,
+  isLocked: Boolean(room.isLocked)
 });
 
 // Broadcast personalized state to each player in room
@@ -209,7 +210,7 @@ io.on('connection', (socket: Socket) => {
   // 1. Create Room
   socket.on(
     'create_room',
-    (data: { mode: GameMode; playerName: string; skinId: string; avatarId?: string; sessionToken?: string }, callback) => {
+    (data: { mode: GameMode; playerName: string; skinId: string; avatarId?: string; sessionToken?: string; isLocked?: boolean }, callback) => {
       try {
         const nameValidation = validatePlayerName(data.playerName || 'Oyunçu 1');
         if (!nameValidation.isValid) {
@@ -227,7 +228,8 @@ io.on('connection', (socket: Socket) => {
           data.skinId || 'ivory_classic',
           () => broadcastRoom(room),
           data.avatarId || 'avatar_baku_classic',
-          sessionToken
+          sessionToken,
+          Boolean(data.isLocked)
         );
 
         rooms.set(roomCode, room);
@@ -313,12 +315,13 @@ io.on('connection', (socket: Socket) => {
         const mode = data.mode || '2p_solo';
         const sessionToken = data.sessionToken || `sess_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-        // Find existing open waiting room with same mode
+        // Find existing open waiting room with same mode (must be public / unlocked)
         let targetRoom: GameRoom | null = null;
         for (const room of rooms.values()) {
           if (
             room.mode === mode &&
             room.status === 'waiting' &&
+            !room.isLocked &&
             room.players.length < room.maxPlayers
           ) {
             targetRoom = room;
@@ -429,6 +432,52 @@ io.on('connection', (socket: Socket) => {
       }
     }
   );
+
+  // 3.6 Get List of Waiting Public & Private Rooms (Durak Online style table browser)
+  socket.on('get_public_rooms', (callback) => {
+    try {
+      const roomList = Array.from(rooms.values())
+        .filter((r) => r.status === 'waiting' && r.players.length < r.maxPlayers)
+        .map((r) => {
+          const hostP = r.players.find((p) => p.isHost) || r.players[0];
+          return {
+            code: r.code,
+            mode: r.mode,
+            hostName: hostP?.name || 'Oyunçu',
+            hostAvatar: hostP?.avatarId || 'avatar_tea_master',
+            playerCount: r.players.length,
+            maxPlayers: r.maxPlayers,
+            isLocked: Boolean(r.isLocked)
+          };
+        });
+
+      safeAck(callback, { success: true, rooms: roomList });
+    } catch (err: unknown) {
+      safeAck(callback, { success: false, error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  // 3.7 Toggle Room Lock (Public vs Private)
+  socket.on('toggle_room_lock', (data: { roomCode?: string }, callback) => {
+    try {
+      const code = (data?.roomCode || socketToRoom.get(socket.id) || '').trim().toUpperCase();
+      const room = rooms.get(code);
+      if (!room) {
+        safeAck(callback, { success: false, error: 'Otaq tapılmadı' });
+        return;
+      }
+      const player = room.players.find((p) => p.socketId === socket.id);
+      if (!player || !player.isHost) {
+        safeAck(callback, { success: false, error: 'Yalnız otaq sahibi masanı kilidləyə bilər' });
+        return;
+      }
+      room.isLocked = !room.isLocked;
+      broadcastRoom(room);
+      safeAck(callback, { success: true, isLocked: room.isLocked });
+    } catch (err: unknown) {
+      safeAck(callback, { success: false, error: err instanceof Error ? err.message : String(err) });
+    }
+  });
 
   // 4. Set Ready
   socket.on('set_ready', (data: { isReady: boolean }) => {

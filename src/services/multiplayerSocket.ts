@@ -4,6 +4,7 @@ import { DoubleComboMove } from '../utils/comboEngine';
 import {
   MultiplayerClientGameState,
   MultiplayerRoomSummary,
+  PublicRoomInfo,
   ChatMessage
 } from '../types/multiplayer';
 
@@ -96,7 +97,8 @@ class MultiplayerSocketService {
     playerName: string,
     skinId: string,
     avatarId?: string,
-    sessionToken?: string
+    sessionToken?: string,
+    isLocked?: boolean
   ): Promise<{
     success: boolean;
     roomCode?: string;
@@ -106,7 +108,23 @@ class MultiplayerSocketService {
     summary?: MultiplayerRoomSummary;
     error?: string;
   }> {
-    return this.emitWithTimeout('create_room', { mode, playerName, skinId, avatarId, sessionToken });
+    return this.emitWithTimeout('create_room', { mode, playerName, skinId, avatarId, sessionToken, isLocked });
+  }
+
+  public getPublicRooms(): Promise<{
+    success: boolean;
+    rooms?: PublicRoomInfo[];
+    error?: string;
+  }> {
+    return this.emitWithTimeout('get_public_rooms');
+  }
+
+  public toggleRoomLock(roomCode?: string): Promise<{
+    success: boolean;
+    isLocked?: boolean;
+    error?: string;
+  }> {
+    return this.emitWithTimeout('toggle_room_lock', { roomCode });
   }
 
   public joinRoom(

@@ -52,6 +52,7 @@ export class GameRoom {
   public isMatchOver: boolean = false;
   public matchWinnerIndex: number = 0;
   public isInstant35: boolean = false;
+  public isLocked: boolean = false;
 
   private turnTimerInterval: NodeJS.Timeout | null = null;
   private onStateChangeCallback: () => void;
@@ -64,10 +65,12 @@ export class GameRoom {
     hostSkin: string,
     onStateChange: () => void,
     hostAvatar?: string,
-    hostSessionToken?: string
+    hostSessionToken?: string,
+    isLocked: boolean = false
   ) {
     this.code = code;
     this.mode = mode;
+    this.isLocked = isLocked;
     this.hostSocketId = hostSocketId;
     this.maxPlayers = mode === '2p_solo' ? 2 : mode === '3p_solo' ? 3 : 4;
     this.onStateChangeCallback = onStateChange;

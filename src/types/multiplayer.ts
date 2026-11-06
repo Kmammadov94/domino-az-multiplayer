@@ -27,6 +27,17 @@ export interface MultiplayerRoomSummary {
   playerCount: number;
   maxPlayers: number;
   players: MultiplayerPlayerSlot[];
+  isLocked?: boolean;
+}
+
+export interface PublicRoomInfo {
+  code: string;
+  mode: GameMode;
+  hostName: string;
+  hostAvatar?: string;
+  playerCount: number;
+  maxPlayers: number;
+  isLocked: boolean;
 }
 
 export interface MultiplayerClientGameState {
