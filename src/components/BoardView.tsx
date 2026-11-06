@@ -17,6 +17,7 @@ interface BoardViewProps {
   boneyardCount?: number;
   onDrawBazaar?: () => void;
   canDrawFromBazaar?: boolean;
+  isDraggingTile?: boolean;
 }
 
 export const BoardView: React.FC<BoardViewProps> = ({
@@ -27,7 +28,8 @@ export const BoardView: React.FC<BoardViewProps> = ({
   playableBranches,
   onSelectBranch,
   branchExpectedScores = {} as Record<BranchId, number>,
-  hoveredBranch = null
+  hoveredBranch = null,
+  isDraggingTile = false
 }) => {
   const tableTheme: TableTheme =
     TABLE_THEMES.find((t) => t.id === tableThemeId) || TABLE_THEMES[0];
@@ -101,6 +103,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
 
   // Mouse pan handlers
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (isDraggingTile) return;
     // Only drag with left click on background
     if (e.button !== 0) return;
     isDraggingRef.current = true;
@@ -108,12 +111,12 @@ export const BoardView: React.FC<BoardViewProps> = ({
   };
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDraggingRef.current) return;
+    if (isDraggingTile || !isDraggingRef.current) return;
     setPanOffset({
       x: e.clientX - dragStartRef.current.x,
       y: e.clientY - dragStartRef.current.y
     });
-  }, []);
+  }, [isDraggingTile]);
 
   const handleMouseUp = () => {
     isDraggingRef.current = false;
@@ -128,6 +131,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
 
   // Touch pan handlers
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (isDraggingTile) return;
     if (e.touches.length === 1) {
       isDraggingRef.current = true;
       dragStartRef.current = {
@@ -138,7 +142,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDraggingRef.current || e.touches.length !== 1) return;
+    if (isDraggingTile || !isDraggingRef.current || e.touches.length !== 1) return;
     setPanOffset({
       x: e.touches[0].clientX - dragStartRef.current.x,
       y: e.touches[0].clientY - dragStartRef.current.y

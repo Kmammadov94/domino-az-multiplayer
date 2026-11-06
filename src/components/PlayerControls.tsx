@@ -66,6 +66,9 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
 
   const handlePointerDown = (e: React.PointerEvent, tile: TileData) => {
     if (!isMyTurn || !playableTileIds.includes(tile.id)) return;
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
     pointerCandidateRef.current = {
       tile,
       startX: e.clientX,
@@ -79,14 +82,20 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     const dy = e.clientY - pointerCandidateRef.current.startY;
     const distance = Math.hypot(dx, dy);
 
-    // If moved more than 6px, start drag mode
-    if (distance > 6) {
+    // If moved more than 8px, start drag mode
+    if (distance > 8) {
+      try {
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      } catch {}
       onStartDrag(tile, { x: e.clientX, y: e.clientY });
       pointerCandidateRef.current = null;
     }
   };
 
   const handlePointerUp = (e: React.PointerEvent, tile: TileData) => {
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
     if (pointerCandidateRef.current && pointerCandidateRef.current.tile.id === tile.id) {
       pointerCandidateRef.current = null;
       // It was a tap/click!
@@ -94,8 +103,49 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     }
   };
 
-  const handlePointerCancel = () => {
+  const handlePointerCancel = (e: React.PointerEvent) => {
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
     pointerCandidateRef.current = null;
+  };
+
+  // Explicit touch handlers for ultra-reliable mobile responsiveness
+  const touchCandidateRef = useRef<{
+    tile: TileData;
+    startX: number;
+    startY: number;
+  } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent, tile: TileData) => {
+    if (!isMyTurn || !playableTileIds.includes(tile.id)) return;
+    if (e.touches.length > 0) {
+      touchCandidateRef.current = {
+        tile,
+        startX: e.touches[0].clientX,
+        startY: e.touches[0].clientY
+      };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent, tile: TileData) => {
+    if (!touchCandidateRef.current || touchCandidateRef.current.tile.id !== tile.id) return;
+    if (e.touches.length > 0) {
+      const dx = e.touches[0].clientX - touchCandidateRef.current.startX;
+      const dy = e.touches[0].clientY - touchCandidateRef.current.startY;
+      if (Math.hypot(dx, dy) > 8) {
+        onStartDrag(tile, { x: e.touches[0].clientX, y: e.touches[0].clientY });
+        touchCandidateRef.current = null;
+        pointerCandidateRef.current = null;
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent, tile: TileData) => {
+    if (touchCandidateRef.current && touchCandidateRef.current.tile.id === tile.id) {
+      touchCandidateRef.current = null;
+      onSelectTile(tile);
+    }
   };
 
   // Dynamic tile dimension calculation:
@@ -203,6 +253,9 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
               onPointerMove={(e) => handlePointerMove(e, tile)}
               onPointerUp={(e) => handlePointerUp(e, tile)}
               onPointerCancel={handlePointerCancel}
+              onTouchStart={(e) => handleTouchStart(e, tile)}
+              onTouchMove={(e) => handleTouchMove(e, tile)}
+              onTouchEnd={(e) => handleTouchEnd(e, tile)}
               className={`touch-none transition-all duration-150 rounded-lg flex-shrink-0 ${
                 isPlayable ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
               } ${isBeingDragged ? 'opacity-20 scale-95' : ''} ${

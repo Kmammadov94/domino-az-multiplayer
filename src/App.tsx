@@ -1453,86 +1453,129 @@ export const App: React.FC = () => {
     triggerHaptic('light');
   };
 
-  // Global Pointer tracking for Drag and Drop
+  // Global Pointer & Touch tracking for Drag and Drop with Magnetic Proximity Snap
   useEffect(() => {
     if (!draggedTile) return;
 
-    const handlePointerMove = (e: PointerEvent) => {
-      setDragPosition({ x: e.clientX, y: e.clientY });
+    let currentHovered: BranchId | null = null;
 
-      const el = document.elementFromPoint(e.clientX, e.clientY);
+    const findTargetBranchAtPoint = (cx: number, cy: number): BranchId | null => {
+      // 1. Direct hit via elementFromPoint
+      const el = document.elementFromPoint(cx, cy);
       const branchEl = el?.closest('[data-branch-id]');
       if (branchEl) {
         const bId = branchEl.getAttribute('data-branch-id') as BranchId;
-        if (bId === 'main_left' && effectiveBoard.tiles.length === 0) {
-          setHoveredBranch('main_left');
-          return;
-        }
-        if (playableBranches.includes(bId)) {
-          setHoveredBranch(bId);
-          return;
-        }
+        if (bId === 'main_left' && effectiveBoard.tiles.length === 0) return 'main_left';
+        if (playableBranches.includes(bId)) return bId;
       }
 
-      // Magnetic snapping when over board:
+      // 2. Proximity hit test: Check distance to all active target rings on the board
+      // A generous magnetic radius of 140px ensures fat-finger touches snap cleanly!
+      let bestBranch: BranchId | null = null;
+      let minDistance = 140;
+
+      for (const bId of playableBranches) {
+        const targets = document.querySelectorAll(`[data-branch-id="${bId}"]`);
+        targets.forEach((node) => {
+          const rect = node.getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const centerY = rect.top + rect.height / 2;
+          const dist = Math.hypot(cx - centerX, cy - centerY);
+          if (dist < minDistance) {
+            minDistance = dist;
+            bestBranch = bId;
+          }
+        });
+      }
+
+      if (bestBranch) return bestBranch;
+
+      // 3. Empty board: dropping anywhere on board targets 'main_left'
       if (effectiveBoard.tiles.length === 0 && el?.closest('[data-domino-board]')) {
-        setHoveredBranch('main_left');
-        return;
+        return 'main_left';
       }
 
+      // 4. If board has only 1 playable branch, dropping anywhere over the board targets it
       if (playableBranches.length === 1 && el?.closest('[data-domino-board]')) {
-        setHoveredBranch(playableBranches[0]);
-        return;
+        return playableBranches[0];
       }
 
-      setHoveredBranch(null);
+      return null;
     };
 
-    const handlePointerUp = (e: PointerEvent) => {
-      const el = document.elementFromPoint(e.clientX, e.clientY);
-      const branchEl = el?.closest('[data-branch-id]');
-      let targetBranch: BranchId | null = null;
-
-      if (branchEl) {
-        const bId = branchEl.getAttribute('data-branch-id') as BranchId;
-        if (bId === 'main_left' && effectiveBoard.tiles.length === 0) {
-          targetBranch = 'main_left';
-        } else if (playableBranches.includes(bId)) {
-          targetBranch = bId;
+    const updateDragPosition = (cx: number, cy: number) => {
+      setDragPosition({ x: cx, y: cy });
+      const target = findTargetBranchAtPoint(cx, cy);
+      if (target !== currentHovered) {
+        currentHovered = target;
+        setHoveredBranch(target);
+        if (target) {
+          triggerHaptic('light');
         }
       }
+    };
 
-      if (!targetBranch) {
-        if (effectiveBoard.tiles.length === 0 && el?.closest('[data-domino-board]')) {
-          targetBranch = 'main_left';
-        } else if (playableBranches.length === 1 && el?.closest('[data-domino-board]')) {
-          targetBranch = playableBranches[0];
-        }
-      }
-
+    const finishDrag = (cx: number, cy: number) => {
+      const targetBranch = findTargetBranchAtPoint(cx, cy);
       if (targetBranch) {
+        triggerHaptic('medium');
         if (effectiveInMultiplayer) {
           multiplayerSocket.playTile(draggedTile.id, targetBranch);
         } else {
           executeMove(0, draggedTile, targetBranch);
         }
       }
-
       setDraggedTile(null);
       setDragPosition(null);
       setHoveredBranch(null);
     };
 
+    // Pointer events (Desktop & Modern mobile)
+    const handlePointerMove = (e: PointerEvent) => {
+      updateDragPosition(e.clientX, e.clientY);
+    };
+
+    const handlePointerUp = (e: PointerEvent) => {
+      finishDrag(e.clientX, e.clientY);
+    };
+
+    // Native Touch events (iOS Safari & Android WebViews)
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length > 0) {
+        // Crucial: Prevent iOS Safari elastic bounce & page panning during tile drag!
+        if (e.cancelable) e.preventDefault();
+        const t = e.touches[0];
+        updateDragPosition(t.clientX, t.clientY);
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      const t = e.changedTouches[0] || e.touches[0];
+      if (t) {
+        finishDrag(t.clientX, t.clientY);
+      } else {
+        setDraggedTile(null);
+        setDragPosition(null);
+        setHoveredBranch(null);
+      }
+    };
+
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
     window.addEventListener('pointercancel', handlePointerUp);
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
+    window.addEventListener('touchend', handleTouchEnd, { passive: false });
+    window.addEventListener('touchcancel', handleTouchEnd, { passive: false });
 
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
       window.removeEventListener('pointercancel', handlePointerUp);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('touchcancel', handleTouchEnd);
     };
-  }, [draggedTile, playableBranches, board]);
+  }, [draggedTile, playableBranches, effectiveBoard, effectiveInMultiplayer]);
 
   // Language cycle helper
   const cycleLanguage = () => {
@@ -2325,6 +2368,7 @@ export const App: React.FC = () => {
                 boneyardCount={effectiveBoneyardCount}
                 onDrawBazaar={handleDrawTile}
                 canDrawFromBazaar={isMyTurn && !humanHasPlayableMove && effectiveBoneyardCount > 0}
+                isDraggingTile={Boolean(draggedTile)}
               />
             </div>
 
@@ -2380,23 +2424,23 @@ export const App: React.FC = () => {
         )}
       </main>
 
-      {/* Floating Dragged Domino Avatar (Follows Cursor / Touch) */}
+      {/* Floating Dragged Domino Avatar (Follows Cursor / Touch, offset above finger on mobile) */}
       {draggedTile && dragPosition && (
         <div
-          className="fixed pointer-events-none z-50 transform -translate-x-1/2 -translate-y-1/2"
+          className="fixed pointer-events-none z-50 transform -translate-x-1/2 -translate-y-full mb-3 select-none"
           style={{
             left: `${dragPosition.x}px`,
-            top: `${dragPosition.y}px`,
-            filter: 'drop-shadow(0 20px 35px rgba(0,0,0,0.8))'
+            top: `${dragPosition.y - 20}px`,
+            filter: 'drop-shadow(0 25px 40px rgba(0,0,0,0.9))'
           }}
         >
-          <div className="transform -rotate-6 scale-110">
+          <div className="transform -rotate-6 scale-105 animate-pulse">
             <DominoTile
               tile={draggedTile}
               skin={activeSkin}
               isVertical={true}
-              customWidth={56}
-              customHeight={112}
+              customWidth={54}
+              customHeight={108}
               isSelected={true}
             />
           </div>
