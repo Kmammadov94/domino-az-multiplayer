@@ -550,7 +550,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  Kodla Giriş
+                  Kodla Qoşul
                 </button>
                 <button
                   onClick={() => setTab('quick')}
@@ -793,7 +793,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                                   className="px-3 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/80 border border-rose-500/40 text-rose-300 font-bold text-xs flex items-center gap-1 active:scale-95 transition"
                                 >
                                   <Lock className="w-3 h-3 text-rose-400" />
-                                  <span>Kodla Gir</span>
+                                  <span>Kodla Qoşul</span>
                                 </button>
                               ) : (
                                 <button
@@ -850,7 +850,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                     className="w-full py-3.5 rounded-xl bg-gradient-to-r from-sky-600 to-sky-500 hover:brightness-110 text-white font-black text-sm shadow-lg flex items-center justify-center gap-2 active:scale-95 transition cursor-pointer"
                   >
                     <Users className="w-4 h-4" />
-                    <span>{loading ? 'Qoşulur...' : 'Otağa Daxil Ol'}</span>
+                    <span>{loading ? 'Qoşulur...' : 'Kodla Qoşul'}</span>
                   </button>
                 </div>
               )}
