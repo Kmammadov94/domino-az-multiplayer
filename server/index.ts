@@ -68,19 +68,27 @@ const saveUserDatabase = (db: Record<string, any>): void => {
   }
 };
 
-// Special VIP / Creator coin grants
-const VIP_ACCOUNTS: Record<string, number> = {
-  'karammammadov.94@gmail.com': 10000
+// Special VIP / Creator one-time coin grants
+const ONE_TIME_GRANTS: Record<string, { grantId: string; amount: number }> = {
+  'karammammadov.94@gmail.com': { grantId: 'grant_10000_v1', amount: 10000 }
 };
 
 let userDatabase = loadUserDatabase();
 
-// Ensure existing VIP accounts in database have their granted coins
+// Ensure existing accounts have their one-time grant registered without re-clamping coins
 for (const record of Object.values(userDatabase)) {
   const uEmail = (record?.profile?.email || '').toLowerCase().trim();
-  if (VIP_ACCOUNTS[uEmail]) {
-    if (!record.stats) record.stats = {};
-    record.stats.coins = Math.max(record.stats.coins || 0, VIP_ACCOUNTS[uEmail]);
+  const grant = ONE_TIME_GRANTS[uEmail];
+  if (grant) {
+    if (!record.claimedGrants) record.claimedGrants = {};
+    if (!record.claimedGrants[grant.grantId]) {
+      if (!record.stats) record.stats = {};
+      // If coins are not yet at least grant amount, bump it once
+      if ((record.stats.coins || 0) < grant.amount) {
+        record.stats.coins = (record.stats.coins || 0) + grant.amount;
+      }
+      record.claimedGrants[grant.grantId] = true;
+    }
   }
 }
 saveUserDatabase(userDatabase);
@@ -94,19 +102,23 @@ app.post('/api/user-stats', (req, res) => {
 
   const existing = userDatabase[googleId] || {};
   const existingStats = existing.stats || {};
+  const existingGrants = existing.claimedGrants || {};
 
   // Handle coins:
-  // If it's an initial sign-in on a device and cloud already has coins, preserve cloud coins.
   // In normal gameplay or store purchases (isInitialLogin !== true), trust the client's current coins!
   let finalCoins = typeof stats?.coins === 'number' ? Math.max(0, stats.coins) : (existingStats.coins ?? 20);
   if (isInitialLogin && existingStats.coins !== undefined) {
     finalCoins = Math.max(existingStats.coins, finalCoins);
   }
 
-  // Grant VIP coins if applicable
+  // Check one-time VIP grant on first login
   const normalizedEmail = (email || existing.profile?.email || '').toLowerCase().trim();
-  if (VIP_ACCOUNTS[normalizedEmail]) {
-    finalCoins = Math.max(finalCoins, VIP_ACCOUNTS[normalizedEmail]);
+  const grant = ONE_TIME_GRANTS[normalizedEmail];
+  if (grant && !existingGrants[grant.grantId]) {
+    if (finalCoins < grant.amount) {
+      finalCoins += grant.amount;
+    }
+    existingGrants[grant.grantId] = true;
   }
 
   // Merge stats intelligently (union of unlocked cosmetics, max streak, etc.)
@@ -143,6 +155,7 @@ app.post('/api/user-stats', (req, res) => {
       picture: picture || existing.profile?.picture || ''
     },
     stats: mergedStats,
+    claimedGrants: existingGrants,
     updatedAt: Date.now()
   };
 
