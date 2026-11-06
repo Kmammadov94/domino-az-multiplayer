@@ -30,6 +30,7 @@ export interface GameBoard {
   branches: Record<BranchId, BranchState>;
   spinnerTile: BoardTile | null;
   spinnerDeclared: boolean;
+  allowSpinner?: boolean;
 }
 
 // Fixed dimensions for standard dominoes:
@@ -38,7 +39,7 @@ export const TILE_SHORT = 46;
 export const TILE_LONG = 92;
 export const TILE_GAP = 2; // tight 2px gap so tiles touch cleanly
 
-export const createInitialBoard = (): GameBoard => {
+export const createInitialBoard = (allowSpinner: boolean = true): GameBoard => {
   return {
     tiles: [],
     branches: {
@@ -88,7 +89,8 @@ export const createInitialBoard = (): GameBoard => {
       }
     },
     spinnerTile: null,
-    spinnerDeclared: false
+    spinnerDeclared: false,
+    allowSpinner
   };
 };
 
@@ -146,11 +148,14 @@ export const getPlayableBranches = (board: GameBoard, tile: TileData): BranchId[
   if (board.tiles.length === 0) return ['main_left'];
 
   const playable: BranchId[] = [];
-  const branchKeys: BranchId[] = ['main_left', 'main_right', 'spinner_top', 'spinner_bottom'];
+  const branchKeys: BranchId[] =
+    board.allowSpinner === false
+      ? ['main_left', 'main_right']
+      : ['main_left', 'main_right', 'spinner_top', 'spinner_bottom'];
 
   for (const bId of branchKeys) {
     const branch = board.branches[bId];
-    if (branch.active) {
+    if (branch && branch.active) {
       if (tile.left === branch.openValue || tile.right === branch.openValue) {
         playable.push(bId);
       }
@@ -189,7 +194,8 @@ export const placeTileOnBranch = (
 
     // Check Spinner declaration:
     // "The spinner is not the first double played, but the first double that has tiles in both sides"
-    if (!newBoard.spinnerDeclared) {
+    // Spinner is strictly disabled in 101 mode (allowSpinner === false)!
+    if (newBoard.allowSpinner !== false && !newBoard.spinnerDeclared) {
       const isParentDouble = parentTile.tile.left === parentTile.tile.right;
       if (isParentDouble && parentTile.connections >= 2) {
         newBoard.spinnerDeclared = true;
@@ -484,7 +490,10 @@ export const getActiveOpenEnds = (board: GameBoard): OpenEnd[] => {
   }
 
   const openEnds: OpenEnd[] = [];
-  const branchKeys: BranchId[] = ['main_left', 'main_right', 'spinner_top', 'spinner_bottom'];
+  const branchKeys: BranchId[] =
+    board.allowSpinner === false
+      ? ['main_left', 'main_right']
+      : ['main_left', 'main_right', 'spinner_top', 'spinner_bottom'];
 
   for (const bId of branchKeys) {
     const branch = board.branches[bId];

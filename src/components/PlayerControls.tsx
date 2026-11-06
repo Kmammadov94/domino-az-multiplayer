@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
-import { TileData, DominoSkin, Language } from '../types/domino';
+import { TileData, DominoSkin, Language, GameVariant } from '../types/domino';
 import { DoubleComboMove } from '../utils/comboEngine';
 import { translations } from '../i18n/translations';
 import { DominoTile } from './DominoTile';
@@ -23,6 +23,7 @@ interface PlayerControlsProps {
   onPassTurn: () => void;
   lang: Language;
   isBoardBlocked?: boolean;
+  variant?: GameVariant;
 }
 
 export const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -41,7 +42,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   onDrawTile,
   onPassTurn,
   lang,
-  isBoardBlocked = false
+  isBoardBlocked = false,
+  variant = '365'
 }) => {
   const t = translations[lang];
 
@@ -259,7 +261,11 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           >
             <Layers className="w-4 h-4" />
             <span>
-              {t.drawTile} ({boneyardCount})
+              {variant === '101'
+                ? boneyardCount >= 2
+                  ? `${t.drawTile} (+2 daş • cəmi ${boneyardCount})`
+                  : `${t.drawTile} (${boneyardCount})`
+                : `${t.drawTile} (${boneyardCount})`}
             </span>
           </button>
         )}

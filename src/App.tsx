@@ -821,7 +821,7 @@ export const App: React.FC = () => {
       turnTimeoutRef.current = null;
     }
 
-    setBoard(createInitialBoard());
+    setBoard(createInitialBoard(gameVariant !== '101'));
     setBoneyard(newBoneyard);
     setSelectedTile(null);
     setConsecutivePasses(0);
@@ -898,11 +898,15 @@ export const App: React.FC = () => {
 
         setTimeout(() => {
           const playersWith101 = finalPlayers.map((p) => {
-            const teamMain =
-              p.team === 1 ? res.nextMatchState.team1.mainScore : res.nextMatchState.team2.mainScore;
+            const pScore =
+              finalPlayers.length === 3
+                ? res.nextMatchState.playerAccounts?.[p.id]?.mainScore ?? 0
+                : p.team === 1
+                ? res.nextMatchState.team1.mainScore
+                : res.nextMatchState.team2.mainScore;
             return {
               ...p,
-              score: teamMain
+              score: pScore
             };
           });
 
@@ -910,7 +914,10 @@ export const App: React.FC = () => {
 
           if (res.isMatchOver) {
             setIsMatchOver(true);
-            const userWon = res.nextMatchState.team1.mainScore > res.nextMatchState.team2.mainScore;
+            const userWon =
+              finalPlayers.length === 3
+                ? res.winnerPlayerIndex === 0
+                : res.nextMatchState.team1.mainScore > res.nextMatchState.team2.mainScore;
             setWinnerTeam(userWon ? 1 : 2);
             awardMatchCoins(userWon);
           } else {
@@ -1448,21 +1455,24 @@ export const App: React.FC = () => {
     }
 
     if (currentTurn !== 0 || boneyard.length === 0 || handRevealed) return;
-    const numIdx =
-      typeof tileIndex === 'number' && Number.isFinite(tileIndex)
-        ? tileIndex
-        : 0;
-    const safeIdx = Math.min(Math.max(0, numIdx), boneyard.length - 1);
-    const drawn = boneyard[safeIdx];
-    if (!drawn) return;
-    const nextBoneyard = boneyard.filter((_, i) => i !== safeIdx);
+    // In 101 mode: players draw 2 tiles at a time from bazaar ("2 daş 2 daş gedirsən")!
+    const countToDraw = gameVariant === '101' ? Math.min(2, boneyard.length) : 1;
+    let nextBoneyard = [...boneyard];
+    const drawnTiles: TileData[] = [];
+    for (let c = 0; c < countToDraw; c++) {
+      if (nextBoneyard.length > 0) {
+        drawnTiles.push(nextBoneyard[0]);
+        nextBoneyard.shift();
+      }
+    }
+    if (drawnTiles.length === 0) return;
 
     sounds.playTileDraw();
     setBoneyard(nextBoneyard);
 
     const updatedPlayers = players.map((p, idx) => {
       if (idx === 0) {
-        return { ...p, hand: [...p.hand, drawn] };
+        return { ...p, hand: [...p.hand, ...drawnTiles] };
       }
       return p;
     });
@@ -1564,14 +1574,15 @@ export const App: React.FC = () => {
         }
 
         if (boneyard.length > 0 && canBazaarHelp) {
-          // AI draws from boneyard
-          const drawn = boneyard[0];
-          const nextBoneyard = boneyard.slice(1);
+          // AI draws from boneyard (2 tiles in 101 mode, 1 tile in other modes)
+          const countToDraw = gameVariant === '101' ? Math.min(2, boneyard.length) : 1;
+          const drawn = boneyard.slice(0, countToDraw);
+          const nextBoneyard = boneyard.slice(countToDraw);
           setBoneyard(nextBoneyard);
 
           const updatedPlayers = players.map((p, idx) => {
             if (idx === currentTurn) {
-              return { ...p, hand: [...p.hand, drawn] };
+              return { ...p, hand: [...p.hand, ...drawn] };
             }
             return p;
           });
@@ -2283,44 +2294,62 @@ export const App: React.FC = () => {
               <div className="w-full space-y-2.5">
                 {gameVariant === '101' ? (
                   <>
+                    {/* 4 Player Duo */}
                     <button
                       onClick={() => startMatch('4p_duo', '101')}
-                      className="w-full py-4 px-4 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-xl transition-all flex flex-col gap-1.5 group transform hover:-translate-y-0.5 border border-amber-300/80 active:scale-95 text-left"
+                      className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-xl transition-all flex items-center justify-between group transform hover:-translate-y-0.5 border border-amber-300/80 active:scale-95 text-left"
                     >
-                      <div className="w-full flex items-center justify-between">
-                        <span className="flex items-center gap-2 text-sm sm:text-base">
-                          <Play className="w-5 h-5 fill-slate-950" />
-                          <span>4 Nəfərlik Qoşa (2 vs 2 Cütlük)</span>
+                      <div className="flex items-center gap-2">
+                        <Play className="w-4 h-4 fill-slate-950" />
+                        <span className="text-xs sm:text-sm font-black">4 Nəfərlik Qoşa (2 vs 2 Cütlük)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <span className="text-[10px] bg-slate-950 text-slate-300 font-bold px-2 py-0.5 rounded-full">
+                          Bazar yoxdur
                         </span>
                         <span className="text-[10px] bg-slate-950 text-amber-300 font-black px-2 py-0.5 rounded-full shadow">
-                          HƏDƏF: 101
+                          101 XAL
                         </span>
-                      </div>
-                      <div className="w-full flex items-center justify-between text-[11px] text-slate-900 font-bold pt-1 border-t border-slate-950/15">
-                        <span>Hər kəsə 7 daş • Bazar yoxdur</span>
-                        <span>İlk gediş: 1-1 (1 Qoşa)</span>
                       </div>
                     </button>
 
-                    {/* Quick 101 Rules Accordion Banner */}
-                    <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-2xl text-left text-xs space-y-1.5 shadow-inner">
-                      <div className="flex items-center justify-between text-[11px] font-black text-amber-300 pb-1 border-b border-white/5">
-                        <span>📖 Azərbaycan 101 Qaydaları:</span>
-                        <span className="text-slate-400 font-normal">Klassik Çayxana</span>
+                    {/* 3 Player Solo */}
+                    <button
+                      onClick={() => startMatch('3p_solo', '101')}
+                      className="w-full py-3.5 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition-all flex items-center justify-between group transform hover:-translate-y-0.5 active:scale-95 text-left shadow-lg"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-amber-400" />
+                        <span className="text-xs sm:text-sm font-bold text-white">3 Nəfərlik Tək (Hərəyə 7 daş)</span>
                       </div>
-                      <p className="text-[11px] text-slate-300 leading-snug">
-                        • <strong className="text-amber-300">Saya Düşmək (13 Xal):</strong> İlk dəfə xal yazmaq üçün tək əldə ən azı 13 xal toplamalısınız. 13-dən az xal qaralamada qalır.
-                      </p>
-                      <p className="text-[11px] text-slate-300 leading-snug">
-                        • <strong className="text-rose-400">Qaralamanın Yanması:</strong> Saya düşməmiş komandanın qaralaması rəqib udanda və ya 3 cəhddə 13-ü aşa bilməyəndə sıfırlanır!
-                      </p>
-                      <p className="text-[11px] text-slate-300 leading-snug">
-                        • <strong className="text-cyan-300">Ayaz [0:0] Tələsi:</strong> Əldə qalan cüt boş daşı (0-0) tək xal deyil, 20 cərimə xalı sayılır!
-                      </p>
-                      <p className="text-[11px] text-slate-300 leading-snug">
-                        • <strong className="text-yellow-300">Seka (Bərabərlik):</strong> Bağlı oyunda xallar bərabərdirsə, Seka Bankına yığılır və növbəti əli udana verilir.
-                      </p>
-                    </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <span className="text-[10px] bg-slate-950 text-slate-300 font-bold px-2 py-0.5 rounded-full">
+                          7 daş bazarda
+                        </span>
+                        <span className="text-[10px] bg-slate-950 text-amber-300 font-black px-2 py-0.5 rounded-full">
+                          101 XAL
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* 2 Player Solo */}
+                    <button
+                      onClick={() => startMatch('2p_solo', '101')}
+                      className="w-full py-3.5 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition-all flex items-center justify-between group transform hover:-translate-y-0.5 active:scale-95 text-left shadow-lg"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">👤</span>
+                        <span className="text-xs sm:text-sm font-bold text-white">2 Nəfərlik Tək (Hərəyə 7 daş)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <span className="text-[10px] bg-slate-950 text-slate-300 font-bold px-2 py-0.5 rounded-full">
+                          14 daş bazarda
+                        </span>
+                        <span className="text-[10px] bg-slate-950 text-amber-300 font-black px-2 py-0.5 rounded-full">
+                          101 XAL
+                        </span>
+                      </div>
+                    </button>
                   </>
                 ) : (
                   <>
@@ -2876,6 +2905,7 @@ export const App: React.FC = () => {
               onPassTurn={handlePassTurn}
               lang={lang}
               isBoardBlocked={isCurrentBoardBlocked}
+              variant={effectiveInMultiplayer ? '365' : gameVariant}
             />
           </div>
         )}

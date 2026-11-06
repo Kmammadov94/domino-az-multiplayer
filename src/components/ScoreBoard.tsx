@@ -59,78 +59,135 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
           </div>
         )}
 
-        {/* Teams Score Grid for 101 */}
-        <div className="grid grid-cols-2 gap-2">
-          {/* Team 1 */}
-          <div className={`p-2 rounded-xl border flex flex-col items-center transition-all ${
-            t1State.mainScore >= 101
-              ? 'bg-amber-950/50 border-amber-400 ring-2 ring-amber-400/40 shadow-lg'
-              : 'bg-slate-800/70 border-slate-700'
-          }`}>
-            <span className="text-xs font-black text-emerald-400 flex items-center gap-1">
-              {t.team1}
-              {t1State.mainScore >= 101 && <Award className="w-3 h-3 text-amber-400" />}
-            </span>
-            <span className="text-2xl font-black text-white tracking-tight my-0.5">{t1State.mainScore}</span>
-            <div className="w-full bg-slate-700/50 rounded-full h-1.5 overflow-hidden">
-              <div
-                className="bg-emerald-500 h-full rounded-full transition-all duration-300"
-                style={{ width: `${Math.min(100, (t1State.mainScore / 101) * 100)}%` }}
-              />
+        {/* Players / Teams Score Grid for 101 */}
+        {players.length === 3 ? (
+          <div className="grid grid-cols-3 gap-1.5">
+            {players.map((p) => {
+              const acc = match101State?.playerAccounts?.[p.id] || {
+                isOpen: false,
+                draftScore: 0,
+                mainScore: 0,
+                unopenedAttempts: 0
+              };
+              const colorClass =
+                p.id === 0 ? 'text-emerald-400' : p.id === 1 ? 'text-amber-400' : 'text-cyan-400';
+              const barClass =
+                p.id === 0 ? 'bg-emerald-500' : p.id === 1 ? 'bg-amber-500' : 'bg-cyan-500';
+
+              return (
+                <div
+                  key={p.id}
+                  className={`p-1.5 rounded-xl border flex flex-col items-center transition-all ${
+                    acc.mainScore >= 101
+                      ? 'bg-amber-950/50 border-amber-400 ring-2 ring-amber-400/40 shadow-lg'
+                      : 'bg-slate-800/70 border-slate-700'
+                  }`}
+                >
+                  <span className={`text-[11px] font-black ${colorClass} flex items-center gap-0.5 truncate max-w-[80px]`}>
+                    {p.name}
+                    {acc.mainScore >= 101 && <Award className="w-2.5 h-2.5 text-amber-400" />}
+                  </span>
+                  <span className="text-xl font-black text-white tracking-tight my-0.5">
+                    {acc.mainScore}
+                  </span>
+                  <div className="w-full bg-slate-700/50 rounded-full h-1 overflow-hidden">
+                    <div
+                      className={`${barClass} h-full rounded-full transition-all duration-300`}
+                      style={{ width: `${Math.min(100, (acc.mainScore / 101) * 100)}%` }}
+                    />
+                  </div>
+
+                  {acc.isOpen ? (
+                    <span className="text-[9px] text-emerald-300 font-bold bg-emerald-950/60 border border-emerald-500/30 px-1 py-0.2 rounded mt-1 flex items-center gap-0.5 whitespace-nowrap">
+                      <Sparkles className="w-2 h-2" /> Saya düşüb
+                    </span>
+                  ) : (
+                    <div className="flex flex-col items-center mt-0.5 text-[9px] leading-tight">
+                      <span className="text-amber-400 font-bold">
+                        Qaralama: {acc.draftScore}
+                      </span>
+                      <span className="text-slate-400 text-[8px]">
+                        {acc.unopenedAttempts}/3 cəhd
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            {/* Team 1 / Player 1 */}
+            <div className={`p-2 rounded-xl border flex flex-col items-center transition-all ${
+              t1State.mainScore >= 101
+                ? 'bg-amber-950/50 border-amber-400 ring-2 ring-amber-400/40 shadow-lg'
+                : 'bg-slate-800/70 border-slate-700'
+            }`}>
+              <span className="text-xs font-black text-emerald-400 flex items-center gap-1">
+                {mode === '2p_solo' ? (players[0]?.name || t.player) : t.team1}
+                {t1State.mainScore >= 101 && <Award className="w-3 h-3 text-amber-400" />}
+              </span>
+              <span className="text-2xl font-black text-white tracking-tight my-0.5">{t1State.mainScore}</span>
+              <div className="w-full bg-slate-700/50 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                  style={{ width: `${Math.min(100, (t1State.mainScore / 101) * 100)}%` }}
+                />
+              </div>
+
+              {/* Status & Draft Info */}
+              {t1State.isOpen ? (
+                <span className="text-[10px] text-emerald-300 font-bold bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.5 rounded-md mt-1.5 flex items-center gap-0.5">
+                  <Sparkles className="w-2.5 h-2.5" /> Saya düşüb ✓
+                </span>
+              ) : (
+                <div className="flex flex-col items-center mt-1 text-[10px]">
+                  <span className="text-amber-400 font-bold bg-amber-950/60 border border-amber-500/30 px-1.5 py-0.5 rounded-md">
+                    Qaralama: {t1State.draftScore}
+                  </span>
+                  <span className="text-slate-400 text-[9px] mt-0.5">
+                    {t1State.unopenedAttempts}/3 cəhd (Hədd: 13)
+                  </span>
+                </div>
+              )}
             </div>
 
-            {/* Status & Draft Info */}
-            {t1State.isOpen ? (
-              <span className="text-[10px] text-emerald-300 font-bold bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.5 rounded-md mt-1.5 flex items-center gap-0.5">
-                <Sparkles className="w-2.5 h-2.5" /> Saya düşüb ✓
+            {/* Team 2 / Player 2 */}
+            <div className={`p-2 rounded-xl border flex flex-col items-center transition-all ${
+              t2State.mainScore >= 101
+                ? 'bg-amber-950/50 border-amber-400 ring-2 ring-amber-400/40 shadow-lg'
+                : 'bg-slate-800/70 border-slate-700'
+            }`}>
+              <span className="text-xs font-black text-rose-400 flex items-center gap-1">
+                {mode === '2p_solo' ? (players[1]?.name || 'Bot') : t.team2}
+                {t2State.mainScore >= 101 && <Award className="w-3 h-3 text-amber-400" />}
               </span>
-            ) : (
-              <div className="flex flex-col items-center mt-1 text-[10px]">
-                <span className="text-amber-400 font-bold bg-amber-950/60 border border-amber-500/30 px-1.5 py-0.5 rounded-md">
-                  Qaralama: {t1State.draftScore}
-                </span>
-                <span className="text-slate-400 text-[9px] mt-0.5">
-                  {t1State.unopenedAttempts}/3 cəhd (Hədd: 13)
-                </span>
+              <span className="text-2xl font-black text-white tracking-tight my-0.5">{t2State.mainScore}</span>
+              <div className="w-full bg-slate-700/50 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="bg-rose-500 h-full rounded-full transition-all duration-300"
+                  style={{ width: `${Math.min(100, (t2State.mainScore / 101) * 100)}%` }}
+                />
               </div>
-            )}
-          </div>
 
-          {/* Team 2 */}
-          <div className={`p-2 rounded-xl border flex flex-col items-center transition-all ${
-            t2State.mainScore >= 101
-              ? 'bg-amber-950/50 border-amber-400 ring-2 ring-amber-400/40 shadow-lg'
-              : 'bg-slate-800/70 border-slate-700'
-          }`}>
-            <span className="text-xs font-black text-rose-400 flex items-center gap-1">
-              {t.team2}
-              {t2State.mainScore >= 101 && <Award className="w-3 h-3 text-amber-400" />}
-            </span>
-            <span className="text-2xl font-black text-white tracking-tight my-0.5">{t2State.mainScore}</span>
-            <div className="w-full bg-slate-700/50 rounded-full h-1.5 overflow-hidden">
-              <div
-                className="bg-rose-500 h-full rounded-full transition-all duration-300"
-                style={{ width: `${Math.min(100, (t2State.mainScore / 101) * 100)}%` }}
-              />
+              {/* Status & Draft Info */}
+              {t2State.isOpen ? (
+                <span className="text-[10px] text-emerald-300 font-bold bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.5 rounded-md mt-1.5 flex items-center gap-0.5">
+                  <Sparkles className="w-2.5 h-2.5" /> Saya düşüb ✓
+                </span>
+              ) : (
+                <div className="flex flex-col items-center mt-1 text-[10px]">
+                  <span className="text-amber-400 font-bold bg-amber-950/60 border border-amber-500/30 px-1.5 py-0.5 rounded-md">
+                    Qaralama: {t2State.draftScore}
+                  </span>
+                  <span className="text-slate-400 text-[9px] mt-0.5">
+                    {t2State.unopenedAttempts}/3 cəhd (Hədd: 13)
+                  </span>
+                </div>
+              )}
             </div>
-
-            {/* Status & Draft Info */}
-            {t2State.isOpen ? (
-              <span className="text-[10px] text-emerald-300 font-bold bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.5 rounded-md mt-1.5 flex items-center gap-0.5">
-                <Sparkles className="w-2.5 h-2.5" /> Saya düşüb ✓
-              </span>
-            ) : (
-              <div className="flex flex-col items-center mt-1 text-[10px]">
-                <span className="text-amber-400 font-bold bg-amber-950/60 border border-amber-500/30 px-1.5 py-0.5 rounded-md">
-                  Qaralama: {t2State.draftScore}
-                </span>
-                <span className="text-slate-400 text-[9px] mt-0.5">
-                  {t2State.unopenedAttempts}/3 cəhd (Hədd: 13)
-                </span>
-              </div>
-            )}
           </div>
-        </div>
+        )}
 
         {/* 101 Ayaz Reminder Badge */}
         <div className="text-[10px] text-slate-400 flex items-center justify-between px-1 pt-0.5 border-t border-white/5">

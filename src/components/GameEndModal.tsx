@@ -172,8 +172,8 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
                   : t.instant35Loss
                 : variant === '101'
                 ? userWon
-                  ? '🎉 101 XAL! Komandanız Matçın Qalibi Oldu!'
-                  : 'Rəqib Komanda 101 Xala Çatdı!'
+                  ? (mode === '4p_duo' ? '🎉 101 XAL! Komandanız Matçın Qalibi Oldu!' : '🎉 101 XAL! Siz Matçın Qalibi Oldunuz!')
+                  : (mode === '4p_duo' ? 'Rəqib Komanda 101 Xala Çatdı!' : `${winnerPlayer?.name || 'Rəqib'} 101 Xala Çatdı!`)
                 : userWon
                 ? t.matchWinner
                 : `${winnerPlayer?.name || 'Rəqib'} matçın qalibi oldu!`}
@@ -182,7 +182,11 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
               {isInstant35
                 ? t.instant35Desc
                 : variant === '101'
-                ? `101 Matçı — ${t.team1}: ${match101State?.team1.mainScore ?? 0} xal vs ${t.team2}: ${match101State?.team2.mainScore ?? 0} xal`
+                ? players.length === 3
+                  ? `101 Matçı — ${players.map((p) => `${p.name}: ${match101State?.playerAccounts?.[p.id]?.mainScore ?? p.score} xal`).join(' vs ')}`
+                  : mode === '2p_solo'
+                  ? `101 Matçı — ${players[0]?.name || 'Siz'}: ${match101State?.team1.mainScore ?? 0} xal vs ${players[1]?.name || 'Bot'}: ${match101State?.team2.mainScore ?? 0} xal`
+                  : `101 Matçı — ${t.team1}: ${match101State?.team1.mainScore ?? 0} xal vs ${t.team2}: ${match101State?.team2.mainScore ?? 0} xal`
                 : mode === '4p_duo'
                 ? `${t.team1}: ${players.find((p) => p.team === 1)?.score ?? 0} — ${
                     t.team2
