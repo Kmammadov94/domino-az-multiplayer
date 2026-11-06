@@ -1,0 +1,11 @@
+{
+  "appId": "az.domino.pro",
+  "appName": "Domino PRO",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "backgroundColor": "#0c2214"
+  }
+}
