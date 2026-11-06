@@ -14,10 +14,10 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose, lang })
   const t = translations[lang];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-      <div className="bg-slate-900 border border-amber-500/40 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in pointer-events-auto">
+      <div className="bg-slate-900 border border-amber-500/40 rounded-2xl w-full max-w-2xl max-h-[90dvh] min-h-0 flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+        <div className="p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-amber-400" />
             <h2 className="text-lg font-bold text-amber-300">{t.rules} — {t.title}</h2>
@@ -31,7 +31,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose, lang })
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs sm:text-sm text-slate-300 leading-relaxed">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 pb-8 space-y-4 text-xs sm:text-sm text-slate-300 leading-relaxed">
           {lang === 'az' && (
             <>
               <section className="bg-slate-800/40 p-3 rounded-xl border border-slate-700/50">

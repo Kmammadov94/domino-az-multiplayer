@@ -215,8 +215,8 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-      <div className="bg-slate-900 border-2 border-amber-500/40 rounded-3xl w-full max-w-4xl h-[88vh] max-h-[780px] flex flex-col shadow-2xl overflow-hidden min-h-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in pointer-events-auto">
+      <div className="bg-slate-900 border-2 border-amber-500/40 rounded-3xl w-full max-w-4xl h-[90dvh] max-h-[780px] flex flex-col shadow-2xl overflow-hidden min-h-0 relative">
         {/* Top Header */}
         <div className="p-3 sm:p-4 flex-shrink-0 bg-gradient-to-r from-amber-950/70 via-slate-900 to-amber-950/70 border-b border-amber-500/20 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -344,7 +344,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             </div>
 
             {/* Skins Grid */}
-            <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
+            <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 pb-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
               {filteredSkins.map((skin) => {
                 const isUnlocked = stats.unlockedSkins.includes(skin.id) || !!skin.unlockedByDefault;
                 const isEquipped = stats.equippedSkin === skin.id;
@@ -448,7 +448,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             </div>
 
             {/* Avatars Grid - Pictures Only */}
-            <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 pb-12 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               {filteredAvatars.map((avatar) => {
                 const isUnlocked = currentUnlockedAvatars.includes(avatar.id);
                 const isEquipped = currentEquippedAvatar === avatar.id;
@@ -537,7 +537,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
 
         {/* 3. Avatar Frames Tab */}
         {storeTab === 'frames' && (
-          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 pb-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {AVATAR_FRAMES.map((frame) => {
               const isEquipped = currentEquippedFrame === frame.id;
               const isUnlocked = currentUnlockedFrames.includes(frame.id) || frame.price === 0;
@@ -603,7 +603,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
 
         {/* 4. Player Titles Tab */}
         {storeTab === 'titles' && (
-          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 pb-12 grid grid-cols-1 sm:grid-cols-2 gap-3">
             {PLAYER_TITLES.map((title) => {
               const isEquipped = currentEquippedTitle === title.id;
               const isUnlocked = currentUnlockedTitles.includes(title.id) || title.price === 0;
@@ -665,7 +665,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
 
         {/* 5. Table Themes Tab */}
         {storeTab === 'tables' && (
-          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 pb-12 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {TABLE_THEMES.map((theme) => {
               const isEquipped = currentEquippedTable === theme.id;
 

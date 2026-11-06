@@ -1901,7 +1901,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="w-screen h-screen flex flex-col bg-slate-950 text-slate-100 select-none overflow-hidden font-sans">
+    <div className="w-full h-full min-h-[100dvh] max-h-[100dvh] flex flex-col bg-slate-950 text-slate-100 select-none overflow-hidden font-sans">
       {/* Top Navbar */}
       <header className="h-12 bg-slate-900/95 border-b border-amber-600/30 px-3 flex items-center justify-between z-30 shadow-md">
         <AzerbaijanLogo size="sm" />
@@ -2085,11 +2085,11 @@ export const App: React.FC = () => {
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 relative overflow-hidden flex flex-col">
+      <main className={`flex-1 relative flex flex-col min-h-0 ${!inGame ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'}`}>
         {!inGame ? (
           /* Lobby / Game Mode Selection Screen */
-          <div className="flex-1 flex flex-col items-center justify-center p-4 bg-radial from-slate-900 via-slate-950 to-black relative">
-            <div className="max-w-md w-full bg-slate-900/90 border border-amber-500/30 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center">
+          <div className="flex-1 flex flex-col items-center justify-start sm:justify-center p-3 sm:p-6 bg-radial from-slate-900 via-slate-950 to-black relative min-h-full py-4 sm:py-8 pb-20">
+            <div className="max-w-md w-full my-auto bg-slate-900/90 border border-amber-500/30 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col items-center text-center">
               {/* Domino Art Logo */}
               <div className="flex items-center gap-2 mb-4">
                 <DominoTile

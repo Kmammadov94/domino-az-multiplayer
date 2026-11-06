@@ -52,8 +52,8 @@ export const DailyRewardModal: React.FC<DailyRewardModalProps> = ({
   const days = [1, 2, 3, 4, 5, 6, 7];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-      <div className="bg-slate-900 border border-amber-500/40 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in pointer-events-auto">
+      <div className="bg-slate-900 border border-amber-500/40 rounded-2xl w-full max-w-lg p-5 sm:p-6 shadow-2xl relative overflow-y-auto max-h-[90dvh] min-h-0">
         {/* Close Button */}
         <button
           onClick={onClose}

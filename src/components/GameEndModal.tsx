@@ -138,8 +138,8 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
 
   // Standard Modal View
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
-      <div className="bg-slate-900 border-2 border-amber-500/70 rounded-2xl w-full max-w-md max-h-[92vh] overflow-y-auto p-5 sm:p-6 shadow-[0_0_50px_rgba(0,0,0,0.9)] flex flex-col items-center text-center relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in pointer-events-auto">
+      <div className="bg-slate-900 border-2 border-amber-500/70 rounded-2xl w-full max-w-md max-h-[90dvh] min-h-0 overflow-y-auto p-5 sm:p-6 shadow-[0_0_50px_rgba(0,0,0,0.9)] flex flex-col items-center text-center relative">
         {/* Glow effect behind header */}
         <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-48 h-48 bg-amber-500/15 rounded-full blur-2xl pointer-events-none" />
 

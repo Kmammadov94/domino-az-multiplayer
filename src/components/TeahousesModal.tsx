@@ -98,8 +98,8 @@ export const TeahousesModal: React.FC<TeahousesModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/80 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-2xl bg-slate-900 border border-amber-500/40 rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/80 backdrop-blur-sm animate-fade-in pointer-events-auto">
+      <div className="relative w-full max-w-2xl bg-slate-900 border border-amber-500/40 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col max-h-[90dvh] min-h-0">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <div className="flex items-center gap-2.5">
@@ -134,7 +134,7 @@ export const TeahousesModal: React.FC<TeahousesModalProps> = ({
         </div>
 
         {/* Content list */}
-        <div className="flex-1 overflow-y-auto py-4 space-y-3 pr-1">
+        <div className="flex-1 overflow-y-auto py-4 space-y-3 pr-1 min-h-0 pb-8">
           {TEAHOUSE_ROOMS.map((room) => {
             const hasEnough = userCoins >= room.buyIn;
             return (

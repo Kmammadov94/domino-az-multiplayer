@@ -252,8 +252,8 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-      <div className="bg-slate-900 border-2 border-amber-500/80 rounded-2xl w-full max-w-lg shadow-[0_0_50px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in pointer-events-auto">
+      <div className="bg-slate-900 border-2 border-amber-500/80 rounded-2xl w-full max-w-lg shadow-[0_0_50px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden max-h-[90dvh] min-h-0">
         {/* Modal Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-amber-600/30 bg-slate-950/60">
           <div className="flex items-center gap-2">
@@ -271,7 +271,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-5 overflow-y-auto flex-1 flex flex-col gap-4">
+        <div className="p-5 overflow-y-auto flex-1 flex flex-col gap-4 min-h-0">
           {isAutoJoining && (
             <div className="bg-amber-500/20 border border-amber-500/50 text-amber-300 text-xs p-3 rounded-xl font-bold text-center flex items-center justify-center gap-2 animate-pulse">
               <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
