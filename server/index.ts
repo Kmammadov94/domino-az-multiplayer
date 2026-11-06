@@ -72,7 +72,7 @@ let userDatabase = loadUserDatabase();
 
 // Sync user stats endpoint
 app.post('/api/user-stats', (req, res) => {
-  const { googleId, email, name, picture, stats } = req.body || {};
+  const { googleId, email, name, picture, stats, isInitialLogin } = req.body || {};
   if (!googleId) {
     return res.status(400).json({ error: 'googleId is required' });
   }
@@ -80,9 +80,17 @@ app.post('/api/user-stats', (req, res) => {
   const existing = userDatabase[googleId] || {};
   const existingStats = existing.stats || {};
 
-  // Merge stats intelligently (keep highest coins, union of unlocked items, max streak, etc.)
+  // Handle coins:
+  // If it's an initial sign-in on a device and cloud already has coins, preserve cloud coins.
+  // In normal gameplay or store purchases (isInitialLogin !== true), trust the client's current coins!
+  let finalCoins = typeof stats?.coins === 'number' ? Math.max(0, stats.coins) : (existingStats.coins ?? 20);
+  if (isInitialLogin && existingStats.coins !== undefined) {
+    finalCoins = Math.max(existingStats.coins, finalCoins);
+  }
+
+  // Merge stats intelligently (union of unlocked cosmetics, max streak, etc.)
   const mergedStats = {
-    coins: Math.max(existingStats.coins || 0, stats?.coins || 0),
+    coins: finalCoins,
     equippedSkin: stats?.equippedSkin || existingStats.equippedSkin || 'ivory_classic',
     unlockedSkins: Array.from(
       new Set([...(existingStats.unlockedSkins || []), ...(stats?.unlockedSkins || ['ivory_classic'])])
@@ -91,6 +99,15 @@ app.post('/api/user-stats', (req, res) => {
     unlockedAvatars: Array.from(
       new Set([...(existingStats.unlockedAvatars || []), ...(stats?.unlockedAvatars || [])])
     ),
+    equippedFrame: stats?.equippedFrame || existingStats.equippedFrame || 'frame_none',
+    unlockedFrames: Array.from(
+      new Set([...(existingStats.unlockedFrames || ['frame_none']), ...(stats?.unlockedFrames || ['frame_none'])])
+    ),
+    equippedTitle: stats?.equippedTitle || existingStats.equippedTitle || 'title_tea_elder',
+    unlockedTitles: Array.from(
+      new Set([...(existingStats.unlockedTitles || ['title_tea_elder']), ...(stats?.unlockedTitles || ['title_tea_elder'])])
+    ),
+    equippedTableTheme: stats?.equippedTableTheme || existingStats.equippedTableTheme || 'table_emerald_classic',
     dailyStreak: Math.max(existingStats.dailyStreak || 0, stats?.dailyStreak || 0),
     matchesPlayed: Math.max(existingStats.matchesPlayed || 0, stats?.matchesPlayed || 0),
     matchesWon: Math.max(existingStats.matchesWon || 0, stats?.matchesWon || 0),

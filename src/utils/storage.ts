@@ -111,7 +111,8 @@ export const setGuestNoticeDismissed = (dismissed: boolean): void => {
 // Sync stats with cloud server
 export const syncWithCloud = async (
   profile: GoogleUserProfile,
-  currentStats: PlayerStats
+  currentStats: PlayerStats,
+  isInitialLogin: boolean = false
 ): Promise<PlayerStats> => {
   try {
     const res = await fetch('/api/user-stats', {
@@ -122,7 +123,8 @@ export const syncWithCloud = async (
         email: profile.email,
         name: profile.name,
         picture: profile.picture,
-        stats: currentStats
+        stats: currentStats,
+        isInitialLogin
       })
     });
     if (res.ok) {
