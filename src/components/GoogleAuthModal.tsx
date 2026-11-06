@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Cloud, CheckCircle, ShieldAlert, LogOut, X, Sparkles, Key, ExternalLink } from 'lucide-react';
+import { Cloud, CheckCircle, ShieldAlert, LogOut, X, Sparkles } from 'lucide-react';
 import { GoogleUserProfile } from '../utils/storage';
+
+export const GOOGLE_CLIENT_ID =
+  '345163175505-a7dv01uno2tof42k31omil6p5c9do20g.apps.googleusercontent.com';
 
 interface GoogleAuthModalProps {
   isOpen: boolean;
@@ -10,8 +13,6 @@ interface GoogleAuthModalProps {
   onSignOut: () => void;
 }
 
-const SAVED_CLIENT_ID_KEY = 'az_domino_google_client_id';
-
 export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
   isOpen,
   onClose,
@@ -19,45 +20,38 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
   onSignIn,
   onSignOut
 }) => {
-  const [clientIdInput, setClientIdInput] = useState<string>(() => {
-    return (
-      localStorage.getItem(SAVED_CLIENT_ID_KEY) ||
-      (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID ||
-      ''
-    );
-  });
-  const [showConfig, setShowConfig] = useState(false);
   const [gisLoaded, setGisLoaded] = useState(false);
   const [gisError, setGisError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
 
+    let attempts = 0;
     const checkGis = () => {
       const win = window as any;
       if (win.google?.accounts?.id) {
         setGisLoaded(true);
         initGoogleGis(win.google.accounts.id);
+      } else if (attempts < 20) {
+        attempts++;
+        setTimeout(checkGis, 250);
       } else {
-        setTimeout(checkGis, 300);
+        setGisError('Google Identity Services xidməti yüklənə bilmədi.');
       }
     };
 
     checkGis();
-  }, [isOpen, clientIdInput]);
+  }, [isOpen]);
 
   const initGoogleGis = (googleIdApi: any) => {
-    const activeClientId = clientIdInput.trim();
-    if (!activeClientId) return;
-
     try {
       setGisError(null);
       googleIdApi.initialize({
-        client_id: activeClientId,
+        client_id: GOOGLE_CLIENT_ID,
         callback: (response: { credential?: string }) => {
           if (response.credential) {
             try {
-              // Decode payload from JWT
+              // Decode payload from Google JWT
               const base64Url = response.credential.split('.')[1];
               const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
               const jsonPayload = decodeURIComponent(
@@ -97,33 +91,18 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
         });
       }
 
-      // Automatically trigger Google One-Tap popup prompt
+      // Automatically open Google One-Tap prompt
       googleIdApi.prompt();
     } catch (e: any) {
       console.warn('GIS Init Error:', e);
-      setGisError(e?.message || 'Google Client ID xətası');
+      setGisError(e?.message || 'Google xidmətinə qoşulma xətası');
     }
   };
 
-  const handleSaveClientId = (e: React.FormEvent) => {
-    e.preventDefault();
-    const clean = clientIdInput.trim();
-    if (clean) {
-      localStorage.setItem(SAVED_CLIENT_ID_KEY, clean);
-      setShowConfig(false);
-      const win = window as any;
-      if (win.google?.accounts?.id) {
-        initGoogleGis(win.google.accounts.id);
-      }
-    }
-  };
-
-  const handleOneTapDirectPrompt = () => {
+  const handleManualPrompt = () => {
     const win = window as any;
-    if (win.google?.accounts?.id && clientIdInput.trim()) {
+    if (win.google?.accounts?.id) {
       win.google.accounts.id.prompt();
-    } else {
-      setShowConfig(true);
     }
   };
 
@@ -165,10 +144,10 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
           </div>
           <div>
             <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-1.5">
-              Rəsmi Google Hesabı ilə Giriş
+              Google ilə Giriş et
             </h2>
             <span className="text-[11px] text-amber-300 font-semibold block">
-              Google OAuth 2.0 Təhlükəsiz Giriş
+              Rəsmi Google One-Tap & Təhlükəsiz Bulud
             </span>
           </div>
         </div>
@@ -222,7 +201,7 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
           </div>
         ) : (
           /* Not Signed In View */
-          <div className="flex flex-col gap-3.5">
+          <div className="flex flex-col gap-4">
             {/* Friendly Non-Mandatory Warning Notice */}
             <div className="bg-amber-950/40 border border-amber-500/50 rounded-2xl p-3 flex items-start gap-2.5 shadow-md">
               <ShieldAlert className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
@@ -231,23 +210,23 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
                   Məcburi deyil, amma tövsiyə olunur!
                 </span>
                 <span>
-                  Google ilə daxil olmasanız, brauzer tarixçəsi təmizləndikdə və ya cihazınızı dəyişdikdə qazanılan qızıllarınız və açdığınız avatarlar itə bilər.
+                  Google ilə daxil olduqda qızıllarınız və açdığınız dəstlər Google hesabınızda qorunur. İstənilən telefon və ya kompüterdən daxil olduqda qızıllarınız yerində olacaq.
                 </span>
               </div>
             </div>
 
-            {/* Official Google Button Container */}
-            <div className="flex flex-col items-center justify-center my-2 min-h-[44px]">
-              <div id="google-official-btn" className="flex justify-center"></div>
+            {/* Official Google Button Container (rendered directly by Google's native SDK) */}
+            <div className="flex flex-col items-center justify-center my-2 min-h-[48px]">
+              <div id="google-official-btn" className="flex justify-center w-full"></div>
 
-              {/* If GIS button is not rendered yet, show active 1-click trigger */}
-              {(!clientIdInput.trim() || !gisLoaded) && (
+              {/* Fallback button that invokes Google prompt */}
+              {!gisLoaded && (
                 <button
                   type="button"
-                  onClick={handleOneTapDirectPrompt}
-                  className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-slate-100 text-slate-800 font-bold text-xs sm:text-sm transition shadow-lg flex items-center justify-center gap-3 active:scale-95 border border-slate-300"
+                  onClick={handleManualPrompt}
+                  className="w-full max-w-[280px] py-2.5 px-4 rounded-full bg-white hover:bg-slate-100 text-slate-800 font-bold text-xs sm:text-sm transition shadow-lg flex items-center justify-center gap-2.5 active:scale-95 border border-slate-300"
                 >
-                  <svg viewBox="0 0 24 24" className="w-5 h-5">
+                  <svg viewBox="0 0 24 24" className="w-4 h-4">
                     <path
                       fill="#4285F4"
                       d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -265,7 +244,7 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
                       d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                     />
                   </svg>
-                  <span>Google Hesabı ilə Giriş et</span>
+                  <span>Google ilə Davam et</span>
                 </button>
               )}
             </div>
@@ -275,55 +254,6 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
                 {gisError}
               </div>
             )}
-
-            {/* Google Cloud Client ID Configuration Panel */}
-            <div className="border border-slate-800 rounded-2xl p-3 bg-slate-950/60">
-              <button
-                type="button"
-                onClick={() => setShowConfig(!showConfig)}
-                className="w-full flex items-center justify-between text-xs font-bold text-amber-300 hover:text-amber-200"
-              >
-                <span className="flex items-center gap-1.5">
-                  <Key className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Google Client ID quraşdırması</span>
-                </span>
-                <span className="text-[10px] text-slate-400">
-                  {showConfig ? 'Gizlət ▲' : 'Dəyiş ▼'}
-                </span>
-              </button>
-
-              {showConfig && (
-                <form onSubmit={handleSaveClientId} className="flex flex-col gap-2 mt-3 pt-2 border-t border-slate-800">
-                  <p className="text-[10px] text-slate-400 leading-tight">
-                    Google OAuth-un rəsmi popup pəncərəsi açması üçün Google Cloud Console-dan pulsuz <strong>Web Client ID</strong> lazımdır:
-                  </p>
-                  <input
-                    type="text"
-                    value={clientIdInput}
-                    onChange={(e) => setClientIdInput(e.target.value)}
-                    placeholder="məs: 123456-abc.apps.googleusercontent.com"
-                    className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono text-[11px]"
-                  />
-                  <div className="flex items-center justify-between gap-2 mt-1">
-                    <a
-                      href="https://console.cloud.google.com/apis/credentials"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[10px] text-sky-400 hover:underline flex items-center gap-1"
-                    >
-                      <span>Google Console aç</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                    <button
-                      type="submit"
-                      className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition"
-                    >
-                      Saxla & Aktiv Et
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
 
             {/* Voluntary Continue as Guest Button */}
             <div className="border-t border-slate-800 pt-3 flex flex-col items-center">
