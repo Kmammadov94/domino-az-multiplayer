@@ -65,9 +65,18 @@ export const DominoTile: React.FC<DominoTileProps> = ({
       >
         {skin.isFlagSkin && (
           <div className="absolute inset-0 flex flex-col pointer-events-none">
-            <div className="h-1/3 w-full bg-[#0092bc]" />
-            <div className="h-1/3 w-full bg-[#e4002b]" />
-            <div className="h-1/3 w-full bg-[#009739]" />
+            {skin.flagType === 'ukraine' ? (
+              <>
+                <div className="h-1/2 w-full bg-[#0057b7]" />
+                <div className="h-1/2 w-full bg-[#ffd700]" />
+              </>
+            ) : (
+              <>
+                <div className="h-1/3 w-full bg-[#0092bc]" />
+                <div className="h-1/3 w-full bg-[#e4002b]" />
+                <div className="h-1/3 w-full bg-[#009739]" />
+              </>
+            )}
           </div>
         )}
         <div className="absolute inset-1.5 rounded border border-dashed border-white/25 flex items-center justify-center opacity-45 z-10">
@@ -107,6 +116,8 @@ export const DominoTile: React.FC<DominoTileProps> = ({
               cy={cy}
               r={dotRadius}
               fill={skin.pipColor}
+              stroke={skin.isFlagSkin ? 'rgba(0,0,0,0.35)' : undefined}
+              strokeWidth={skin.isFlagSkin ? 0.9 : 0}
             />
             {/* Pip glossy gleam */}
             <circle
@@ -143,24 +154,43 @@ export const DominoTile: React.FC<DominoTileProps> = ({
     >
       {/* Background layer for Flag skin */}
       {skin.isFlagSkin && (
-        <div className={`absolute inset-0 flex pointer-events-none rounded-md overflow-hidden z-0 ${
-          isVertical ? 'flex-col' : 'flex-row'
-        }`}>
-          <div className={isVertical ? "h-1/3 w-full bg-[#0092bc]" : "w-1/3 h-full bg-[#0092bc]"} />
-          <div className={isVertical ? "h-1/3 w-full bg-[#e4002b] relative flex items-center justify-center" : "w-1/3 h-full bg-[#e4002b] relative flex items-center justify-center"}>
-            <svg viewBox="0 0 40 20" className="w-5 h-2.5 opacity-50">
-              <path
-                d="M 16 3 A 7 7 0 1 0 24 17 A 8.5 8.5 0 1 1 16 3 Z"
-                fill="#ffffff"
-              />
-              <polygon
-                points="23,7 24,9 26,9 24.5,10.2 25,12 23.5,10.8 22,12 22.5,10.2 21,9 23,9"
-                fill="#ffffff"
-              />
-            </svg>
+        skin.flagType === 'ukraine' ? (
+          <div className="absolute inset-0 flex flex-col pointer-events-none rounded-md overflow-hidden z-0">
+            <div className="h-1/2 w-full bg-[#0057b7]" />
+            <div className="h-1/2 w-full bg-[#ffd700]" />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <svg viewBox="0 0 24 24" className="w-5 h-5 opacity-40">
+                <path
+                  d="M12 3v13 M8 6v6c0 2 4 3 4 3s4-1 4-3V6 M6 9c0 3 3 5 6 5s6-2 6-5 M12 16v4"
+                  stroke="#ffffff"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              </svg>
+            </div>
           </div>
-          <div className={isVertical ? "h-1/3 w-full bg-[#009739]" : "w-1/3 h-full bg-[#009739]"} />
-        </div>
+        ) : (
+          <div className={`absolute inset-0 flex pointer-events-none rounded-md overflow-hidden z-0 ${
+            isVertical ? 'flex-col' : 'flex-row'
+          }`}>
+            <div className={isVertical ? "h-1/3 w-full bg-[#0092bc]" : "w-1/3 h-full bg-[#0092bc]"} />
+            <div className={isVertical ? "h-1/3 w-full bg-[#e4002b] relative flex items-center justify-center" : "w-1/3 h-full bg-[#e4002b] relative flex items-center justify-center"}>
+              <svg viewBox="0 0 40 20" className="w-5 h-2.5 opacity-50">
+                <path
+                  d="M 16 3 A 7 7 0 1 0 24 17 A 8.5 8.5 0 1 1 16 3 Z"
+                  fill="#ffffff"
+                />
+                <polygon
+                  points="23,7 24,9 26,9 24.5,10.2 25,12 23.5,10.8 22,12 22.5,10.2 21,9 23,9"
+                  fill="#ffffff"
+                />
+              </svg>
+            </div>
+            <div className={isVertical ? "h-1/3 w-full bg-[#009739]" : "w-1/3 h-full bg-[#009739]"} />
+          </div>
+        )
       )}
 
       {/* Half 1 */}

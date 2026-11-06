@@ -1,5 +1,6 @@
 import { PlayerStats } from '../types/domino';
 import { DEFAULT_AVATAR_ID, FREE_AVATAR_IDS } from '../data/avatars';
+import { DOMINO_SKINS } from '../data/skins';
 
 const STORAGE_KEY = 'az_domino_telefon365_v1';
 const GOOGLE_USER_KEY = 'az_domino_google_user_v1';
@@ -43,6 +44,17 @@ export const loadPlayerStats = (): PlayerStats => {
         }
       });
     }
+
+    // Ensure all default skins are always unlocked
+    if (!loaded.unlockedSkins) {
+      loaded.unlockedSkins = ['ivory_classic'];
+    }
+    DOMINO_SKINS.filter((s) => s.unlockedByDefault).forEach((s) => {
+      if (!loaded.unlockedSkins.includes(s.id)) {
+        loaded.unlockedSkins.push(s.id);
+      }
+    });
+
     return loaded;
   } catch {
     return DEFAULT_STATS;

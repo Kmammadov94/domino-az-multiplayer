@@ -152,7 +152,33 @@ export const DOMINO_SKINS: DominoSkin[] = [
     pipColor: '#ffffff',
     spinnerColor: '#f59e0b',
     glowEffect: '0 0 14px rgba(228, 0, 43, 0.45)',
-    isFlagSkin: true
+    isFlagSkin: true,
+    flagType: 'azerbaijan'
+  },
+  // 8. Ukraine National Flag Skin (Ukrayna Bayrağı)
+  {
+    id: 'ukraine_flag',
+    name: {
+      az: 'Ukrayna Bayrağı',
+      ru: 'Флаг Украины',
+      en: 'Ukraine Flag'
+    },
+    desc: {
+      az: 'Göy səma və bərəkətli sarı buğda zəmilərinin rəmzi olan Ukrayna bayrağı.',
+      ru: 'Символ синего неба и золотых пшеничных полей — флаг Украины.',
+      en: 'Vibrant blue sky and golden wheat fields — Ukraine national flag.'
+    },
+    price: 0,
+    unlockedByDefault: true,
+    category: 'baku',
+    bgGradient: 'from-blue-600 via-sky-500 to-yellow-400',
+    tileFace: '#0057b7',
+    tileBorder: '#0f172a',
+    pipColor: '#ffffff',
+    spinnerColor: '#ffd700',
+    glowEffect: '0 0 14px rgba(0, 87, 183, 0.55)',
+    isFlagSkin: true,
+    flagType: 'ukraine'
   },
   // 8. Ruby Flame (Odlar Yurdu)
   {

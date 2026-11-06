@@ -91,13 +91,6 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
             )}
           </div>
         </div>
-
-        {/* Last scored points popup banner */}
-        {lastScoredPoints && (
-          <div className="bg-amber-500/20 border border-amber-500/40 rounded px-2 py-1 text-center text-xs font-bold text-amber-300 animate-bounce">
-            ⚡ {lastScoredPoints.playerName}: +{lastScoredPoints.points} Xal
-          </div>
-        )}
       </div>
     );
   }
@@ -151,12 +144,6 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
           );
         })}
       </div>
-
-      {lastScoredPoints && (
-        <div className="bg-amber-500/20 border border-amber-500/40 rounded px-2 py-0.5 text-center text-xs font-bold text-amber-300 animate-bounce">
-          ⚡ {lastScoredPoints.playerName}: +{lastScoredPoints.points} Xal
-        </div>
-      )}
     </div>
   );
 };

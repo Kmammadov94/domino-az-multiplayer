@@ -1079,6 +1079,7 @@ export const App: React.FC = () => {
         playerName: players[playerIndex].name,
         points: scored
       });
+      setTimeout(() => setLastScoredPoints(null), 1200);
       setFloatingScore({
         id: `sc_${Date.now()}_${Math.random()}`,
         points: scored,
@@ -1176,6 +1177,7 @@ export const App: React.FC = () => {
         playerName: players[playerIndex].name,
         points: scored
       });
+      setTimeout(() => setLastScoredPoints(null), 1200);
       setFloatingScore({
         id: `sc_${Date.now()}_${Math.random()}`,
         points: scored,

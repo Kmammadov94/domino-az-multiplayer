@@ -69,6 +69,7 @@ export interface DominoSkin {
   spinnerColor: string;
   glowEffect?: string;
   isFlagSkin?: boolean;
+  flagType?: 'azerbaijan' | 'ukraine';
   category: 'classic' | 'luxury' | 'baku' | 'modern' | 'public_domain';
 }
 

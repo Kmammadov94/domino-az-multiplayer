@@ -346,7 +346,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             {/* Skins Grid */}
             <div className="flex-1 overflow-y-auto p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
               {filteredSkins.map((skin) => {
-                const isUnlocked = stats.unlockedSkins.includes(skin.id);
+                const isUnlocked = stats.unlockedSkins.includes(skin.id) || !!skin.unlockedByDefault;
                 const isEquipped = stats.equippedSkin === skin.id;
 
                 return (
