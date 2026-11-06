@@ -250,36 +250,43 @@ export const placeTileOnBranch = (
     }
   }
 
-  // Curving (Snake / 90-degree turn) when a line extends too far
+  // Curving (Snake / 90-degree L-shape turn) when a line extends too far
   let direction = branch.direction;
   let shouldTurn = false;
   let nextDirection = direction;
 
+  // Generous thresholds: let lines breathe naturally before turning (at least 3-4 tiles)
   if (branchId === 'main_left') {
-    if (direction === 'left' && branch.tipX < -230) {
+    if (direction === 'left' && branch.tipX < -320) {
       shouldTurn = true;
       nextDirection = 'bottom';
-    } else if (direction === 'bottom' && branch.tipY > 140) {
+    } else if (direction === 'bottom' && branch.tipY > 220) {
       shouldTurn = true;
       nextDirection = 'right';
     }
   } else if (branchId === 'main_right') {
-    if (direction === 'right' && branch.tipX > 230) {
+    if (direction === 'right' && branch.tipX > 320) {
       shouldTurn = true;
       nextDirection = 'top';
-    } else if (direction === 'top' && branch.tipY < -140) {
+    } else if (direction === 'top' && branch.tipY < -220) {
       shouldTurn = true;
       nextDirection = 'left';
     }
   } else if (branchId === 'spinner_top') {
-    if (direction === 'top' && branch.tipY < -150) {
+    if (direction === 'top' && branch.tipY < -260) {
       shouldTurn = true;
       nextDirection = 'right';
+    } else if (direction === 'right' && branch.tipX > 260) {
+      shouldTurn = true;
+      nextDirection = 'bottom';
     }
   } else if (branchId === 'spinner_bottom') {
-    if (direction === 'bottom' && branch.tipY > 150) {
+    if (direction === 'bottom' && branch.tipY > 260) {
       shouldTurn = true;
-      nextDirection = 'left';
+      nextDirection = 'right';
+    } else if (direction === 'right' && branch.tipX > 260) {
+      shouldTurn = true;
+      nextDirection = 'top';
     }
   }
 
@@ -291,97 +298,53 @@ export const placeTileOnBranch = (
   // Render tile with correct half facing outward
   let orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
 
-  if (shouldTurn) {
+  // Rule: NEVER turn on a double! Doubles must always lie squarely across the current line.
+  // Turning into an L-shape only happens on a NORMAL (non-double) tile.
+  const canTurnNow = shouldTurn && !isDouble;
+
+  if (canTurnNow) {
     if (direction === 'left' && nextDirection === 'bottom') {
-      isVertical = !isDouble;
-      if (isDouble) {
-        newX = branch.tipX - (TILE_SHORT / 2) - TILE_GAP;
-        newY = branch.tipY + (TILE_SHORT / 2) + TILE_GAP;
-        branch.tipX = newX;
-        branch.tipY = newY + (TILE_SHORT / 2);
-        orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
-      } else {
-        newX = branch.tipX - (TILE_SHORT / 2) - TILE_GAP;
-        newY = branch.tipY + (TILE_LONG - TILE_SHORT) / 2;
-        branch.tipX = newX;
-        branch.tipY = newY + (TILE_LONG / 2);
-        orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
-      }
+      isVertical = true;
+      newX = branch.tipX - TILE_GAP - (TILE_SHORT / 2);
+      newY = branch.tipY + (TILE_LONG / 4);
+      branch.tipX = newX;
+      branch.tipY = newY + (TILE_LONG / 2);
+      orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
     } else if (direction === 'right' && nextDirection === 'top') {
-      isVertical = !isDouble;
-      if (isDouble) {
-        newX = branch.tipX + (TILE_SHORT / 2) + TILE_GAP;
-        newY = branch.tipY - (TILE_SHORT / 2) - TILE_GAP;
-        branch.tipX = newX;
-        branch.tipY = newY - (TILE_SHORT / 2);
-        orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
-      } else {
-        newX = branch.tipX + (TILE_SHORT / 2) + TILE_GAP;
-        newY = branch.tipY - (TILE_LONG - TILE_SHORT) / 2;
-        branch.tipX = newX;
-        branch.tipY = newY - (TILE_LONG / 2);
-        orientedTile = { id: tile.id, left: newOpenVal, right: matchingVal };
-      }
+      isVertical = true;
+      newX = branch.tipX + TILE_GAP + (TILE_SHORT / 2);
+      newY = branch.tipY - (TILE_LONG / 4);
+      branch.tipX = newX;
+      branch.tipY = newY - (TILE_LONG / 2);
+      orientedTile = { id: tile.id, left: newOpenVal, right: matchingVal };
     } else if (direction === 'bottom' && nextDirection === 'right') {
-      isVertical = isDouble;
-      if (isDouble) {
-        newX = branch.tipX + (TILE_SHORT / 2) + TILE_GAP;
-        newY = branch.tipY + (TILE_SHORT / 2) + TILE_GAP;
-        branch.tipX = newX + (TILE_SHORT / 2);
-        branch.tipY = newY;
-        orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
-      } else {
-        newX = branch.tipX + (TILE_LONG - TILE_SHORT) / 2;
-        newY = branch.tipY + (TILE_SHORT / 2) + TILE_GAP;
-        branch.tipX = newX + (TILE_LONG / 2);
-        branch.tipY = newY;
-        orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
-      }
+      isVertical = false;
+      newY = branch.tipY + TILE_GAP + (TILE_SHORT / 2);
+      newX = branch.tipX + (TILE_LONG / 4);
+      branch.tipX = newX + (TILE_LONG / 2);
+      branch.tipY = newY;
+      orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
     } else if (direction === 'bottom' && nextDirection === 'left') {
-      isVertical = isDouble;
-      if (isDouble) {
-        newX = branch.tipX - (TILE_SHORT / 2) - TILE_GAP;
-        newY = branch.tipY + (TILE_SHORT / 2) + TILE_GAP;
-        branch.tipX = newX - (TILE_SHORT / 2);
-        branch.tipY = newY;
-        orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
-      } else {
-        newX = branch.tipX - (TILE_LONG - TILE_SHORT) / 2;
-        newY = branch.tipY + (TILE_SHORT / 2) + TILE_GAP;
-        branch.tipX = newX - (TILE_LONG / 2);
-        branch.tipY = newY;
-        orientedTile = { id: tile.id, left: newOpenVal, right: matchingVal };
-      }
+      isVertical = false;
+      newY = branch.tipY + TILE_GAP + (TILE_SHORT / 2);
+      newX = branch.tipX - (TILE_LONG / 4);
+      branch.tipX = newX - (TILE_LONG / 2);
+      branch.tipY = newY;
+      orientedTile = { id: tile.id, left: newOpenVal, right: matchingVal };
     } else if (direction === 'top' && nextDirection === 'left') {
-      isVertical = isDouble;
-      if (isDouble) {
-        newX = branch.tipX - (TILE_SHORT / 2) - TILE_GAP;
-        newY = branch.tipY - (TILE_SHORT / 2) - TILE_GAP;
-        branch.tipX = newX - (TILE_SHORT / 2);
-        branch.tipY = newY;
-        orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
-      } else {
-        newX = branch.tipX - (TILE_LONG - TILE_SHORT) / 2;
-        newY = branch.tipY - (TILE_SHORT / 2) - TILE_GAP;
-        branch.tipX = newX - (TILE_LONG / 2);
-        branch.tipY = newY;
-        orientedTile = { id: tile.id, left: newOpenVal, right: matchingVal };
-      }
+      isVertical = false;
+      newY = branch.tipY - TILE_GAP - (TILE_SHORT / 2);
+      newX = branch.tipX - (TILE_LONG / 4);
+      branch.tipX = newX - (TILE_LONG / 2);
+      branch.tipY = newY;
+      orientedTile = { id: tile.id, left: newOpenVal, right: matchingVal };
     } else if (direction === 'top' && nextDirection === 'right') {
-      isVertical = isDouble;
-      if (isDouble) {
-        newX = branch.tipX + (TILE_SHORT / 2) + TILE_GAP;
-        newY = branch.tipY - (TILE_SHORT / 2) - TILE_GAP;
-        branch.tipX = newX + (TILE_SHORT / 2);
-        branch.tipY = newY;
-        orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
-      } else {
-        newX = branch.tipX + (TILE_LONG - TILE_SHORT) / 2;
-        newY = branch.tipY - (TILE_SHORT / 2) - TILE_GAP;
-        branch.tipX = newX + (TILE_LONG / 2);
-        branch.tipY = newY;
-        orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
-      }
+      isVertical = false;
+      newY = branch.tipY - TILE_GAP - (TILE_SHORT / 2);
+      newX = branch.tipX + (TILE_LONG / 4);
+      branch.tipX = newX + (TILE_LONG / 2);
+      branch.tipY = newY;
+      orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
     }
     branch.direction = nextDirection;
   } else {
