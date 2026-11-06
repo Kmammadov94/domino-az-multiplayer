@@ -3,7 +3,7 @@ import { TABLE_GIFTS, TableGiftDef } from '../data/tableGifts';
 import { Language } from '../types/domino';
 import { Coins, X, Sparkles, UserPlus, Check } from 'lucide-react';
 import { triggerHaptic } from '../utils/haptics';
-import { addFriend, isFriend } from '../utils/friendsStorage';
+import { addFriend, isFriend, isBotName } from '../utils/friendsStorage';
 
 interface TableGiftPickerProps {
   targetPlayerName: string;
@@ -13,6 +13,7 @@ interface TableGiftPickerProps {
   onSendGift: (gift: TableGiftDef, targetIndex: number) => void;
   userCoins: number;
   lang: Language;
+  isBot?: boolean;
 }
 
 export const TableGiftPicker: React.FC<TableGiftPickerProps> = ({
@@ -22,13 +23,16 @@ export const TableGiftPicker: React.FC<TableGiftPickerProps> = ({
   onClose,
   onSendGift,
   userCoins,
-  lang
+  lang,
+  isBot = false
 }) => {
+  const canAddFriend = !isBot && !isBotName(targetPlayerName);
   const [friendAdded, setFriendAdded] = useState(() => isFriend(targetPlayerName));
 
   if (!isOpen) return null;
 
   const handleAddFriendClick = () => {
+    if (!canAddFriend) return;
     triggerHaptic('success');
     addFriend({
       name: targetPlayerName,
@@ -55,20 +59,22 @@ export const TableGiftPicker: React.FC<TableGiftPickerProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {friendAdded ? (
-              <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <Check className="w-3 h-3" />
-                <span>Dost</span>
-              </span>
-            ) : (
-              <button
-                onClick={handleAddFriendClick}
-                title="Dostlara əlavə et"
-                className="text-[10px] text-amber-300 font-bold bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 px-2 py-1 rounded-lg flex items-center gap-1 transition active:scale-95"
-              >
-                <UserPlus className="w-3 h-3" />
-                <span>Dost Et</span>
-              </button>
+            {canAddFriend && (
+              friendAdded ? (
+                <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <Check className="w-3 h-3" />
+                  <span>Dost</span>
+                </span>
+              ) : (
+                <button
+                  onClick={handleAddFriendClick}
+                  title="Dostlara əlavə et"
+                  className="text-[10px] text-amber-300 font-bold bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 px-2 py-1 rounded-lg flex items-center gap-1 transition active:scale-95"
+                >
+                  <UserPlus className="w-3 h-3" />
+                  <span>Dost Et</span>
+                </button>
+              )
             )}
             <button
               onClick={onClose}

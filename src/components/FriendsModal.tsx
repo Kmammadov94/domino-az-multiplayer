@@ -5,7 +5,8 @@ import {
   loadFriends,
   addFriend,
   removeFriend,
-  loadRecentPlayers
+  loadRecentPlayers,
+  isBotName
 } from '../utils/friendsStorage';
 import { Language } from '../types/domino';
 import { AvatarView } from './AvatarView';
@@ -59,10 +60,17 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({
 
   const handleAddSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!newFriendName.trim()) return;
+    const trimmed = newFriendName.trim();
+    if (!trimmed) return;
+
+    if (isBotName(trimmed)) {
+      triggerHaptic('medium');
+      showToast('⚠️ Bu ad kompüter botuna aiddir. Yalnız real oyunçuları əlavə edə bilərsiniz.');
+      return;
+    }
 
     const ok = addFriend({
-      name: newFriendName.trim(),
+      name: trimmed,
       avatarId: 'avatar_tea_master',
       title: 'Çayxana Qonağı'
     });
@@ -71,7 +79,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({
       triggerHaptic('success');
       setFriends(loadFriends());
       setNewFriendName('');
-      showToast(`${newFriendName.trim()} dostluğa əlavə edildi! 🎉`);
+      showToast(`${trimmed} dostluğa əlavə edildi! 🎉`);
       setTab('list');
     } else {
       triggerHaptic('medium');
@@ -271,14 +279,14 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({
             {/* Direct Name Input */}
             <form onSubmit={handleAddSubmit} className="flex flex-col gap-2">
               <label className="text-xs font-bold text-amber-300/90 text-left">
-                Dostunuzun Adı və ya Ləqəbi:
+                Real Oyunçu / Dostunuzun Adı:
               </label>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
                   value={newFriendName}
                   onChange={(e) => setNewFriendName(e.target.value)}
-                  placeholder="məs: Rəşad, Eldar..."
+                  placeholder="məs: Murad, Samir, Ayan..."
                   maxLength={18}
                   className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white font-bold focus:outline-none focus:border-amber-400 transition"
                 />
@@ -290,6 +298,9 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({
                   Əlavə Et
                 </button>
               </div>
+              <p className="text-[10px] text-slate-400 text-left">
+                💡 Yalnız real dostlarınızı və multiplayer oyunçularını əlavə edə bilərsiniz (Süni intellekt botları əlavə edilmir).
+              </p>
             </form>
 
             {/* Shareable Invite Link */}
@@ -314,15 +325,15 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({
           </div>
         )}
 
-        {/* Tab 3: Recent Opponents */}
+        {/* Tab 3: Recent Real Opponents */}
         {tab === 'recent' && (
           <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[220px]">
             {recentPlayers.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-48 text-center p-4 text-slate-500">
                 <Clock className="w-8 h-8 mb-2 opacity-50" />
-                <span className="font-bold text-xs">Hələ heç bir oyun oynanmayıb.</span>
-                <span className="text-[10px] text-slate-600 mt-0.5">
-                  Matç bitdikdən sonra qarşılaşdığınız oyunçular burada çıxacaq.
+                <span className="font-bold text-xs text-slate-300">Hələ heç bir real rəqiblə oynanmayıb.</span>
+                <span className="text-[10px] text-slate-400 mt-1 max-w-xs leading-relaxed">
+                  Onlayn multiplayer oyunlarında qarşılaşdığınız real oyunçular avtomatik burada əks olunacaq. Botlar bu siyahıya daxil edilmir.
                 </span>
               </div>
             ) : (

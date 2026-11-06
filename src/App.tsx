@@ -48,7 +48,7 @@ import { TableGiftPicker } from './components/TableGiftPicker';
 import { TableGiftAnimationOverlay, ActiveGiftAnimation } from './components/TableGiftAnimationOverlay';
 import { BoardView } from './components/BoardView';
 import { FriendsModal } from './components/FriendsModal';
-import { recordRecentPlayer } from './utils/friendsStorage';
+import { recordRecentPlayer, loadRecentPlayers, isBotName } from './utils/friendsStorage';
 import { ScoreBoard } from './components/ScoreBoard';
 import { PlayerControls } from './components/PlayerControls';
 import { DominoTile } from './components/DominoTile';
@@ -164,7 +164,7 @@ export const App: React.FC = () => {
   // Teahouse Rooms & Interactive Table Gifts State
   const [showTeahousesModal, setShowTeahousesModal] = useState<boolean>(false);
   const [showFriendsModal, setShowFriendsModal] = useState<boolean>(false);
-  const [giftTargetPlayer, setGiftTargetPlayer] = useState<{ index: number; name: string } | null>(null);
+  const [giftTargetPlayer, setGiftTargetPlayer] = useState<{ index: number; name: string; isBot?: boolean } | null>(null);
   const [activeGiftAnimation, setActiveGiftAnimation] = useState<ActiveGiftAnimation | null>(null);
 
   // Setup multiplayer socket events & query param auto-join / session reconnection
@@ -295,6 +295,30 @@ export const App: React.FC = () => {
         setIsMultiplayer(true);
         setInGame(true);
         setShowMultiplayerLobby(false);
+
+        // Record real multiplayer opponents to recent players
+        if (state.players && state.players.length > 1) {
+          try {
+            const existing = loadRecentPlayers();
+            const realOpponents = state.players
+              .filter((p, idx) => idx !== state.myPlayerIndex && !p.isAI && p.name && !isBotName(p.name))
+              .map((p) => ({
+                name: p.name.replace(/\s*\((Siz|Вы|You)\)\s*/g, '').trim(),
+                avatarId: p.avatarId || 'avatar_tea_master',
+                date: new Date().toLocaleDateString('az-AZ'),
+                isRealPlayer: true
+              }));
+            if (realOpponents.length > 0) {
+              const merged = [
+                ...realOpponents,
+                ...existing.filter((e) => !realOpponents.some((r) => r.name.toLowerCase() === e.name.toLowerCase()))
+              ].slice(0, 15);
+              localStorage.setItem('domino_recent_players', JSON.stringify(merged));
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        }
       } else if (state.status === 'finished') {
         setShowGameEnd(true);
       }
@@ -856,22 +880,26 @@ export const App: React.FC = () => {
     }, 800);
   };
 
-  // Award match gold coins
+  // Award match gold coins & record real opponents only
   const recordRecentOpponents = (playerList: Player[]) => {
+    // NEVER record AI bots in offline singleplayer mode!
+    if (!isMultiplayer) return;
+
     try {
-      const existing: Array<{ name: string; avatarId?: string; date: string }> =
-        JSON.parse(localStorage.getItem('domino_recent_players') || '[]');
+      const existing = loadRecentPlayers();
       const newOnes = playerList
-        .filter((_, idx) => idx !== localPlayerIndex)
+        .filter((p, idx) => idx !== localPlayerIndex && !p.isAI && !isBotName(p.name))
         .map((p) => ({
-          name: p.name,
+          name: p.name.replace(/\s*\((Siz|Вы|You)\)\s*/g, '').trim(),
           avatarId: p.avatarId || 'avatar_tea_master',
-          date: new Date().toLocaleDateString('az-AZ')
+          date: new Date().toLocaleDateString('az-AZ'),
+          isRealPlayer: true
         }));
+      if (newOnes.length === 0) return;
       const merged = [
         ...newOnes,
-        ...existing.filter((e) => !newOnes.some((n) => n.name === e.name))
-      ].slice(0, 10);
+        ...existing.filter((e) => !newOnes.some((n) => n.name.toLowerCase() === e.name.toLowerCase()))
+      ].slice(0, 15);
       localStorage.setItem('domino_recent_players', JSON.stringify(merged));
     } catch (e) {
       console.error(e);
@@ -880,7 +908,9 @@ export const App: React.FC = () => {
 
   const awardMatchCoins = (userWon: boolean) => {
     triggerHaptic('success');
-    recordRecentOpponents(players);
+    if (isMultiplayer) {
+      recordRecentOpponents(players);
+    }
     const coinReward = userWon ? 5 : 3;
     handleUpdateStats({
       ...stats,
@@ -2165,7 +2195,7 @@ export const App: React.FC = () => {
                   <div
                     onClick={() => {
                       triggerHaptic('light');
-                      if (opponent) setGiftTargetPlayer({ index: oppIdx >= 0 ? oppIdx : 1, name: opponent.name });
+                      if (opponent) setGiftTargetPlayer({ index: oppIdx >= 0 ? oppIdx : 1, name: opponent.name, isBot: opponent.isAI || !effectiveInMultiplayer });
                     }}
                     className="flex items-center gap-1.5 mb-1 bg-slate-900/80 hover:bg-slate-800/90 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-slate-700/60 shadow cursor-pointer active:scale-95 transition-all group"
                     title={`${opponent?.name} üçün hədiyyə göndər`}
@@ -2270,7 +2300,7 @@ export const App: React.FC = () => {
                     <div
                       onClick={() => {
                         triggerHaptic('light');
-                        if (topPartner) setGiftTargetPlayer({ index: topIdx, name: topPartner.name });
+                        if (topPartner) setGiftTargetPlayer({ index: topIdx, name: topPartner.name, isBot: topPartner.isAI || !effectiveInMultiplayer });
                       }}
                       className="flex items-center gap-1.5 mb-1 bg-slate-900/80 hover:bg-slate-800/90 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-slate-700/60 shadow cursor-pointer active:scale-95 transition-all group"
                       title={`${topPartner?.name} üçün hədiyyə göndər`}
@@ -2304,7 +2334,7 @@ export const App: React.FC = () => {
                     <div
                       onClick={() => {
                         triggerHaptic('light');
-                        if (leftOpponent) setGiftTargetPlayer({ index: leftIdx, name: leftOpponent.name });
+                        if (leftOpponent) setGiftTargetPlayer({ index: leftIdx, name: leftOpponent.name, isBot: leftOpponent.isAI || !effectiveInMultiplayer });
                       }}
                       className="flex items-center gap-1 mb-0.5 bg-slate-900/80 hover:bg-slate-800/90 px-2 py-0.5 rounded-full border border-slate-700 shadow cursor-pointer active:scale-95 transition-all group"
                       title={`${leftOpponent?.name} üçün hədiyyə göndər`}
@@ -2338,7 +2368,7 @@ export const App: React.FC = () => {
                     <div
                       onClick={() => {
                         triggerHaptic('light');
-                        if (rightOpponent) setGiftTargetPlayer({ index: rightIdx, name: rightOpponent.name });
+                        if (rightOpponent) setGiftTargetPlayer({ index: rightIdx, name: rightOpponent.name, isBot: rightOpponent.isAI || !effectiveInMultiplayer });
                       }}
                       className="flex items-center gap-1 mb-0.5 bg-slate-900/80 hover:bg-slate-800/90 px-2 py-0.5 rounded-full border border-slate-700 shadow cursor-pointer active:scale-95 transition-all group"
                       title={`${rightOpponent?.name} üçün hədiyyə göndər`}
@@ -2588,6 +2618,7 @@ export const App: React.FC = () => {
           onSendGift={handleSendTableGift}
           userCoins={stats.coins}
           lang={lang}
+          isBot={giftTargetPlayer.isBot}
         />
       )}
 

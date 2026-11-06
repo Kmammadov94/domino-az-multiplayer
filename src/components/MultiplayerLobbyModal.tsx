@@ -8,6 +8,7 @@ import {
 import { AvatarView } from './AvatarView';
 import { multiplayerSocket } from '../services/multiplayerSocket';
 import { validatePlayerName, containsProfanity } from '../utils/profanityFilter';
+import { loadRecentPlayers, isBotName, RecentPlayerItem } from '../utils/friendsStorage';
 import {
   Globe,
   Users,
@@ -963,12 +964,9 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                 </div>
               )}
 
-              {/* Recent Opponents & Friends Section */}
+              {/* Recent Opponents & Friends Section (Real players only) */}
               {(() => {
-                let recentList: Array<{ name: string; avatarId?: string; date: string }> = [];
-                try {
-                  recentList = JSON.parse(localStorage.getItem('domino_recent_players') || '[]');
-                } catch {}
+                const recentList = loadRecentPlayers().filter((p) => p && !isBotName(p.name));
                 if (recentList.length === 0) return null;
 
                 return (
