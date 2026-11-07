@@ -3,7 +3,7 @@ import { Player, Language, GameMode, GameVariant } from '../types/domino';
 import { Match101State } from '../utils/domino101Logic';
 import { translations } from '../i18n/translations';
 import { sounds } from '../utils/sound';
-import { Trophy, Frown, Coins, ArrowRight, RotateCcw, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { Trophy, Frown, Coins, ArrowRight, RotateCcw, Eye, EyeOff, Sparkles, LogOut } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { AvatarView } from './AvatarView';
 
@@ -24,6 +24,7 @@ interface GameEndModalProps {
   isHost?: boolean;
   onNextHand: () => void;
   onRestartMatch: () => void;
+  onLeaveMatch: () => void;
   variant?: GameVariant;
   match101State?: Match101State;
   isSeka?: boolean;
@@ -47,6 +48,7 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
   isHost = true,
   onNextHand,
   onRestartMatch,
+  onLeaveMatch,
   variant = '365',
   match101State,
   isSeka = false,
@@ -110,10 +112,10 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
   // Mode: Minimized Floating Bar allowing user to inspect the full board & opponent tiles freely!
   if (isViewingBoard) {
     return (
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-slate-900/95 backdrop-blur-md border-2 border-amber-500/70 rounded-2xl p-2.5 px-4 shadow-[0_10px_35px_rgba(0,0,0,0.85)] animate-fade-in pointer-events-auto">
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-wrap items-center justify-center gap-2 sm:gap-3 bg-slate-900/95 backdrop-blur-md border-2 border-amber-500/70 rounded-2xl p-2.5 px-4 shadow-[0_10px_35px_rgba(0,0,0,0.85)] animate-fade-in pointer-events-auto max-w-[95vw]">
         <button
           onClick={() => setIsViewingBoard(false)}
-          className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs flex items-center gap-2 border border-slate-700 shadow transition active:scale-95"
+          className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs flex items-center gap-1.5 border border-slate-700 shadow transition active:scale-95"
         >
           <EyeOff className="w-4 h-4 text-amber-400" />
           <span>{t.showResults || 'Nəticələrə Qayıt'}</span>
@@ -122,7 +124,7 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
         {isHost ? (
           <button
             onClick={isMatchOver ? onRestartMatch : onNextHand}
-            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:brightness-110 text-white font-black text-xs flex items-center gap-2 shadow-lg transition active:scale-95"
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:brightness-110 text-white font-black text-xs flex items-center gap-1.5 shadow-lg transition active:scale-95"
           >
             <span>{isMatchOver ? (t.playAgain || 'Yenidən Oyna') : (t.nextHand || 'Növbəti Əl')}</span>
             <ArrowRight className="w-4 h-4" />
@@ -132,6 +134,14 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
             👑 Otaq sahibi gözlənilir...
           </span>
         )}
+
+        <button
+          onClick={onLeaveMatch}
+          className="px-3.5 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-700 text-rose-200 font-bold text-xs flex items-center gap-1.5 shadow transition active:scale-95"
+        >
+          <LogOut className="w-4 h-4 text-rose-400" />
+          <span>{t.forfeit || 'Çıxış'}</span>
+        </button>
       </div>
     );
   }
@@ -238,6 +248,15 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
               >
                 <Eye className="w-4 h-4 text-sky-400" />
                 <span>{t.viewBoard || 'Masanın Son Vəziyyətinə Bax'}</span>
+              </button>
+
+              {/* Exit to Main Menu Button */}
+              <button
+                onClick={onLeaveMatch}
+                className="w-full py-2.5 rounded-xl bg-rose-950/75 hover:bg-rose-900 border border-rose-800 text-rose-200 hover:text-white font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95"
+              >
+                <LogOut className="w-4 h-4 text-rose-400" />
+                <span>Ana Menyuya Çıx</span>
               </button>
             </div>
           </>
@@ -367,6 +386,15 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
               >
                 <Eye className="w-4 h-4 text-sky-400" />
                 <span>{t.viewBoard || 'Masanın Son Vəziyyətinə Bax'}</span>
+              </button>
+
+              {/* Exit to Main Menu Button */}
+              <button
+                onClick={onLeaveMatch}
+                className="w-full py-2.5 rounded-xl bg-rose-950/75 hover:bg-rose-900 border border-rose-800 text-rose-200 hover:text-white font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95"
+              >
+                <LogOut className="w-4 h-4 text-rose-400" />
+                <span>Oyundan Çıx (Ana Menyu)</span>
               </button>
             </div>
           </>

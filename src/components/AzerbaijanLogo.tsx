@@ -3,12 +3,14 @@ import React, { useId } from 'react';
 interface AzerbaijanLogoProps {
   size?: 'sm' | 'md' | 'lg';
   showSubtitle?: boolean;
+  compact?: boolean;
   className?: string;
 }
 
 export const AzerbaijanLogo: React.FC<AzerbaijanLogoProps> = ({
   size = 'md',
   showSubtitle = false,
+  compact = false,
   className = ''
 }) => {
   const isSm = size === 'sm';
@@ -17,11 +19,11 @@ export const AzerbaijanLogo: React.FC<AzerbaijanLogoProps> = ({
   const idPrefix = `domino_${rawId.replace(/:/g, '_')}_${size}`;
 
   // Authentic 2:1 horizontal domino tile dimensions
-  const tileWidth = isSm ? 54 : isLg ? 108 : 76;
-  const tileHeight = isSm ? 27 : isLg ? 54 : 38;
+  const tileWidth = compact ? 42 : isSm ? 54 : isLg ? 108 : 76;
+  const tileHeight = compact ? 21 : isSm ? 27 : isLg ? 54 : 38;
 
   return (
-    <div className={`flex items-center gap-2.5 sm:gap-3.5 select-none ${className}`}>
+    <div className={`flex items-center ${compact ? 'gap-1.5' : 'gap-2.5 sm:gap-3.5'} select-none ${className}`}>
       {/* 3D Tactile Domino Tile Skinned with Azerbaijani Flag [3:2] */}
       <div
         style={{
@@ -173,7 +175,7 @@ export const AzerbaijanLogo: React.FC<AzerbaijanLogoProps> = ({
       </div>
 
       {/* Brand Typography */}
-      <div className="flex flex-col justify-center">
+      <div className={`flex flex-col justify-center ${compact ? 'hidden sm:flex' : 'flex'}`}>
         <div className="flex items-center gap-1.5 sm:gap-2 leading-none">
           <span
             className={`font-black tracking-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] ${

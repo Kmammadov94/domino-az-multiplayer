@@ -4,6 +4,18 @@ Bütün yeniləmələr, düzəlişlər, funksionallıqlar və versiya dəyişikl
 
 ---
 
+## [1.1.3] — 2026-11-07 (Oyun İçi Yuxarı Panel & Matç Sonu Çıxış Düyməsi)
+
+### 🎨 İnterfeys (UI / UX) Düzəlişləri
+- **Oyun İçi Yuxarı Panelin (Top Bar) Tam Görünməsi**:
+  - Mobil ekranlarda yuxarı paneldəki loqo yığcam (`compact`) rejimə keçirildi ki, sağ tərəfdəki **Otaq nömrəsi, Qızıl balansı, Səs və Çıxış** düymələri ekran kənarından kəsilməsin.
+  - `<header>` elementinə `flex-shrink-0`, `flex-wrap` və `safe-area-inset` boşluqları əlavə olundu.
+  - `MainActivity.java` daxilində `LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER` aktivləşdirildi ki, telefonun kamera kəsiyi (notch) yuxarı paneli örtməsin.
+- **Əl və Matç Bitdikdə Çıxış (Ana Menyu) Düyməsi (`GameEndModal.tsx`)**:
+  - Həm botlarla (AI), həm də onlayn multiplayer oyunlarında əl bitdikdə və ya matç bitdikdə **"Ana Menyuya Çıx / Oyundan Çıx"** düyməsi əlavə olundu (həm əsas nəticə pəncərəsində, həm də "Masanın Son Vəziyyətinə Bax" alt panelində).
+
+---
+
 ## [1.1.2] — 2026-11-07 (İnterfeys & Növbə İndikatoru Yerləşməsi)
 
 ### 🎨 Vizual & UI Təkmilləşdirməsi

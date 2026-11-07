@@ -1205,10 +1205,17 @@ export const App: React.FC = () => {
   const handleForfeitAction = () => {
     if (isMultiplayer) {
       multiplayerSocket.leaveRoom();
+      try {
+        localStorage.removeItem('domino_mp_session');
+        window.history.replaceState(null, '', window.location.pathname);
+      } catch (e) {}
       setIsMultiplayer(false);
       setMpGameState(null);
       setMpRoom(null);
+      setMpIsHost(false);
     }
+    setShowGameEnd(false);
+    setHandRevealed(false);
     setInGame(false);
   };
 
@@ -2018,19 +2025,22 @@ export const App: React.FC = () => {
       {/* Top Navbar */}
       {/* Top Bar Header */}
       <header
-        className={`${
-          inGame ? 'h-11 sm:h-12' : 'min-h-11 py-1 sm:py-1.5'
-        } bg-slate-900/95 border-b border-amber-600/30 px-2 sm:px-3 flex items-center justify-between gap-2 z-30 shadow-md select-none`}
+        style={{
+          paddingTop: 'max(0.25rem, env(safe-area-inset-top))',
+          paddingLeft: 'max(0.5rem, env(safe-area-inset-left))',
+          paddingRight: 'max(0.5rem, env(safe-area-inset-right))'
+        }}
+        className="flex-shrink-0 min-h-11 py-1 sm:py-1.5 bg-slate-900/95 border-b border-amber-600/30 flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 z-30 shadow-md select-none"
       >
         {inGame ? (
-          /* Clean, non-intrusive in-game header */
+          /* Clean, non-intrusive in-game header — all elements guaranteed visible on mobile */
           <>
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <AzerbaijanLogo size="sm" />
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <AzerbaijanLogo size="sm" compact />
               <span className="px-2 py-0.5 rounded-full bg-slate-800/90 border border-amber-500/40 text-[10px] sm:text-[11px] font-black text-amber-300 shadow">
                 {effectiveInMultiplayer ? (mpGameState?.variant === '101' ? '101 XAL' : '365 XAL') : (gameVariant === '101' ? '101 XAL' : '365 XAL')}
               </span>
-              {effectiveInMultiplayer && mpRoom && (
+              {effectiveInMultiplayer && mpRoom ? (
                 <div className="flex items-center gap-1 bg-emerald-950/80 border border-emerald-500/40 rounded-lg px-2 py-0.5 text-[10px] sm:text-xs">
                   <span className="font-bold text-emerald-300">Otaq:</span>
                   <span className="font-black text-white">{mpRoom.code}</span>
@@ -2041,10 +2051,14 @@ export const App: React.FC = () => {
                     </span>
                   )}
                 </div>
+              ) : (
+                <span className="px-2 py-0.5 rounded-lg bg-slate-800/80 border border-slate-700 text-[10px] font-bold text-slate-300">
+                  🤖 Bot ilə
+                </span>
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 ml-auto">
               {/* Gold Coin Balance */}
               <div className="bg-slate-800/90 border border-amber-500/40 rounded-full px-2.5 py-0.5 sm:px-3 sm:py-1 flex items-center gap-1 shadow-inner">
                 <Coins className="w-3.5 h-3.5 text-amber-400" />
@@ -2070,10 +2084,10 @@ export const App: React.FC = () => {
               <button
                 onClick={handleForfeitAction}
                 title={t.forfeit}
-                className="p-1.5 rounded-lg bg-rose-950/70 hover:bg-rose-900 border border-rose-800 text-rose-300 transition flex items-center gap-1 active:scale-95"
+                className="px-2 py-1 rounded-lg bg-rose-950/80 hover:bg-rose-900 border border-rose-700 text-rose-200 transition flex items-center gap-1 active:scale-95"
               >
-                <LogOut className="w-4 h-4" />
-                <span className="text-[10px] font-bold hidden sm:inline">{t.forfeit}</span>
+                <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                <span className="text-[10px] font-bold">{t.forfeit}</span>
               </button>
             </div>
           </>
@@ -2081,7 +2095,7 @@ export const App: React.FC = () => {
           /* Lobby Header with wrapped visible items (2 rows on compact screens, no horizontal scroll) */
           <>
             <div className="flex-shrink-0">
-              <AzerbaijanLogo size="sm" />
+              <AzerbaijanLogo size="sm" compact />
             </div>
 
             {/* Right Action Icons & Balance — flex-wrap so all buttons are always visible without scrolling */}
@@ -3273,6 +3287,7 @@ export const App: React.FC = () => {
         isHost={effectiveInMultiplayer ? mpIsHost : true}
         onNextHand={handleNextHandAction}
         onRestartMatch={handleRestartMatchAction}
+        onLeaveMatch={handleForfeitAction}
         variant={effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant}
         match101State={effectiveInMultiplayer ? (mpGameState?.match101State || match101State) : match101State}
         isSeka={effectiveInMultiplayer ? !!mpGameState?.handResults?.isSeka : is101Seka}
