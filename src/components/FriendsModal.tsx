@@ -11,7 +11,7 @@ import {
   isBotName
 } from '../utils/friendsStorage';
 import { Language, PlayerStats } from '../types/domino';
-import { GoogleUserProfile } from '../utils/storage';
+import { GoogleUserProfile, getPublicShareBaseUrl } from '../utils/storage';
 import {
   getMyPlayerIdentity,
   parseFriendSearchQuery,
@@ -116,7 +116,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({
 
   const handleShareInviteLink = async () => {
     triggerHaptic('light');
-    const url = `${window.location.origin}?friend_id=${myIdentity.id}&tag=${myIdentity.tag}&name=${encodeURIComponent(myIdentity.name)}`;
+    const url = `${getPublicShareBaseUrl()}/?friend_id=${myIdentity.id}&tag=${myIdentity.tag}&name=${encodeURIComponent(myIdentity.name)}`;
     const shareData = {
       title: 'Domino PRO Azərbaycan',
       text: `${myIdentity.name} (${myIdentity.handle}) sizi Domino PRO oyununda dostluğa dəvət edir!`,

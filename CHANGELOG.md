@@ -26,6 +26,9 @@ Bütün yeniləmələr, düzəlişlər, funksionallıqlar və versiya dəyişikl
   - `DoubleComboMove` tipində gedişlər `combo.moves` massivində saxlanıldığı halda, serverdə `executeCombo` metodu `combo.tiles.every(...)` oxumağa çalışırdı və oyunçu onlayn oyunda eyni anda 2 qoşa daş oynadıqda server xəta verirdi. `combo.moves` dəstəyi ilə tam düzəldildi.
 - **Capacitor `appUrlOpen` Dinləyici Sızması (`src/App.tsx`)**:
   - `useEffect(..., [stats])` hər dəfə qızıl/statistika dəyişdikdə yeni native `CapApp.addListener('appUrlOpen')` yaradır və Capacitor v8-də `addListener` Promise qaytardığı üçün köhnə dinləyicini silə bilmirdi. `statsRef` və tək `[]` mount effekti ilə Promise düzgün təmizləndi.
+- **Mobil APK-da Paylaşılan Otaq və Dostluq Linklərinin Düzəldilməsi (`src/utils/storage.ts`, `src/components/MultiplayerLobbyModal.tsx`, `src/components/FriendsModal.tsx`)**:
+  - Mobil APK daxilində `window.location.origin` dəyəri `https://localhost` olduğu üçün otaq və dostluq dəvət linkləri `https://localhost/?room=XXXX` kimi paylaşılırdı (halbuki oyun özü canlı `https://domino-az-multiplayer.onrender.com` serverinə qoşuludur).
+  - `getPublicShareBaseUrl()` əlavə olundu: mobil tətbiqdən paylaşılan bütün dəvət linkləri indi birbaşa canlı `https://domino-az-multiplayer.onrender.com/?room=XXXX` ünvanını paylaşır.
 
 ---
 

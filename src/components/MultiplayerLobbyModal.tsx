@@ -9,6 +9,7 @@ import { AvatarView } from './AvatarView';
 import { multiplayerSocket } from '../services/multiplayerSocket';
 import { validatePlayerName, containsProfanity } from '../utils/profanityFilter';
 import { loadRecentPlayers, isBotName, RecentPlayerItem } from '../utils/friendsStorage';
+import { getPublicShareBaseUrl } from '../utils/storage';
 import {
   Globe,
   Users,
@@ -231,7 +232,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
   };
 
   const handleCopyLink = async (code: string) => {
-    const url = `${window.location.origin}${window.location.pathname}?room=${code}`;
+    const url = `${getPublicShareBaseUrl()}/?room=${code}`;
     if (navigator.share) {
       try {
         await navigator.share({

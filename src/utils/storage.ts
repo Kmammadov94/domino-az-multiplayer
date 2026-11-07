@@ -40,6 +40,14 @@ export const getBackendServerUrl = (): string => {
   return origin;
 };
 
+export const getPublicShareBaseUrl = (): string => {
+  if (typeof window === 'undefined') return PRODUCTION_SERVER_URL;
+  if (isNativeMobileApp()) {
+    return PRODUCTION_SERVER_URL;
+  }
+  return window.location.origin;
+};
+
 export interface GoogleUserProfile {
   googleId: string;
   email: string;
