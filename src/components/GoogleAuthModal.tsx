@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Cloud, CheckCircle, ShieldAlert, LogOut, X, Smartphone, ExternalLink, Loader2 } from 'lucide-react';
+import { Browser as CapBrowser } from '@capacitor/browser';
 import {
   GoogleUserProfile,
   isNativeMobileApp,
@@ -158,7 +159,7 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
   };
 
   // Start Mobile Browser Auth Bridge for Android APK (avoids WebView origin_mismatch 100%)
-  const handleStartMobileBrowserAuth = () => {
+  const handleStartMobileBrowserAuth = async () => {
     const sessionId = `apk_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     setWaitingForMobileBrowser(true);
     setGisError(null);
@@ -168,12 +169,16 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
     }
 
     const baseUrl = getBackendServerUrl() || PRODUCTION_SERVER_URL;
-    const bridgeUrl = `${baseUrl}/?apk_auth=${encodeURIComponent(sessionId)}`;
+    // Direct dedicated authentication bridge page — no full web game load!
+    const bridgeUrl = `${baseUrl}/auth-bridge.html?apk_auth=${encodeURIComponent(sessionId)}`;
 
-    // Open in system browser (Chrome / Custom Tab) where https://domino-az-multiplayer.onrender.com is an authorized origin
-    window.open(bridgeUrl, '_system');
+    try {
+      await CapBrowser.open({ url: bridgeUrl, windowName: '_blank' });
+    } catch {
+      window.open(bridgeUrl, '_system');
+    }
 
-    // Poll backend every 1.5s for completion
+    // Poll backend every 1.2s for completion
     pollIntervalRef.current = setInterval(async () => {
       try {
         const res = await fetch(`${baseUrl}/api/apk-auth/${encodeURIComponent(sessionId)}`);
@@ -184,6 +189,9 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
               clearInterval(pollIntervalRef.current);
               pollIntervalRef.current = null;
             }
+            try {
+              await CapBrowser.close().catch(() => {});
+            } catch {}
             setWaitingForMobileBrowser(false);
             onSignIn(data.user);
             onClose();
@@ -192,7 +200,7 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
       } catch {
         // Ignore transient network errors while user is in browser
       }
-    }, 1500);
+    }, 1200);
   };
 
   if (!isOpen) return null;

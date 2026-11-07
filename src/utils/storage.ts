@@ -166,6 +166,9 @@ export const syncWithCloud = async (
       const data = await res.json();
       if (data.stats) {
         savePlayerStats(data.stats);
+        if (data.profile) {
+          saveGoogleUser(data.profile);
+        }
         return data.stats;
       }
     }

@@ -52,6 +52,8 @@ import {
 } from './utils/storage';
 
 import { triggerHaptic } from './utils/haptics';
+import { App as CapApp } from '@capacitor/app';
+import { Browser as CapBrowser } from '@capacitor/browser';
 import { TABLE_THEMES, DEFAULT_TABLE_THEME_ID } from './data/tableThemes';
 import { PLAYER_TITLES } from './data/profileCustomization';
 import { TABLE_GIFTS, TableGiftDef } from './data/tableGifts';
@@ -201,6 +203,53 @@ export const App: React.FC = () => {
   const [activeGiftAnimation, setActiveGiftAnimation] = useState<ActiveGiftAnimation | null>(null);
   const [floatingScore, setFloatingScore] = useState<FloatingScoreItem | null>(null);
   const [isScreenShaking, setIsScreenShaking] = useState<boolean>(false);
+
+  // Listen for native deep link appUrlOpen (dominoaz://auth) from system browser after Google Sign-In
+  useEffect(() => {
+    let handler: any = null;
+    try {
+      handler = CapApp.addListener('appUrlOpen', async (data: { url: string }) => {
+        if (!data?.url) return;
+        try {
+          await CapBrowser.close().catch(() => {});
+        } catch {}
+
+        try {
+          const rawUrl = data.url.replace('dominoaz://auth', 'https://dummy.local');
+          const parsed = new URL(rawUrl);
+          const gId = parsed.searchParams.get('googleId');
+          const email = parsed.searchParams.get('email');
+          const name = parsed.searchParams.get('name');
+          const picture = parsed.searchParams.get('picture') || undefined;
+
+          if (gId && email) {
+            const userProfile: GoogleUserProfile = {
+              googleId: gId,
+              email,
+              name: name || 'Google Oyunçusu',
+              picture,
+              signedInAt: Date.now()
+            };
+            saveGoogleUser(userProfile);
+            setGoogleUser(userProfile);
+            setShowGuestWarning(false);
+            setShowGoogleAuthModal(false);
+            syncWithCloud(userProfile, stats, true).then((synced) => {
+              if (synced) setStats(synced);
+            });
+          }
+        } catch (err) {
+          console.warn('Failed to parse incoming deep link auth:', err);
+        }
+      });
+    } catch {}
+
+    return () => {
+      if (handler && typeof handler.remove === 'function') {
+        handler.remove();
+      }
+    };
+  }, [stats]);
 
   // Setup multiplayer socket events & query param auto-join / session reconnection
   useEffect(() => {

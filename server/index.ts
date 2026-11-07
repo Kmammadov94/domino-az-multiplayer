@@ -156,7 +156,7 @@ app.get('/api/apk-auth/:sessionId', (req, res) => {
   if (!record) {
     return res.json({ authenticated: false });
   }
-  apkAuthSessions.delete(sessionId);
+  // Keep record available for polling (do not delete on first read so repeated polls or retry deep-links succeed)
   res.json({ authenticated: true, user: record.user });
 });
 

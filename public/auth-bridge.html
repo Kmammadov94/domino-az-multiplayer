@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Google Girişi — Domino PRO</title>
+  <link rel="icon" type="image/png" href="/icon-192.png" />
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .card {
+      background: rgba(15, 23, 42, 0.95);
+      border: 2px solid rgba(245, 158, 11, 0.6);
+      border-radius: 28px;
+      padding: 28px 24px;
+      max-width: 380px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7);
+    }
+    .logo-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 64px;
+      height: 64px;
+      border-radius: 20px;
+      background: #ffffff;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      margin-bottom: 16px;
+    }
+    .logo-badge svg {
+      width: 36px;
+      height: 36px;
+    }
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 900;
+      color: #ffffff;
+      margin-bottom: 6px;
+    }
+    p.subtitle {
+      font-size: 0.85rem;
+      color: #cbd5e1;
+      margin-bottom: 22px;
+      line-height: 1.4;
+    }
+    .btn-container {
+      display: flex;
+      justify-content: center;
+      min-height: 48px;
+      margin-bottom: 16px;
+    }
+    .status-box {
+      display: none;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1.5px solid #10b981;
+      border-radius: 18px;
+      padding: 16px;
+      margin-top: 12px;
+    }
+    .status-box.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+    .status-title {
+      color: #34d399;
+      font-weight: 800;
+      font-size: 1rem;
+      margin-bottom: 4px;
+    }
+    .status-text {
+      font-size: 0.82rem;
+      color: #e2e8f0;
+      line-height: 1.4;
+    }
+    .btn-return {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      margin-top: 14px;
+      padding: 12px 18px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #022c22;
+      font-weight: 900;
+      font-size: 0.95rem;
+      border-radius: 16px;
+      text-decoration: none;
+      box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+    }
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: #34d399;
+      animation: spin 0.8s ease-in-out infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo-badge">
+      <svg viewBox="0 0 24 24">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+      </svg>
+    </div>
+
+    <h1>Domino PRO Girişi</h1>
+    <p class="subtitle" id="sub-desc">Google hesabınızı seçin, qızıllarınız və oyun nailiyyətləriniz mobil tətbiqinizə sinxronlaşsın.</p>
+
+    <div class="btn-container" id="google-btn-box">
+      <div id="google-btn"></div>
+    </div>
+
+    <div class="status-box" id="status-box">
+      <div class="status-title" id="status-title">Giriş Uğurla Tamamlandı!</div>
+      <p class="status-text" id="status-text">Məlumatlarınız Domino PRO tətbiqinə göndərilir...</p>
+      <a href="dominoaz://auth" class="btn-return" id="return-btn">
+        <span>Tətbiqə Qayıt</span>
+      </a>
+    </div>
+  </div>
+
+  <script>
+    const CLIENT_ID = '345163175505-a7dv01uno2tof42k31omil6p5c9do20g.apps.googleusercontent.com';
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('apk_auth');
+
+    function parseJwt(token) {
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(
+          atob(base64)
+            .split('')
+            .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+            .join('')
+        );
+        return JSON.parse(jsonPayload);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function handleCredentialResponse(response) {
+      if (!response || !response.credential) return;
+      const payload = parseJwt(response.credential);
+      if (!payload) return;
+
+      const profile = {
+        googleId: payload.sub,
+        email: payload.email,
+        name: payload.name || payload.given_name || 'Google Oyunçusu',
+        picture: payload.picture,
+        signedInAt: Date.now()
+      };
+
+      document.getElementById('google-btn-box').style.display = 'none';
+      document.getElementById('sub-desc').style.display = 'none';
+      const statusBox = document.getElementById('status-box');
+      const statusTitle = document.getElementById('status-title');
+      const statusText = document.getElementById('status-text');
+      statusBox.classList.add('active');
+
+      if (sessionId) {
+        statusText.innerHTML = '<span class="loading-spinner"></span> Tətbiqə bağlanır: <strong>' + profile.name + '</strong>';
+        try {
+          await fetch('/api/apk-auth/' + encodeURIComponent(sessionId), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user: profile })
+          });
+        } catch (e) {
+          console.error(e);
+        }
+
+        statusTitle.textContent = 'Giriş Tamamlandı!';
+        statusText.innerHTML = '<strong>' + profile.name + '</strong> hesabınız bağlandı. Aşağıdakı düyməyə basaraq və ya avtomatik tətbiqə qayıdın.';
+
+        // Automatic redirect via deep links
+        const returnUrl = 'dominoaz://auth?googleId=' + encodeURIComponent(profile.googleId) +
+          '&name=' + encodeURIComponent(profile.name) +
+          '&email=' + encodeURIComponent(profile.email) +
+          (profile.picture ? '&picture=' + encodeURIComponent(profile.picture) : '');
+
+        document.getElementById('return-btn').href = returnUrl;
+
+        // Try direct intent / scheme
+        setTimeout(function() {
+          window.location.href = returnUrl;
+        }, 500);
+
+        setTimeout(function() {
+          window.location.href = 'intent://auth#Intent;scheme=dominoaz;package=az.domino.telefon365;end';
+        }, 1200);
+      } else {
+        statusTitle.textContent = 'Giriş Tamamlandı!';
+        statusText.textContent = profile.name + ' kimi daxil oldunuz.';
+        document.getElementById('return-btn').href = '/';
+        document.getElementById('return-btn').textContent = 'Oyuna Başla';
+      }
+    }
+
+    function initGis() {
+      if (window.google && window.google.accounts && window.google.accounts.id) {
+        window.google.accounts.id.initialize({
+          client_id: CLIENT_ID,
+          callback: handleCredentialResponse,
+          auto_select: true
+        });
+        window.google.accounts.id.renderButton(
+          document.getElementById('google-btn'),
+          { theme: 'filled_blue', size: 'large', type: 'standard', shape: 'pill', width: 280 }
+        );
+        window.google.accounts.id.prompt();
+      } else {
+        setTimeout(initGis, 250);
+      }
+    }
+
+    window.addEventListener('load', initGis);
+  </script>
+</body>
+</html>
