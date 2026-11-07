@@ -4,7 +4,10 @@ Bütün yeniləmələr, düzəlişlər, funksionallıqlar və versiya dəyişikl
 
 ---
 
-## [1.1.5] — 2026-11-07 (Performans, Batareya Qənaəti və Kritik Kod Audit Düzəlişləri)
+## [1.1.5] — 2026-11-07 (Google Play Closed Beta v2 — `versionCode 3`, Performans, Batareya Qənaəti və Kritik Kod Audit Düzəlişləri)
+
+### 📦 Google Play Closed Beta Yeniləməsi (`versionCode: 3`, `versionName: "1.1.5"`)
+- `android/app/build.gradle` daxilində `versionCode` **2 → 3**, `versionName` isə **"1.1.0" → "1.1.5"** olaraq yeniləndi ki, yeni `Domino-AZ-GooglePlay.aab` paketi Google Play Console-a yeni Closed Beta buraxılışı kimi maneəsiz yüklənə bilsin.
 
 ### 🔋 Batareya Qənaəti & Mobil Performans Təkmilləşdirmələri
 - **60–120 FPS Daş Sürüşdürmə Zamanı Sıfır Re-render (`src/App.tsx`)**:
