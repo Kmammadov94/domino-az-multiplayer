@@ -15,6 +15,7 @@ interface ScoreBoardProps {
   equippedTitle?: string;
   variant?: GameVariant;
   match101State?: Match101State;
+  myPlayerIndex?: number;
 }
 
 export const ScoreBoard: React.FC<ScoreBoardProps> = ({
@@ -26,7 +27,8 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
   equippedFrame,
   equippedTitle,
   variant = '365',
-  match101State
+  match101State,
+  myPlayerIndex = 0
 }) => {
   const t = translations[lang];
   // On mobile screens (< 640px), default to collapsed compact view so it doesn't block the board
@@ -48,7 +50,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
     // Compact collapsed view for mobile or user toggle
     if (isCollapsed) {
       return (
-        <div className="bg-slate-900/95 backdrop-blur-md border border-amber-600/40 rounded-xl px-2.5 py-1.5 shadow-xl flex items-center gap-2 text-xs select-none animate-fade-in max-w-[95vw]">
+        <div className="relative bg-slate-950/95 backdrop-blur-md border border-amber-500/50 rounded-xl px-2.5 py-1 shadow-xl flex items-center gap-2 text-xs select-none animate-fade-in max-w-[95vw]">
           <div className="flex items-center gap-1 font-bold text-amber-400">
             <Trophy className="w-3.5 h-3.5 text-amber-400" />
             <span className="text-[11px] font-black">101</span>
@@ -58,41 +60,56 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
 
           {/* 3 Players Compact */}
           {players.length === 3 ? (
-            <div className="flex items-center gap-1.5">
-              {players.map((p) => {
-                const acc = match101State?.playerAccounts?.[p.id] || { mainScore: 0, isOpen: false };
-                const color = p.id === 0 ? 'text-emerald-400' : p.id === 1 ? 'text-amber-400' : 'text-cyan-400';
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {players.map((p, idx) => {
+                const acc = match101State?.playerAccounts?.[p.id] || { mainScore: 0, draftScore: 0, isOpen: false };
+                const isMe = idx === myPlayerIndex;
                 return (
-                  <span key={p.id} className="text-[11px] font-bold flex items-center gap-0.5">
-                    <span className="text-slate-400">{p.name.slice(0, 3)}:</span>
-                    <span className={`${color} font-black`}>{acc.mainScore}</span>
-                    {acc.isOpen && <span className="text-[9px] text-emerald-300">✓</span>}
+                  <span
+                    key={p.id}
+                    className={`text-[11px] font-bold flex items-center gap-1 px-1.5 py-0.5 rounded-lg border ${
+                      isMe
+                        ? 'bg-emerald-950/70 border-emerald-500/50 text-emerald-300'
+                        : 'bg-slate-800/80 border-slate-700 text-amber-300'
+                    }`}
+                  >
+                    <span className="text-slate-300">{isMe ? 'Sən' : p.name.split(' ')[0]}:</span>
+                    <span className="text-white font-black text-xs">{acc.mainScore}</span>
+                    {acc.isOpen ? (
+                      <span className="text-[9px] text-emerald-400">✓</span>
+                    ) : (
+                      <span className="text-[9px] text-amber-400/90">({acc.draftScore})</span>
+                    )}
                   </span>
                 );
               })}
             </div>
           ) : (
             /* 2 Teams / 2 Players Compact */
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold flex items-center gap-1">
-                <span className="text-emerald-400">{mode === '2p_solo' ? (players[0]?.name?.split(' ')[0] || 'Sən') : 'K1'}:</span>
-                <span className="text-white font-black">{t1State.mainScore}</span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] font-bold flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-950/70 border border-emerald-500/50">
+                <span className="text-emerald-300">
+                  {mode === '2p_solo' ? (myPlayerIndex === 0 ? 'Sən' : (players[0]?.name?.split(' ')[0] || 'O1')) : 'Sizin Kom.'}:
+                </span>
+                <span className="text-white font-black text-xs">{t1State.mainScore}</span>
                 {t1State.isOpen ? (
                   <span className="text-[9px] text-emerald-400">✓</span>
                 ) : (
-                  <span className="text-[9px] text-amber-400/80">({t1State.draftScore})</span>
+                  <span className="text-[9px] text-amber-400/90">({t1State.draftScore})</span>
                 )}
               </span>
 
-              <span className="text-slate-600 font-bold">vs</span>
+              <span className="text-slate-500 font-black text-[10px]">VS</span>
 
-              <span className="text-[11px] font-bold flex items-center gap-1">
-                <span className="text-rose-400">{mode === '2p_solo' ? (players[1]?.name?.split(' ')[0] || 'Bot') : 'K2'}:</span>
-                <span className="text-white font-black">{t2State.mainScore}</span>
+              <span className="text-[11px] font-bold flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-950/60 border border-rose-500/40">
+                <span className="text-rose-300">
+                  {mode === '2p_solo' ? (myPlayerIndex === 1 ? 'Sən' : (players[1]?.name?.split(' ')[0] || 'Rəqib')) : 'Rəqib Kom.'}:
+                </span>
+                <span className="text-white font-black text-xs">{t2State.mainScore}</span>
                 {t2State.isOpen ? (
                   <span className="text-[9px] text-emerald-400">✓</span>
                 ) : (
-                  <span className="text-[9px] text-amber-400/80">({t2State.draftScore})</span>
+                  <span className="text-[9px] text-amber-400/90">({t2State.draftScore})</span>
                 )}
               </span>
             </div>
@@ -106,7 +123,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
 
           <button
             onClick={() => setIsCollapsed(false)}
-            className="p-1 rounded-md bg-slate-800 hover:bg-slate-700 text-amber-400 transition ml-1"
+            className="p-1 rounded-md bg-slate-800 hover:bg-slate-700 text-amber-400 transition ml-0.5"
             title="Hesab lövhəsini aç"
           >
             <ChevronDown className="w-3.5 h-3.5" />
@@ -300,7 +317,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
     // Compact collapsed view for mobile or user toggle
     if (isCollapsed) {
       return (
-        <div className="bg-slate-900/95 backdrop-blur-md border border-amber-600/40 rounded-xl px-2.5 py-1.5 shadow-xl flex items-center gap-2 text-xs select-none animate-fade-in max-w-[95vw]">
+        <div className="relative bg-slate-950/95 backdrop-blur-md border border-amber-500/50 rounded-xl px-2.5 py-1 shadow-xl flex items-center gap-2 text-xs select-none animate-fade-in max-w-[95vw]">
           <div className="flex items-center gap-1 font-bold text-amber-400">
             <Trophy className="w-3.5 h-3.5 text-amber-400" />
             <span className="text-[11px] font-black">365</span>
@@ -308,25 +325,25 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
 
           <div className="h-4 w-[1px] bg-white/20" />
 
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold flex items-center gap-1">
-              <span className="text-emerald-400">K1:</span>
-              <span className="text-white font-black">{team1Score}</span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] font-bold flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-950/70 border border-emerald-500/50">
+              <span className="text-emerald-300">Sizin Kom.:</span>
+              <span className="text-white font-black text-xs">{team1Score}</span>
               {team1Over300 && <span className="text-[9px] text-amber-400">300+</span>}
             </span>
 
-            <span className="text-slate-600 font-bold">vs</span>
+            <span className="text-slate-500 font-black text-[10px]">VS</span>
 
-            <span className="text-[11px] font-bold flex items-center gap-1">
-              <span className="text-rose-400">K2:</span>
-              <span className="text-white font-black">{team2Score}</span>
+            <span className="text-[11px] font-bold flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-950/60 border border-rose-500/40">
+              <span className="text-rose-300">Rəqib Kom.:</span>
+              <span className="text-white font-black text-xs">{team2Score}</span>
               {team2Over300 && <span className="text-[9px] text-amber-400">300+</span>}
             </span>
           </div>
 
           <button
             onClick={() => setIsCollapsed(false)}
-            className="p-1 rounded-md bg-slate-800 hover:bg-slate-700 text-amber-400 transition ml-1"
+            className="p-1 rounded-md bg-slate-800 hover:bg-slate-700 text-amber-400 transition ml-0.5"
             title="Hesab lövhəsini aç"
           >
             <ChevronDown className="w-3.5 h-3.5" />
@@ -407,7 +424,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
   // Solo modes (2p, 3p, 4p)
   if (isCollapsed) {
     return (
-      <div className="bg-slate-900/95 backdrop-blur-md border border-amber-600/40 rounded-xl px-2.5 py-1.5 shadow-xl flex items-center gap-2 text-xs select-none animate-fade-in max-w-[95vw]">
+      <div className="relative bg-slate-950/95 backdrop-blur-md border border-amber-500/50 rounded-xl px-2.5 py-1 shadow-xl flex items-center gap-2 text-xs select-none animate-fade-in max-w-[95vw]">
         <div className="flex items-center gap-1 font-bold text-amber-400">
           <Trophy className="w-3.5 h-3.5 text-amber-400" />
           <span className="text-[11px] font-black">365</span>
@@ -415,21 +432,31 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
 
         <div className="h-4 w-[1px] bg-white/20" />
 
-        <div className="flex items-center gap-2">
-          {players.map((p, idx) => (
-            <span key={p.id} className="text-[11px] font-bold flex items-center gap-0.5">
-              <span className={idx === 0 ? 'text-emerald-400' : 'text-slate-400'}>
-                {idx === 0 ? 'Sən' : p.name.slice(0, 3)}:
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {players.map((p, idx) => {
+            const isMe = idx === myPlayerIndex;
+            return (
+              <span
+                key={p.id}
+                className={`text-[11px] font-bold flex items-center gap-1 px-1.5 py-0.5 rounded-lg border ${
+                  isMe
+                    ? 'bg-emerald-950/70 border-emerald-500/50 text-emerald-300'
+                    : 'bg-slate-800/80 border-slate-700 text-amber-300'
+                }`}
+              >
+                <span className={isMe ? 'text-emerald-300' : 'text-slate-300'}>
+                  {isMe ? 'Sən' : p.name.split(' ')[0]}:
+                </span>
+                <span className="text-white font-black text-xs">{p.score}</span>
+                {p.score >= 300 && <span className="text-[9px] text-amber-400">★</span>}
               </span>
-              <span className="text-white font-black">{p.score}</span>
-              {p.score >= 300 && <span className="text-[8px] text-amber-400">★</span>}
-            </span>
-          ))}
+            );
+          })}
         </div>
 
         <button
           onClick={() => setIsCollapsed(false)}
-          className="p-1 rounded-md bg-slate-800 hover:bg-slate-700 text-amber-400 transition ml-1"
+          className="p-1 rounded-md bg-slate-800 hover:bg-slate-700 text-amber-400 transition ml-0.5"
           title="Hesab lövhəsini aç"
         >
           <ChevronDown className="w-3.5 h-3.5" />
@@ -459,32 +486,33 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
 
       <div className={`grid gap-1.5 ${players.length === 2 ? 'grid-cols-2' : players.length === 3 ? 'grid-cols-3' : 'grid-cols-4'}`}>
         {players.map((p, idx) => {
+          const isMe = idx === myPlayerIndex;
           const isOver300 = p.score >= 300;
           const isOver365 = p.score >= 365;
           return (
             <div
               key={p.id}
               className={`p-1.5 rounded-lg border flex flex-col items-center ${
-                idx === 0
+                isMe
                   ? isOver365 ? 'bg-emerald-950/50 border-emerald-400' : 'bg-emerald-900/20 border-emerald-700/50'
                   : isOver365 ? 'bg-amber-950/40 border-amber-500' : 'bg-slate-800/60 border-slate-700'
               }`}
             >
               <div className="flex items-center gap-1 mb-0.5">
                 <AvatarView
-                  avatarId={p.avatarId || (idx === 0 ? undefined : idx === 1 ? 'avatar_tea_master' : idx === 2 ? 'avatar_sheki_guest' : 'avatar_icherisheher_sage')}
-                  frameId={idx === 0 ? equippedFrame : undefined}
+                  avatarId={p.avatarId || (isMe ? undefined : idx === 1 ? 'avatar_tea_master' : idx === 2 ? 'avatar_sheki_guest' : 'avatar_icherisheher_sage')}
+                  frameId={isMe ? equippedFrame : undefined}
                   size={20}
                   showBorder={false}
                 />
-                <span className={`text-[11px] font-semibold truncate max-w-[55px] ${idx === 0 ? 'text-emerald-300' : 'text-slate-300'}`}>
-                  {idx === 0 ? t.player : p.name.split(' ')[0]}
+                <span className={`text-[11px] font-semibold truncate max-w-[55px] ${isMe ? 'text-emerald-300' : 'text-slate-300'}`}>
+                  {isMe ? t.player : p.name.split(' ')[0]}
                 </span>
               </div>
               <span className="text-lg font-black text-white">{p.score}</span>
               <div className="w-full bg-slate-700/50 rounded-full h-1 mt-0.5 overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all duration-300 ${idx === 0 ? 'bg-emerald-400' : 'bg-amber-400'}`}
+                  className={`h-full rounded-full transition-all duration-300 ${isMe ? 'bg-emerald-400' : 'bg-amber-400'}`}
                   style={{ width: `${Math.min(100, (p.score / 365) * 100)}%` }}
                 />
               </div>

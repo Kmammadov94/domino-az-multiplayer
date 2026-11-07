@@ -4,6 +4,21 @@ Bütün yeniləmələr, düzəlişlər, funksionallıqlar və versiya dəyişikl
 
 ---
 
+## [1.1.4] — 2026-11-07 (Sizin və Rəqibin Xallarının, Daşlarının və Növbə İndikatorunun Ayrılması)
+
+### 🎨 İnterfeys (UI / UX) Düzəlişləri
+- **Xüsusi Üst Oyun Paneli (Dedicated Non-Overlapping Top HUD Bar — `src/App.tsx`)**:
+  - Əvvəl mobil ekranlarda hesab lövhəsi (`ScoreBoard`), rəqibin avatarı/daşları və növbə indikatoru (`Sizin gedişinizdir` / `Rəqib düşünür...`) hamısı `absolute` olaraq masanın yuxarı hissəsində yerləşdiyindən bir-birinin üstünə düşür və həm oyunçunun, həm də rəqibin xallarını gizlədirdi.
+  - İndi oyun masasının yuxarısında heç vaxt üst-üstə düşməyən ayrıca **Üst Məlumat Zolağı (Top HUD Bar)** yaradıldı:
+    - **Sol tərəfdə**: `ScoreBoard` — **Sizin xalınız** (`Sən: X`) və **Rəqibin xalı** (`Rəqib: Y`) rəngli və aydın çərçivələrdə göstərilir.
+    - **Sağ tərəfdə**: Növbə indikatoru (`🟢 Sizin gedişinizdir` və ya `🟡 <Rəqib> düşünür...`) və Bazar qutusu (`BazaarTray`).
+  - Rəqibin avatarı və daşları bu zolağın tam altında yerləşən oyun masası daxilində açılır, beləliklə heç bir ekranda üst-üstə düşmə baş vermir.
+- **Rəqibin Ad Həbində və Sizin Əlinizin Üstündə Canlı Xal Göstəricisi (`src/App.tsx`, `src/components/PlayerControls.tsx`, `src/components/ScoreBoard.tsx`)**:
+  - Hər rəqibin ad həbinin içində daş sayı ilə yanaşı onun canlı xalı da (`⭐ X xal`) birbaşa göstərilir (2P, 3P və 4P rejimlərində).
+  - Oyunçunun öz əlindəki daşların düz üstündə (`PlayerControls.tsx`) canlı xal həbi (`Sən: X xal | Rəqib: Y xal`) əlavə olundu ki, həm sizin, həm də rəqibin xalları hər an 100% görünsün.
+
+---
+
 ## [1.1.3] — 2026-11-07 (Oyun İçi Yuxarı Panel & Matç Sonu Çıxış Düyməsi)
 
 ### 🎨 İnterfeys (UI / UX) Düzəlişləri

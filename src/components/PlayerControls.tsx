@@ -25,6 +25,8 @@ interface PlayerControlsProps {
   isBoardBlocked?: boolean;
   variant?: GameVariant;
   minBoneyardReserve?: number;
+  myScore?: number;
+  opponentSummary?: string;
 }
 
 export const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -45,7 +47,9 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   lang,
   isBoardBlocked = false,
   variant = '365',
-  minBoneyardReserve = 1
+  minBoneyardReserve = 1,
+  myScore,
+  opponentSummary
 }) => {
   const t = translations[lang];
   const canDrawFromReserve = boneyardCount > minBoneyardReserve && !isBoardBlocked;
@@ -233,7 +237,20 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
       )}
 
       {/* Action Buttons Bar & Tile Sorter */}
-      <div className="flex items-center gap-2 flex-wrap justify-center">
+      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-center">
+        {/* Live Score Pill right above player's hand so scores are 100% visible at a glance */}
+        {myScore !== undefined && (
+          <div className="px-2.5 py-1 rounded-xl text-[10px] sm:text-xs font-black bg-slate-900/95 border border-emerald-500/50 shadow flex items-center gap-1.5">
+            <span className="text-emerald-400">Sən: <span className="text-white">{myScore} xal</span></span>
+            {opponentSummary && (
+              <>
+                <span className="text-slate-600">|</span>
+                <span className="text-amber-300">{opponentSummary} xal</span>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Tile Sorting Toggle Pill */}
         {hand.length > 1 && (
           <button

@@ -2567,66 +2567,88 @@ export const App: React.FC = () => {
         ) : (
           /* Active Playing Screen */
           <div className="flex-1 relative flex flex-col overflow-hidden">
-            {/* Top Score Overlay */}
-            <div className="absolute top-2 left-2 z-20 pointer-events-auto">
-              <ScoreBoard
-                players={effectivePlayers}
-                mode={effectiveInMultiplayer ? (mpGameState?.mode || mode) : mode}
-                lang={lang}
-                roundNumber={effectiveRoundNumber}
-                lastScoredPoints={effectiveLastScored}
-                equippedFrame={stats.equippedFrame}
-                equippedTitle={stats.equippedTitle}
-                variant={effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant}
-                match101State={effectiveInMultiplayer ? (mpGameState?.match101State || match101State) : match101State}
-              />
-            </div>
-
-            {/* Starting tile notice banner */}
-            {effectiveForcedTile && (
-              <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 bg-amber-500/20 border border-amber-500/50 rounded-xl px-4 py-1.5 max-w-sm text-xs text-amber-300 font-semibold shadow-lg animate-pulse text-center">
-                {t.startingTilePrompt}
+            {/* Dedicated Non-Overlapping Top HUD Bar: ScoreBoard (Your & Opponent Scores) + Turn Indicator + Bazaar */}
+            <div className="w-full px-2 py-1.5 bg-slate-950/85 border-b border-amber-500/20 flex flex-wrap items-center justify-between gap-1.5 z-30 flex-shrink-0 pointer-events-auto">
+              {/* Left: Player & Opponent Scores */}
+              <div className="flex items-center">
+                <ScoreBoard
+                  players={effectivePlayers}
+                  mode={effectiveInMultiplayer ? (mpGameState?.mode || mode) : mode}
+                  lang={lang}
+                  roundNumber={effectiveRoundNumber}
+                  lastScoredPoints={effectiveLastScored}
+                  equippedFrame={stats.equippedFrame}
+                  equippedTitle={stats.equippedTitle}
+                  variant={effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant}
+                  match101State={effectiveInMultiplayer ? (mpGameState?.match101State || match101State) : match101State}
+                  myPlayerIndex={localPlayerIndex}
+                />
               </div>
-            )}
 
-            {/* Reshuffle Notice Banner */}
-            {effectiveReshuffleNotice && (
-              <div className="absolute top-24 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center pointer-events-none animate-fade-in">
-                <div className="bg-amber-950/95 border-2 border-amber-400 rounded-2xl px-5 py-2.5 shadow-[0_0_35px_rgba(251,191,36,0.6)] flex items-center gap-2.5 max-w-md text-center">
-                  <RotateCcw className="w-4 h-4 text-amber-400 animate-spin flex-shrink-0" />
-                  <span className="text-amber-200 text-xs sm:text-sm font-black tracking-wide">
-                    {effectiveReshuffleNotice}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Sleek Turn Indicator Mini-Pill (Positioned below the opponent tiles/avatar so it never overlaps!) */}
-            {!effectiveHandRevealed && !effectiveForcedTile && (
-              <div className="absolute top-14 sm:top-16 left-1/2 -translate-x-1/2 z-20 pointer-events-none transition-all">
-                {isMyTurn ? (
-                  <div className="bg-emerald-950/90 border-2 border-emerald-400 text-emerald-300 px-3.5 py-1 rounded-full shadow-[0_4px_16px_rgba(16,185,129,0.5)] flex items-center gap-1.5 text-[11px] sm:text-xs font-black uppercase tracking-wider backdrop-blur-md animate-fade-in">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping inline-block" />
-                    <span>{t.yourTurn}</span>
-                    {effectiveInMultiplayer && mpGameState?.turnTimeRemaining !== undefined && (
-                      <span className="text-emerald-300 font-mono text-[10px] ml-1 bg-emerald-900/80 px-1.5 py-0.5 rounded-full border border-emerald-500/40">
-                        ⏱ {mpGameState.turnTimeRemaining}s
-                      </span>
+              {/* Right / Center: Turn Indicator Pill + Bazaar Tray */}
+              <div className="flex items-center gap-1.5 ml-auto">
+                {!effectiveHandRevealed && !effectiveForcedTile && (
+                  <div className="pointer-events-none transition-all">
+                    {isMyTurn ? (
+                      <div className="bg-emerald-950/95 border-2 border-emerald-400 text-emerald-300 px-3 py-1 rounded-full shadow-[0_2px_12px_rgba(16,185,129,0.45)] flex items-center gap-1.5 text-[11px] sm:text-xs font-black uppercase tracking-wider backdrop-blur-md animate-fade-in">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                        <span>{t.yourTurn}</span>
+                        {effectiveInMultiplayer && mpGameState?.turnTimeRemaining !== undefined && (
+                          <span className="text-emerald-300 font-mono text-[10px] ml-0.5 bg-emerald-900/80 px-1.5 py-0.5 rounded-full border border-emerald-500/40">
+                            ⏱ {mpGameState.turnTimeRemaining}s
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="bg-slate-900/95 border border-amber-500/70 text-slate-200 px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1.5 text-[11px] font-bold backdrop-blur-md">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse inline-block" />
+                        <span className="text-amber-300 font-black max-w-[95px] sm:max-w-[130px] truncate">
+                          {effectivePlayers[effectiveTurn]?.name}
+                        </span>
+                        <span className="text-slate-300 text-[10px] font-semibold">{t.aiThinking}</span>
+                      </div>
                     )}
                   </div>
-                ) : (
-                  <div className="bg-slate-950/90 border border-amber-500/60 text-slate-200 px-3 py-1 rounded-full shadow-lg flex items-center gap-1.5 text-[11px] font-bold backdrop-blur-md">
-                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse inline-block" />
-                    <span className="text-amber-300 font-bold max-w-[110px] truncate">
-                      {effectivePlayers[effectiveTurn]?.name}
-                    </span>
-                    <span className="text-slate-400 text-[10px]">{t.aiThinking}</span>
+                )}
+
+                {effectiveBoneyardCount > 0 && effectivePlayers.length < 4 && (
+                  <div className="pointer-events-auto">
+                    <BazaarTray
+                      boneyard={boneyard}
+                      count={effectiveBoneyardCount}
+                      skin={activeSkin}
+                      isMyTurn={isMyTurn}
+                      canDraw={isMyTurn && !humanHasPlayableMove && effectiveBoneyardCount > currentMinReserve && !isCurrentBoardBlocked}
+                      onDrawTile={handleDrawTile}
+                      lang={lang}
+                    />
                   </div>
                 )}
               </div>
-            )}
+            </div>
 
-            {/* Hand End Animated Tally Overlay Banner on Table */}
+            {/* Table Area (Completely below ScoreBoard & Turn Indicator so they NEVER overlap!) */}
+            <div className="flex-1 relative flex flex-col overflow-hidden">
+              {/* Starting tile notice banner */}
+              {effectiveForcedTile && (
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 bg-amber-500/20 border border-amber-500/50 rounded-xl px-4 py-1.5 max-w-sm text-xs text-amber-300 font-semibold shadow-lg animate-pulse text-center">
+                  {t.startingTilePrompt}
+                </div>
+              )}
+
+              {/* Reshuffle Notice Banner */}
+              {effectiveReshuffleNotice && (
+                <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center pointer-events-none animate-fade-in">
+                  <div className="bg-amber-950/95 border-2 border-amber-400 rounded-2xl px-5 py-2.5 shadow-[0_0_35px_rgba(251,191,36,0.6)] flex items-center gap-2.5 max-w-md text-center">
+                    <RotateCcw className="w-4 h-4 text-amber-400 animate-spin flex-shrink-0" />
+                    <span className="text-amber-200 text-xs sm:text-sm font-black tracking-wide">
+                      {effectiveReshuffleNotice}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Hand End Animated Tally Overlay Banner on Table */}
             {effectiveHandRevealed && (
               <div
                 onClick={() => setShowGameEnd(true)}
@@ -2686,8 +2708,13 @@ export const App: React.FC = () => {
               const opponent = effectivePlayers[oppIdx] || effectivePlayers[1];
               const isOpponentTurn = effectiveTurn === oppIdx && !effectiveHandRevealed;
               const oppNotice = opponentActionNotice?.playerIndex === oppIdx ? opponentActionNotice : null;
+              const activeVariant = effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant;
+              const active101 = effectiveInMultiplayer ? (mpGameState?.match101State || match101State) : match101State;
+              const oppDisplayScore = activeVariant === '101'
+                ? ((oppIdx === 0 ? active101?.team1?.mainScore : active101?.team2?.mainScore) ?? opponent?.score ?? 0)
+                : (opponent?.score ?? 0);
               return (
-                <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center">
+                <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center">
                   <div
                     onClick={() => {
                       triggerHaptic('light');
@@ -2702,7 +2729,7 @@ export const App: React.FC = () => {
                         });
                       }
                     }}
-                    className={`flex items-center gap-1.5 mb-1 backdrop-blur-sm px-2.5 py-1 rounded-full border shadow cursor-pointer active:scale-95 transition-all group ${
+                    className={`flex items-center gap-1.5 mb-1 backdrop-blur-sm px-2.5 py-0.5 rounded-full border shadow cursor-pointer active:scale-95 transition-all group ${
                       isOpponentTurn
                         ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_25px_rgba(251,191,36,0.9)] scale-105'
                         : 'bg-slate-900/80 hover:bg-slate-800/90 border-slate-700/60'
@@ -2712,7 +2739,7 @@ export const App: React.FC = () => {
                     <div className="relative">
                       <AvatarView
                         avatarId={opponent?.avatarId || 'avatar_tea_master'}
-                        size={22}
+                        size={20}
                         showBorder={false}
                       />
                       {isOpponentTurn && (
@@ -2724,6 +2751,9 @@ export const App: React.FC = () => {
                     </div>
                     <span className={`text-[11px] font-bold flex items-center gap-1 ${isOpponentTurn ? 'text-amber-300 font-black' : 'text-slate-300'}`}>
                       {opponent?.name} ({opponent?.hand.length} daş)
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-black">
+                      ⭐ {oppDisplayScore} xal
                     </span>
                     {isOpponentTurn && (
                       <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse flex items-center gap-0.5 shadow">
@@ -2767,9 +2797,17 @@ export const App: React.FC = () => {
               const isRightTurn = effectiveTurn === rightIdx && !effectiveHandRevealed;
               const leftNotice = opponentActionNotice?.playerIndex === leftIdx ? opponentActionNotice : null;
               const rightNotice = opponentActionNotice?.playerIndex === rightIdx ? opponentActionNotice : null;
+              const activeVariant = effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant;
+              const active101 = effectiveInMultiplayer ? (mpGameState?.match101State || match101State) : match101State;
+              const leftScore = activeVariant === '101'
+                ? (active101?.playerAccounts?.[leftOpponent?.id ?? leftIdx]?.mainScore ?? leftOpponent?.score ?? 0)
+                : (leftOpponent?.score ?? 0);
+              const rightScore = activeVariant === '101'
+                ? (active101?.playerAccounts?.[rightOpponent?.id ?? rightIdx]?.mainScore ?? rightOpponent?.score ?? 0)
+                : (rightOpponent?.score ?? 0);
               return (
                 <>
-                  <div className="absolute top-2 left-[36%] -translate-x-1/2 z-10 flex flex-col items-center">
+                  <div className="absolute top-1.5 left-[28%] sm:left-[34%] -translate-x-1/2 z-10 flex flex-col items-center">
                     <div
                       onClick={() => {
                         triggerHaptic('light');
@@ -2807,6 +2845,9 @@ export const App: React.FC = () => {
                       <span className={`text-[10px] font-bold ${isLeftTurn ? 'text-amber-300 font-black' : 'text-slate-300'}`}>
                         {leftOpponent?.name} ({leftOpponent?.hand.length})
                       </span>
+                      <span className="px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[9px] font-black">
+                        ⭐{leftScore}
+                      </span>
                       {isLeftTurn && (
                         <span className="px-1 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[8px] font-black animate-pulse">
                           🎯 Növbə
@@ -2837,7 +2878,7 @@ export const App: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="absolute top-2 left-[66%] -translate-x-1/2 z-10 flex flex-col items-center">
+                  <div className="absolute top-1.5 left-[72%] sm:left-[66%] -translate-x-1/2 z-10 flex flex-col items-center">
                     <div
                       onClick={() => {
                         triggerHaptic('light');
@@ -2874,6 +2915,9 @@ export const App: React.FC = () => {
                       </div>
                       <span className={`text-[10px] font-bold ${isRightTurn ? 'text-amber-300 font-black' : 'text-slate-300'}`}>
                         {rightOpponent?.name} ({rightOpponent?.hand.length})
+                      </span>
+                      <span className="px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[9px] font-black">
+                        ⭐{rightScore}
                       </span>
                       {isRightTurn && (
                         <span className="px-1 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[8px] font-black animate-pulse">
@@ -2925,7 +2969,7 @@ export const App: React.FC = () => {
               return (
                 <>
                   {/* Top Partner */}
-                  <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center">
+                  <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center">
                     <div
                       onClick={() => {
                         triggerHaptic('light');
@@ -2962,6 +3006,9 @@ export const App: React.FC = () => {
                       </div>
                       <span className={`text-[11px] font-bold ${isTopTurn ? 'text-amber-300 font-black' : 'text-slate-300'}`}>
                         {topPartner?.name} ({topPartner?.hand.length} daş)
+                      </span>
+                      <span className="px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-black">
+                        ⭐{topPartner?.score ?? 0}
                       </span>
                       {isTopTurn && (
                         <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse flex items-center gap-0.5 shadow">
@@ -3032,6 +3079,9 @@ export const App: React.FC = () => {
                       <span className={`text-[10px] font-bold ${isLeftTurn ? 'text-amber-300 font-black' : 'text-slate-300'}`}>
                         {leftOpponent?.name} ({leftOpponent?.hand.length})
                       </span>
+                      <span className="px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[9px] font-black">
+                        ⭐{leftOpponent?.score ?? 0}
+                      </span>
                       {isLeftTurn && (
                         <span className="px-1 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[8px] font-black animate-pulse">
                           🎯 Növbə
@@ -3101,6 +3151,9 @@ export const App: React.FC = () => {
                       <span className={`text-[10px] font-bold ${isRightTurn ? 'text-amber-300 font-black' : 'text-slate-300'}`}>
                         {rightOpponent?.name} ({rightOpponent?.hand.length})
                       </span>
+                      <span className="px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[9px] font-black">
+                        ⭐{rightOpponent?.score ?? 0}
+                      </span>
                       {isRightTurn && (
                         <span className="px-1 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[8px] font-black animate-pulse">
                           🎯 Növbə
@@ -3133,21 +3186,6 @@ export const App: React.FC = () => {
                 </>
               );
             })()}
-
-            {/* Bazaar (Boneyard) Tray: Positioned at Top-Right, completely clear of the domino lines */}
-            {effectiveBoneyardCount > 0 && effectivePlayers.length < 4 && (
-              <div className="absolute right-3 top-2 z-20 pointer-events-auto">
-                <BazaarTray
-                  boneyard={boneyard}
-                  count={effectiveBoneyardCount}
-                  skin={activeSkin}
-                  isMyTurn={isMyTurn}
-                  canDraw={isMyTurn && !humanHasPlayableMove && effectiveBoneyardCount > currentMinReserve && !isCurrentBoardBlocked}
-                  onDrawTile={handleDrawTile}
-                  lang={lang}
-                />
-              </div>
-            )}
 
             {/* The Domino Table Canvas / Board View */}
             <div className={`flex-1 w-full h-full transition-transform ${isScreenShaking ? 'animate-shake' : ''}`}>
@@ -3218,7 +3256,32 @@ export const App: React.FC = () => {
               isBoardBlocked={isCurrentBoardBlocked}
               variant={effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant}
               minBoneyardReserve={currentMinReserve}
+              myScore={
+                (effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant) === '101'
+                  ? ((effectiveInMultiplayer ? (mpGameState?.mode || mode) : mode) === '3p_solo'
+                      ? ((effectiveInMultiplayer ? (mpGameState?.match101State || match101State) : match101State)?.playerAccounts?.[localPlayerIndex]?.mainScore ?? 0)
+                      : ((localPlayerIndex === 0 || (effectivePlayers[localPlayerIndex]?.team === 1))
+                          ? ((effectiveInMultiplayer ? (mpGameState?.match101State || match101State) : match101State)?.team1?.mainScore ?? 0)
+                          : ((effectiveInMultiplayer ? (mpGameState?.match101State || match101State) : match101State)?.team2?.mainScore ?? 0)))
+                  : (effectivePlayers[localPlayerIndex]?.score ?? 0)
+              }
+              opponentSummary={
+                effectivePlayers
+                  .filter((_, idx) => idx !== localPlayerIndex)
+                  .map((p, i) => {
+                    const activeVar = effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant;
+                    const active101State = effectiveInMultiplayer ? (mpGameState?.match101State || match101State) : match101State;
+                    const sc = activeVar === '101'
+                      ? ((effectiveInMultiplayer ? (mpGameState?.mode || mode) : mode) === '3p_solo'
+                          ? (active101State?.playerAccounts?.[p.id]?.mainScore ?? p.score ?? 0)
+                          : (active101State?.team2?.mainScore ?? p.score ?? 0))
+                      : (p.score ?? 0);
+                    return `${p.name.split(' ')[0]}: ${sc}`;
+                  })
+                  .join(' • ')
+              }
             />
+            </div>
           </div>
         )}
       </main>
