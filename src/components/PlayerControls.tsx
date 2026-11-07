@@ -297,10 +297,25 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
         </div>
       )}
 
+      {/* Visual Turn Indicator for Human Player */}
+      {isMyTurn && hasPlayableMove && (
+        <div className="px-3 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-500/30 to-amber-500/20 border border-amber-400 text-amber-300 text-[10px] sm:text-xs font-black shadow-[0_0_15px_rgba(251,191,36,0.45)] animate-pulse flex items-center gap-1.5">
+          <span className="flex h-2 w-2 relative">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+          </span>
+          <span>🎯 Sizin Növbənizdir — Daşı masaya çəkin</span>
+        </div>
+      )}
+
       {/* Hand Domino Tiles Container:
           Dynamically sized so that EVERY domino tile is 100% visible on mobile portrait! */}
       <div
-        className={`w-full max-w-full px-2 sm:px-4 py-1.5 sm:py-2 flex items-center justify-center bg-slate-950/50 backdrop-blur-sm rounded-2xl border border-white/5 shadow-2xl ${
+        className={`w-full max-w-full px-2 sm:px-4 py-1.5 sm:py-2 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm rounded-2xl border transition-all duration-300 shadow-2xl ${
+          isMyTurn
+            ? 'border-amber-400/80 ring-2 ring-amber-400/30 shadow-[0_0_25px_rgba(251,191,36,0.25)]'
+            : 'border-white/5'
+        } ${
           shouldWrapRows ? 'flex-wrap gap-1 sm:gap-2' : 'overflow-x-auto overflow-y-hidden'
         }`}
         style={{

@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Player, GameMode, Language, GameVariant } from '../types/domino';
 import { Match101State } from '../utils/domino101Logic';
 import { translations } from '../i18n/translations';
 import { AvatarView } from './AvatarView';
-import { Trophy, ShieldAlert, Award, Sparkles, Coins } from 'lucide-react';
+import { Trophy, ShieldAlert, Award, Sparkles, Coins, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface ScoreBoardProps {
   players: Player[];
@@ -29,6 +29,13 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
   match101State
 }) => {
   const t = translations[lang];
+  // On mobile screens (< 640px), default to collapsed compact view so it doesn't block the board
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 640) {
+      return true;
+    }
+    return false;
+  });
 
   // ==========================================
   // DOMINO 101 MODE SCOREBOARD
@@ -38,14 +45,93 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
     const t2State = match101State?.team2 || { isOpen: false, draftScore: 0, mainScore: 0, unopenedAttempts: 0 };
     const sekaBank = match101State?.sekaBank || 0;
 
+    // Compact collapsed view for mobile or user toggle
+    if (isCollapsed) {
+      return (
+        <div className="bg-slate-900/95 backdrop-blur-md border border-amber-600/40 rounded-xl px-2.5 py-1.5 shadow-xl flex items-center gap-2 text-xs select-none animate-fade-in max-w-[95vw]">
+          <div className="flex items-center gap-1 font-bold text-amber-400">
+            <Trophy className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-[11px] font-black">101</span>
+          </div>
+
+          <div className="h-4 w-[1px] bg-white/20" />
+
+          {/* 3 Players Compact */}
+          {players.length === 3 ? (
+            <div className="flex items-center gap-1.5">
+              {players.map((p) => {
+                const acc = match101State?.playerAccounts?.[p.id] || { mainScore: 0, isOpen: false };
+                const color = p.id === 0 ? 'text-emerald-400' : p.id === 1 ? 'text-amber-400' : 'text-cyan-400';
+                return (
+                  <span key={p.id} className="text-[11px] font-bold flex items-center gap-0.5">
+                    <span className="text-slate-400">{p.name.slice(0, 3)}:</span>
+                    <span className={`${color} font-black`}>{acc.mainScore}</span>
+                    {acc.isOpen && <span className="text-[9px] text-emerald-300">✓</span>}
+                  </span>
+                );
+              })}
+            </div>
+          ) : (
+            /* 2 Teams / 2 Players Compact */
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold flex items-center gap-1">
+                <span className="text-emerald-400">{mode === '2p_solo' ? (players[0]?.name?.split(' ')[0] || 'Sən') : 'K1'}:</span>
+                <span className="text-white font-black">{t1State.mainScore}</span>
+                {t1State.isOpen ? (
+                  <span className="text-[9px] text-emerald-400">✓</span>
+                ) : (
+                  <span className="text-[9px] text-amber-400/80">({t1State.draftScore})</span>
+                )}
+              </span>
+
+              <span className="text-slate-600 font-bold">vs</span>
+
+              <span className="text-[11px] font-bold flex items-center gap-1">
+                <span className="text-rose-400">{mode === '2p_solo' ? (players[1]?.name?.split(' ')[0] || 'Bot') : 'K2'}:</span>
+                <span className="text-white font-black">{t2State.mainScore}</span>
+                {t2State.isOpen ? (
+                  <span className="text-[9px] text-emerald-400">✓</span>
+                ) : (
+                  <span className="text-[9px] text-amber-400/80">({t2State.draftScore})</span>
+                )}
+              </span>
+            </div>
+          )}
+
+          {sekaBank > 0 && (
+            <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-black text-[10px] flex items-center gap-0.5">
+              <Coins className="w-2.5 h-2.5 text-amber-400" />+{sekaBank}
+            </span>
+          )}
+
+          <button
+            onClick={() => setIsCollapsed(false)}
+            className="p-1 rounded-md bg-slate-800 hover:bg-slate-700 text-amber-400 transition ml-1"
+            title="Hesab lövhəsini aç"
+          >
+            <ChevronDown className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      );
+    }
+
     return (
-      <div className="bg-slate-900/90 backdrop-blur-md border border-amber-600/30 rounded-xl p-3 shadow-xl flex flex-col gap-2 min-w-[280px] max-w-sm animate-fade-in">
+      <div className="bg-slate-900/90 backdrop-blur-md border border-amber-600/30 rounded-xl p-2.5 sm:p-3 shadow-xl flex flex-col gap-1.5 sm:gap-2 w-[240px] sm:w-[280px] animate-fade-in">
         <div className="flex items-center justify-between text-xs text-amber-400 font-semibold border-b border-white/10 pb-1">
           <div className="flex items-center gap-1.5">
             <Trophy className="w-3.5 h-3.5 text-amber-400" />
-            <span className="font-bold text-amber-300">101 Xal (Klassik)</span>
+            <span className="font-bold text-amber-300">101 Xal</span>
           </div>
-          <span className="text-slate-400">{t.round}: {roundNumber}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-400 text-[11px]">{t.round}: {roundNumber}</span>
+            <button
+              onClick={() => setIsCollapsed(true)}
+              className="p-0.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition"
+              title="Yığcam rejimə keç"
+            >
+              <ChevronUp className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* Seka Bank Banner if active */}
@@ -211,14 +297,61 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
     const team1Over365 = team1Score >= 365;
     const team2Over365 = team2Score >= 365;
 
+    // Compact collapsed view for mobile or user toggle
+    if (isCollapsed) {
+      return (
+        <div className="bg-slate-900/95 backdrop-blur-md border border-amber-600/40 rounded-xl px-2.5 py-1.5 shadow-xl flex items-center gap-2 text-xs select-none animate-fade-in max-w-[95vw]">
+          <div className="flex items-center gap-1 font-bold text-amber-400">
+            <Trophy className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-[11px] font-black">365</span>
+          </div>
+
+          <div className="h-4 w-[1px] bg-white/20" />
+
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold flex items-center gap-1">
+              <span className="text-emerald-400">K1:</span>
+              <span className="text-white font-black">{team1Score}</span>
+              {team1Over300 && <span className="text-[9px] text-amber-400">300+</span>}
+            </span>
+
+            <span className="text-slate-600 font-bold">vs</span>
+
+            <span className="text-[11px] font-bold flex items-center gap-1">
+              <span className="text-rose-400">K2:</span>
+              <span className="text-white font-black">{team2Score}</span>
+              {team2Over300 && <span className="text-[9px] text-amber-400">300+</span>}
+            </span>
+          </div>
+
+          <button
+            onClick={() => setIsCollapsed(false)}
+            className="p-1 rounded-md bg-slate-800 hover:bg-slate-700 text-amber-400 transition ml-1"
+            title="Hesab lövhəsini aç"
+          >
+            <ChevronDown className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      );
+    }
+
     return (
-      <div className="bg-slate-900/90 backdrop-blur-md border border-amber-600/30 rounded-xl p-3 shadow-xl flex flex-col gap-2 min-w-[280px] max-w-sm">
+      <div className="bg-slate-900/90 backdrop-blur-md border border-amber-600/30 rounded-xl p-2.5 sm:p-3 shadow-xl flex flex-col gap-1.5 sm:gap-2 w-[240px] sm:w-[280px]">
         <div className="flex items-center justify-between text-xs text-amber-400 font-semibold border-b border-white/10 pb-1">
           <div className="flex items-center gap-1">
             <Trophy className="w-3.5 h-3.5 text-amber-400" />
             <span>{t.targetScore}</span>
           </div>
-          <span className="text-slate-400">{t.round}: {roundNumber}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-400 text-[11px]">{t.round}: {roundNumber}</span>
+            <button
+              onClick={() => setIsCollapsed(true)}
+              className="p-0.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition"
+              title="Yığcam rejimə keç"
+            >
+              <ChevronUp className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* Teams Score Grid */}
@@ -272,14 +405,56 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
   }
 
   // Solo modes (2p, 3p, 4p)
+  if (isCollapsed) {
+    return (
+      <div className="bg-slate-900/95 backdrop-blur-md border border-amber-600/40 rounded-xl px-2.5 py-1.5 shadow-xl flex items-center gap-2 text-xs select-none animate-fade-in max-w-[95vw]">
+        <div className="flex items-center gap-1 font-bold text-amber-400">
+          <Trophy className="w-3.5 h-3.5 text-amber-400" />
+          <span className="text-[11px] font-black">365</span>
+        </div>
+
+        <div className="h-4 w-[1px] bg-white/20" />
+
+        <div className="flex items-center gap-2">
+          {players.map((p, idx) => (
+            <span key={p.id} className="text-[11px] font-bold flex items-center gap-0.5">
+              <span className={idx === 0 ? 'text-emerald-400' : 'text-slate-400'}>
+                {idx === 0 ? 'Sən' : p.name.slice(0, 3)}:
+              </span>
+              <span className="text-white font-black">{p.score}</span>
+              {p.score >= 300 && <span className="text-[8px] text-amber-400">★</span>}
+            </span>
+          ))}
+        </div>
+
+        <button
+          onClick={() => setIsCollapsed(false)}
+          className="p-1 rounded-md bg-slate-800 hover:bg-slate-700 text-amber-400 transition ml-1"
+          title="Hesab lövhəsini aç"
+        >
+          <ChevronDown className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-slate-900/90 backdrop-blur-md border border-amber-600/30 rounded-xl p-3 shadow-xl flex flex-col gap-2 min-w-[280px] max-w-sm">
+    <div className="bg-slate-900/90 backdrop-blur-md border border-amber-600/30 rounded-xl p-2.5 sm:p-3 shadow-xl flex flex-col gap-1.5 sm:gap-2 w-[240px] sm:w-[280px]">
       <div className="flex items-center justify-between text-xs text-amber-400 font-semibold border-b border-white/10 pb-1">
         <div className="flex items-center gap-1">
           <Trophy className="w-3.5 h-3.5 text-amber-400" />
           <span>{t.targetScore}</span>
         </div>
-        <span className="text-slate-400">{t.round}: {roundNumber}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-slate-400 text-[11px]">{t.round}: {roundNumber}</span>
+          <button
+            onClick={() => setIsCollapsed(true)}
+            className="p-0.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition"
+            title="Yığcam rejimə keç"
+          >
+            <ChevronUp className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       <div className={`grid gap-1.5 ${players.length === 2 ? 'grid-cols-2' : players.length === 3 ? 'grid-cols-3' : 'grid-cols-4'}`}>

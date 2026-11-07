@@ -1639,7 +1639,7 @@ export const App: React.FC = () => {
           setCurrentTurn((currentTurn + 1) % players.length);
         }
       }
-    }, 750);
+    }, 1600); // 1.6s deliberation delay so players can observe bot decisions and track moves
 
     return () => {
       if (turnTimeoutRef.current) clearTimeout(turnTimeoutRef.current);
@@ -1947,165 +1947,201 @@ export const App: React.FC = () => {
   return (
     <div className="w-full h-full min-h-[100dvh] max-h-[100dvh] flex flex-col bg-slate-950 text-slate-100 select-none overflow-hidden font-sans">
       {/* Top Navbar */}
-      <header className="h-12 bg-slate-900/95 border-b border-amber-600/30 px-3 flex items-center justify-between z-30 shadow-md">
-        <AzerbaijanLogo size="sm" />
-
-        {/* Right Action Icons & Balance */}
-        <div className="flex items-center gap-2">
-          {/* Profile Picture (Avatar) Quick Selector Button */}
-          <button
-            onClick={() => {
-              setStoreInitialTab('avatars');
-              setShowStore(true);
-            }}
-            title="Profil Şəkli Seç / Dəyiş"
-            className="rounded-full ring-2 ring-amber-500/50 hover:ring-amber-300 transition-all hover:scale-105 active:scale-95 shadow-md flex-shrink-0"
-          >
-            <AvatarView
-              avatarId={stats.equippedAvatar || DEFAULT_AVATAR_ID}
-              size={30}
-              showBorder={false}
-            />
-          </button>
-
-          {/* Gold Coin Balance */}
-          <button
-            onClick={() => {
-              setStoreInitialTab('skins');
-              setShowStore(true);
-            }}
-            className="bg-slate-800/80 hover:bg-slate-700 border border-amber-500/50 rounded-full px-3 py-1 flex items-center gap-1.5 transition shadow-inner group"
-          >
-            <Coins className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
-            <span className="font-black text-amber-300 text-xs sm:text-sm">
-              {stats.coins}
-            </span>
-          </button>
-
-          {/* Google Cloud Sync Status / Login Button */}
-          {googleUser ? (
-            <button
-              onClick={() => setShowGoogleAuthModal(true)}
-              title={`${googleUser.name} (${googleUser.email}) — Buludla Sinxron`}
-              className="bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/50 rounded-full px-2 py-0.5 sm:px-2.5 sm:py-1 flex items-center gap-1.5 transition shadow active:scale-95"
-            >
-              <Cloud className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-              <span className="font-bold text-emerald-300 text-[10px] sm:text-[11px] max-w-[65px] sm:max-w-[85px] truncate">
-                {googleUser.name}
+      {/* Top Bar Header */}
+      <header className="h-11 sm:h-12 bg-slate-900/95 border-b border-amber-600/30 px-2 sm:px-3 flex items-center justify-between z-30 shadow-md select-none">
+        {inGame ? (
+          /* Clean, non-intrusive in-game header */
+          <>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <AzerbaijanLogo size="sm" />
+              <span className="px-2 py-0.5 rounded-full bg-slate-800/90 border border-amber-500/40 text-[10px] sm:text-[11px] font-black text-amber-300 shadow">
+                {effectiveInMultiplayer ? (mpGameState?.variant === '101' ? '101 XAL' : '365 XAL') : (gameVariant === '101' ? '101 XAL' : '365 XAL')}
               </span>
-            </button>
-          ) : (
-            <button
-              onClick={() => setShowGoogleAuthModal(true)}
-              title="Google ilə Daxil ol (Məcburi deyil, qızılları qoruyur)"
-              className="bg-slate-800 hover:bg-slate-700 border border-amber-500/40 rounded-full px-2 py-0.5 sm:px-2.5 sm:py-1 flex items-center gap-1 text-[11px] font-bold text-amber-300 transition shadow active:scale-95"
-            >
-              <span className="font-black text-xs text-white">G</span>
-              <span className="hidden sm:inline">Giriş</span>
-            </button>
-          )}
-
-          {/* Daily Reward Button */}
-          <button
-            onClick={() => setShowDailyReward(true)}
-            title={t.dailyBonus}
-            className={`p-1.5 rounded-lg border transition ${
-              dailyCheck.canClaim
-                ? 'bg-amber-500/20 border-amber-400 text-amber-300 animate-pulse'
-                : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
-            }`}
-          >
-            <Gift className="w-4 h-4" />
-          </button>
-
-          {/* Store Button */}
-          <button
-            onClick={() => setShowStore(true)}
-            title={t.store}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition"
-          >
-            <ShoppingBag className="w-4 h-4 text-amber-400" />
-          </button>
-
-          {/* Friends & Social Button */}
-          <button
-            onClick={() => {
-              triggerHaptic('light');
-              setShowFriendsModal(true);
-            }}
-            title="Dostlar və Çayxana Yoldaşları"
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 hover:text-white transition flex items-center gap-1 active:scale-95"
-          >
-            <Users className="w-4 h-4 text-amber-400" />
-          </button>
-
-          {/* Rules Button */}
-          <button
-            onClick={() => setShowRules(true)}
-            title={t.rules}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition"
-          >
-            <BookOpen className="w-4 h-4 text-sky-400" />
-          </button>
-
-          {/* Sound Toggle */}
-          <button
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            title={t.sound}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition"
-          >
-            {soundEnabled ? (
-              <Volume2 className="w-4 h-4 text-emerald-400" />
-            ) : (
-              <VolumeX className="w-4 h-4 text-slate-500" />
-            )}
-          </button>
-
-          {/* Language Toggle */}
-          <button
-            onClick={cycleLanguage}
-            title={t.language}
-            className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] font-bold text-amber-300 uppercase transition flex items-center gap-1"
-          >
-            <Languages className="w-3.5 h-3.5" />
-            <span>{lang}</span>
-          </button>
-
-          {/* Online Multiplayer Lobby Button */}
-          <button
-            onClick={() => setShowMultiplayerLobby(true)}
-            className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 border border-emerald-400/50 text-white font-bold text-xs shadow-md transition flex items-center gap-1.5 active:scale-95"
-            title="Canlı Onlayn Oyna"
-          >
-            <Globe className="w-3.5 h-3.5 text-emerald-200 animate-pulse" />
-            <span className="hidden sm:inline">Onlayn</span>
-          </button>
-
-          {/* Active Multiplayer Room & Timer Pill */}
-          {effectiveInMultiplayer && mpRoom && (
-            <div className="flex items-center gap-1.5 bg-emerald-950/80 border border-emerald-500/40 rounded-lg px-2.5 py-1 text-xs">
-              <span className="font-bold text-emerald-300">Otaq:</span>
-              <span className="font-black text-white tracking-widest">{mpRoom.code}</span>
-              {mpGameState && mpGameState.turnTimeRemaining !== undefined && (
-                <span className="flex items-center gap-1 ml-1 text-amber-300 font-extrabold text-[11px] bg-amber-500/20 px-1.5 py-0.5 rounded">
-                  <Clock className="w-3 h-3 text-amber-400" />
-                  {mpGameState.turnTimeRemaining}s
-                </span>
+              {effectiveInMultiplayer && mpRoom && (
+                <div className="flex items-center gap-1 bg-emerald-950/80 border border-emerald-500/40 rounded-lg px-2 py-0.5 text-[10px] sm:text-xs">
+                  <span className="font-bold text-emerald-300">Otaq:</span>
+                  <span className="font-black text-white">{mpRoom.code}</span>
+                  {mpGameState && mpGameState.turnTimeRemaining !== undefined && (
+                    <span className="flex items-center gap-0.5 ml-1 text-amber-300 font-black text-[10px] bg-amber-500/20 px-1 rounded">
+                      <Clock className="w-2.5 h-2.5 text-amber-400" />
+                      {mpGameState.turnTimeRemaining}s
+                    </span>
+                  )}
+                </div>
               )}
             </div>
-          )}
 
-          {/* Forfeit Match Button */}
-          {inGame && (
-            <button
-              onClick={handleForfeitAction}
-              title={t.forfeit}
-              className="p-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-300 transition"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* Gold Coin Balance */}
+              <div className="bg-slate-800/90 border border-amber-500/40 rounded-full px-2.5 py-0.5 sm:px-3 sm:py-1 flex items-center gap-1 shadow-inner">
+                <Coins className="w-3.5 h-3.5 text-amber-400" />
+                <span className="font-black text-amber-300 text-xs sm:text-sm">
+                  {stats.coins}
+                </span>
+              </div>
+
+              {/* Sound Toggle */}
+              <button
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                title={t.sound}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition"
+              >
+                {soundEnabled ? (
+                  <Volume2 className="w-4 h-4 text-emerald-400" />
+                ) : (
+                  <VolumeX className="w-4 h-4 text-slate-500" />
+                )}
+              </button>
+
+              {/* Forfeit Match Button */}
+              <button
+                onClick={handleForfeitAction}
+                title={t.forfeit}
+                className="p-1.5 rounded-lg bg-rose-950/70 hover:bg-rose-900 border border-rose-800 text-rose-300 transition flex items-center gap-1 active:scale-95"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="text-[10px] font-bold hidden sm:inline">{t.forfeit}</span>
+              </button>
+            </div>
+          </>
+        ) : (
+          /* Lobby Header with responsive scrollable items */
+          <>
+            <AzerbaijanLogo size="sm" />
+
+            {/* Right Action Icons & Balance */}
+            <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar max-w-[calc(100vw-115px)] py-0.5">
+              {/* Profile Picture (Avatar) Quick Selector Button */}
+              <button
+                onClick={() => {
+                  setStoreInitialTab('avatars');
+                  setShowStore(true);
+                }}
+                title="Profil Şəkli Seç / Dəyiş"
+                className="rounded-full ring-2 ring-amber-500/50 hover:ring-amber-300 transition-all hover:scale-105 active:scale-95 shadow-md flex-shrink-0"
+              >
+                <AvatarView
+                  avatarId={stats.equippedAvatar || DEFAULT_AVATAR_ID}
+                  size={28}
+                  showBorder={false}
+                />
+              </button>
+
+              {/* Gold Coin Balance */}
+              <button
+                onClick={() => {
+                  setStoreInitialTab('skins');
+                  setShowStore(true);
+                }}
+                className="bg-slate-800/80 hover:bg-slate-700 border border-amber-500/50 rounded-full px-2.5 py-1 flex items-center gap-1.5 transition shadow-inner group flex-shrink-0"
+              >
+                <Coins className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+                <span className="font-black text-amber-300 text-xs sm:text-sm">
+                  {stats.coins}
+                </span>
+              </button>
+
+              {/* Google Cloud Sync Status / Login Button */}
+              {googleUser ? (
+                <button
+                  onClick={() => setShowGoogleAuthModal(true)}
+                  title={`${googleUser.name} (${googleUser.email}) — Buludla Sinxron`}
+                  className="bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/50 rounded-full px-2 py-0.5 sm:px-2.5 sm:py-1 flex items-center gap-1.5 transition shadow active:scale-95 flex-shrink-0"
+                >
+                  <Cloud className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                  <span className="font-bold text-emerald-300 text-[10px] sm:text-[11px] max-w-[60px] sm:max-w-[85px] truncate">
+                    {googleUser.name}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowGoogleAuthModal(true)}
+                  title="Google ilə Daxil ol (Məcburi deyil, qızılları qoruyur)"
+                  className="bg-slate-800 hover:bg-slate-700 border border-amber-500/40 rounded-full px-2 py-0.5 sm:px-2.5 sm:py-1 flex items-center gap-1 text-[11px] font-bold text-amber-300 transition shadow active:scale-95 flex-shrink-0"
+                >
+                  <span className="font-black text-xs text-white">G</span>
+                  <span className="hidden sm:inline">Giriş</span>
+                </button>
+              )}
+
+              {/* Daily Reward Button */}
+              <button
+                onClick={() => setShowDailyReward(true)}
+                title={t.dailyBonus}
+                className={`p-1.5 rounded-lg border transition flex-shrink-0 ${
+                  dailyCheck.canClaim
+                    ? 'bg-amber-500/20 border-amber-400 text-amber-300 animate-pulse'
+                    : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+                }`}
+              >
+                <Gift className="w-4 h-4" />
+              </button>
+
+              {/* Store Button */}
+              <button
+                onClick={() => setShowStore(true)}
+                title={t.store}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition flex-shrink-0"
+              >
+                <ShoppingBag className="w-4 h-4 text-amber-400" />
+              </button>
+
+              {/* Friends & Social Button */}
+              <button
+                onClick={() => {
+                  triggerHaptic('light');
+                  setShowFriendsModal(true);
+                }}
+                title="Dostlar və Çayxana Yoldaşları"
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 hover:text-white transition flex items-center gap-1 active:scale-95 flex-shrink-0"
+              >
+                <Users className="w-4 h-4 text-amber-400" />
+              </button>
+
+              {/* Rules Button */}
+              <button
+                onClick={() => setShowRules(true)}
+                title={t.rules}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition flex-shrink-0"
+              >
+                <BookOpen className="w-4 h-4 text-sky-400" />
+              </button>
+
+              {/* Sound Toggle */}
+              <button
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                title={t.sound}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition flex-shrink-0"
+              >
+                {soundEnabled ? (
+                  <Volume2 className="w-4 h-4 text-emerald-400" />
+                ) : (
+                  <VolumeX className="w-4 h-4 text-slate-500" />
+                )}
+              </button>
+
+              {/* Language Toggle */}
+              <button
+                onClick={cycleLanguage}
+                title={t.language}
+                className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] font-bold text-amber-300 uppercase transition flex items-center gap-1 flex-shrink-0"
+              >
+                <Languages className="w-3.5 h-3.5" />
+                <span>{lang}</span>
+              </button>
+
+              {/* Online Multiplayer Lobby Button */}
+              <button
+                onClick={() => setShowMultiplayerLobby(true)}
+                className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 border border-emerald-400/50 text-white font-bold text-xs shadow-md transition flex items-center gap-1.5 active:scale-95 flex-shrink-0"
+                title="Canlı Onlayn Oyna"
+              >
+                <Globe className="w-3.5 h-3.5 text-emerald-200 animate-pulse" />
+                <span className="hidden sm:inline">Onlayn</span>
+              </button>
+            </div>
+          </>
+        )}
       </header>
 
       {/* Main Container */}
@@ -2559,6 +2595,7 @@ export const App: React.FC = () => {
             {effectivePlayers.length === 2 && (() => {
               const oppIdx = effectivePlayers.findIndex((_, i) => i !== localPlayerIndex);
               const opponent = effectivePlayers[oppIdx] || effectivePlayers[1];
+              const isOpponentTurn = effectiveTurn === oppIdx && !effectiveHandRevealed;
               return (
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center">
                   <div
@@ -2575,20 +2612,37 @@ export const App: React.FC = () => {
                         });
                       }
                     }}
-                    className="flex items-center gap-1.5 mb-1 bg-slate-900/80 hover:bg-slate-800/90 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-slate-700/60 shadow cursor-pointer active:scale-95 transition-all group"
+                    className={`flex items-center gap-1.5 mb-1 backdrop-blur-sm px-2.5 py-1 rounded-full border shadow cursor-pointer active:scale-95 transition-all group ${
+                      isOpponentTurn
+                        ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_25px_rgba(251,191,36,0.9)] scale-105'
+                        : 'bg-slate-900/80 hover:bg-slate-800/90 border-slate-700/60'
+                    }`}
                     title={`${opponent?.name} üçün hədiyyə göndər`}
                   >
-                    <AvatarView
-                      avatarId={opponent?.avatarId || 'avatar_tea_master'}
-                      size={20}
-                      showBorder={false}
-                    />
-                    <span className="text-[11px] font-bold text-slate-300">
+                    <div className="relative">
+                      <AvatarView
+                        avatarId={opponent?.avatarId || 'avatar_tea_master'}
+                        size={22}
+                        showBorder={false}
+                      />
+                      {isOpponentTurn && (
+                        <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                        </span>
+                      )}
+                    </div>
+                    <span className={`text-[11px] font-bold flex items-center gap-1 ${isOpponentTurn ? 'text-amber-300 font-black' : 'text-slate-300'}`}>
                       {opponent?.name} ({opponent?.hand.length} daş)
                     </span>
+                    {isOpponentTurn && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse flex items-center gap-0.5 shadow">
+                        <span>🎯 Növbə</span>
+                      </span>
+                    )}
                     <span className="text-xs group-hover:scale-125 transition-transform">🎁</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className={`flex items-center gap-1.5 transition-all ${isOpponentTurn ? 'ring-2 ring-amber-400/50 rounded-lg p-0.5 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
                     {opponent?.hand.map((tile, i) => (
                       <DominoTile
                         key={tile.id || i}
@@ -2606,22 +2660,43 @@ export const App: React.FC = () => {
 
             {/* 2. In 3P Trio: Opponent 1 (Top-Left) and Opponent 2 (Top-Right) */}
             {effectivePlayers.length === 3 && (() => {
-              const leftOpponent = effectivePlayers[(localPlayerIndex + 1) % 3];
-              const rightOpponent = effectivePlayers[(localPlayerIndex + 2) % 3];
+              const leftIdx = (localPlayerIndex + 1) % 3;
+              const rightIdx = (localPlayerIndex + 2) % 3;
+              const leftOpponent = effectivePlayers[leftIdx];
+              const rightOpponent = effectivePlayers[rightIdx];
+              const isLeftTurn = effectiveTurn === leftIdx && !effectiveHandRevealed;
+              const isRightTurn = effectiveTurn === rightIdx && !effectiveHandRevealed;
               return (
                 <>
-                  <div className="absolute top-2 left-72 sm:left-80 z-10 flex flex-col items-center">
-                    <div className="flex items-center gap-1 mb-1 bg-slate-900/80 backdrop-blur-sm px-2 py-0.5 rounded-full border border-slate-700/60 shadow">
-                      <AvatarView
-                        avatarId={leftOpponent?.avatarId || 'avatar_tea_master'}
-                        size={18}
-                        showBorder={false}
-                      />
-                      <span className="text-[10px] font-bold text-slate-300">
+                  <div className="absolute top-2 left-[36%] -translate-x-1/2 z-10 flex flex-col items-center">
+                    <div className={`flex items-center gap-1 mb-1 backdrop-blur-sm px-2 py-0.5 rounded-full border shadow transition-all ${
+                      isLeftTurn
+                        ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
+                        : 'bg-slate-900/80 border-slate-700/60'
+                    }`}>
+                      <div className="relative">
+                        <AvatarView
+                          avatarId={leftOpponent?.avatarId || 'avatar_tea_master'}
+                          size={18}
+                          showBorder={false}
+                        />
+                        {isLeftTurn && (
+                          <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                          </span>
+                        )}
+                      </div>
+                      <span className={`text-[10px] font-bold ${isLeftTurn ? 'text-amber-300 font-black' : 'text-slate-300'}`}>
                         {leftOpponent?.name} ({leftOpponent?.hand.length})
                       </span>
+                      {isLeftTurn && (
+                        <span className="px-1 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[8px] font-black animate-pulse">
+                          🎯 Növbə
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className={`flex items-center gap-1 transition-all ${isLeftTurn ? 'ring-2 ring-amber-400/50 rounded-md p-0.5' : ''}`}>
                       {leftOpponent?.hand.map((tile, i) => (
                         <DominoTile
                           key={tile.id || i}
@@ -2635,18 +2710,35 @@ export const App: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="absolute top-2 left-2/3 -translate-x-1/2 z-10 flex flex-col items-center">
-                    <div className="flex items-center gap-1 mb-1 bg-slate-900/80 backdrop-blur-sm px-2 py-0.5 rounded-full border border-slate-700/60 shadow">
-                      <AvatarView
-                        avatarId={rightOpponent?.avatarId || 'avatar_sheki_guest'}
-                        size={18}
-                        showBorder={false}
-                      />
-                      <span className="text-[10px] font-bold text-slate-300">
+                  <div className="absolute top-2 left-[66%] -translate-x-1/2 z-10 flex flex-col items-center">
+                    <div className={`flex items-center gap-1 mb-1 backdrop-blur-sm px-2 py-0.5 rounded-full border shadow transition-all ${
+                      isRightTurn
+                        ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
+                        : 'bg-slate-900/80 border-slate-700/60'
+                    }`}>
+                      <div className="relative">
+                        <AvatarView
+                          avatarId={rightOpponent?.avatarId || 'avatar_sheki_guest'}
+                          size={18}
+                          showBorder={false}
+                        />
+                        {isRightTurn && (
+                          <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                          </span>
+                        )}
+                      </div>
+                      <span className={`text-[10px] font-bold ${isRightTurn ? 'text-amber-300 font-black' : 'text-slate-300'}`}>
                         {rightOpponent?.name} ({rightOpponent?.hand.length})
                       </span>
+                      {isRightTurn && (
+                        <span className="px-1 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[8px] font-black animate-pulse">
+                          🎯 Növbə
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className={`flex items-center gap-1 transition-all ${isRightTurn ? 'ring-2 ring-amber-400/50 rounded-md p-0.5' : ''}`}>
                       {rightOpponent?.hand.map((tile, i) => (
                         <DominoTile
                           key={tile.id || i}
@@ -2671,6 +2763,9 @@ export const App: React.FC = () => {
               const topPartner = effectivePlayers[topIdx];
               const leftOpponent = effectivePlayers[leftIdx];
               const rightOpponent = effectivePlayers[rightIdx];
+              const isTopTurn = effectiveTurn === topIdx && !effectiveHandRevealed;
+              const isLeftTurn = effectiveTurn === leftIdx && !effectiveHandRevealed;
+              const isRightTurn = effectiveTurn === rightIdx && !effectiveHandRevealed;
               return (
                 <>
                   {/* Top Partner */}
@@ -2689,20 +2784,37 @@ export const App: React.FC = () => {
                           });
                         }
                       }}
-                      className="flex items-center gap-1.5 mb-1 bg-slate-900/80 hover:bg-slate-800/90 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-slate-700/60 shadow cursor-pointer active:scale-95 transition-all group"
+                      className={`flex items-center gap-1.5 mb-1 backdrop-blur-sm px-2.5 py-0.5 rounded-full border shadow cursor-pointer active:scale-95 transition-all group ${
+                        isTopTurn
+                          ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_25px_rgba(251,191,36,0.9)] scale-105'
+                          : 'bg-slate-900/80 hover:bg-slate-800/90 border-slate-700/60'
+                      }`}
                       title={`${topPartner?.name} üçün hədiyyə göndər`}
                     >
-                      <AvatarView
-                        avatarId={topPartner?.avatarId || 'avatar_sheki_guest'}
-                        size={20}
-                        showBorder={false}
-                      />
-                      <span className="text-[11px] font-bold text-slate-300">
+                      <div className="relative">
+                        <AvatarView
+                          avatarId={topPartner?.avatarId || 'avatar_sheki_guest'}
+                          size={20}
+                          showBorder={false}
+                        />
+                        {isTopTurn && (
+                          <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                          </span>
+                        )}
+                      </div>
+                      <span className={`text-[11px] font-bold ${isTopTurn ? 'text-amber-300 font-black' : 'text-slate-300'}`}>
                         {topPartner?.name} ({topPartner?.hand.length} daş)
                       </span>
+                      {isTopTurn && (
+                        <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse flex items-center gap-0.5 shadow">
+                          <span>🎯 Növbə</span>
+                        </span>
+                      )}
                       <span className="text-xs group-hover:scale-125 transition-transform">🎁</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className={`flex items-center gap-1.5 transition-all ${isTopTurn ? 'ring-2 ring-amber-400/50 rounded-lg p-0.5 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
                       {topPartner?.hand.map((tile, i) => (
                         <DominoTile
                           key={tile.id || i}
@@ -2732,20 +2844,37 @@ export const App: React.FC = () => {
                           });
                         }
                       }}
-                      className="flex items-center gap-1 mb-0.5 bg-slate-900/80 hover:bg-slate-800/90 px-2 py-0.5 rounded-full border border-slate-700 shadow cursor-pointer active:scale-95 transition-all group"
+                      className={`flex items-center gap-1 mb-0.5 px-2 py-0.5 rounded-full border shadow cursor-pointer active:scale-95 transition-all group ${
+                        isLeftTurn
+                          ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
+                          : 'bg-slate-900/80 hover:bg-slate-800/90 border-slate-700'
+                      }`}
                       title={`${leftOpponent?.name} üçün hədiyyə göndər`}
                     >
-                      <AvatarView
-                        avatarId={leftOpponent?.avatarId || 'avatar_tea_master'}
-                        size={18}
-                        showBorder={false}
-                      />
-                      <span className="text-[10px] font-bold text-slate-300">
+                      <div className="relative">
+                        <AvatarView
+                          avatarId={leftOpponent?.avatarId || 'avatar_tea_master'}
+                          size={18}
+                          showBorder={false}
+                        />
+                        {isLeftTurn && (
+                          <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                          </span>
+                        )}
+                      </div>
+                      <span className={`text-[10px] font-bold ${isLeftTurn ? 'text-amber-300 font-black' : 'text-slate-300'}`}>
                         {leftOpponent?.name} ({leftOpponent?.hand.length})
                       </span>
+                      {isLeftTurn && (
+                        <span className="px-1 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[8px] font-black animate-pulse">
+                          🎯 Növbə
+                        </span>
+                      )}
                       <span className="text-[10px] group-hover:scale-125 transition-transform">🎁</span>
                     </div>
-                    <div className="flex flex-col items-center gap-1">
+                    <div className={`flex flex-col items-center gap-1 transition-all ${isLeftTurn ? 'ring-2 ring-amber-400/50 rounded-lg p-0.5 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
                       {leftOpponent?.hand.map((tile, i) => (
                         <DominoTile
                           key={tile.id || i}
@@ -2775,20 +2904,37 @@ export const App: React.FC = () => {
                           });
                         }
                       }}
-                      className="flex items-center gap-1 mb-0.5 bg-slate-900/80 hover:bg-slate-800/90 px-2 py-0.5 rounded-full border border-slate-700 shadow cursor-pointer active:scale-95 transition-all group"
+                      className={`flex items-center gap-1 mb-0.5 px-2 py-0.5 rounded-full border shadow cursor-pointer active:scale-95 transition-all group ${
+                        isRightTurn
+                          ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
+                          : 'bg-slate-900/80 hover:bg-slate-800/90 border-slate-700'
+                      }`}
                       title={`${rightOpponent?.name} üçün hədiyyə göndər`}
                     >
-                      <AvatarView
-                        avatarId={rightOpponent?.avatarId || 'avatar_icherisheher_sage'}
-                        size={18}
-                        showBorder={false}
-                      />
-                      <span className="text-[10px] font-bold text-slate-300">
+                      <div className="relative">
+                        <AvatarView
+                          avatarId={rightOpponent?.avatarId || 'avatar_icherisheher_sage'}
+                          size={18}
+                          showBorder={false}
+                        />
+                        {isRightTurn && (
+                          <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                          </span>
+                        )}
+                      </div>
+                      <span className={`text-[10px] font-bold ${isRightTurn ? 'text-amber-300 font-black' : 'text-slate-300'}`}>
                         {rightOpponent?.name} ({rightOpponent?.hand.length})
                       </span>
+                      {isRightTurn && (
+                        <span className="px-1 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[8px] font-black animate-pulse">
+                          🎯 Növbə
+                        </span>
+                      )}
                       <span className="text-[10px] group-hover:scale-125 transition-transform">🎁</span>
                     </div>
-                    <div className="flex flex-col items-center gap-1">
+                    <div className={`flex flex-col items-center gap-1 transition-all ${isRightTurn ? 'ring-2 ring-amber-400/50 rounded-lg p-0.5 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
                       {rightOpponent?.hand.map((tile, i) => (
                         <DominoTile
                           key={tile.id || i}

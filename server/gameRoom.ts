@@ -849,7 +849,7 @@ export class GameRoom {
     setTimeout(() => {
       if (this.status !== 'in_game' || this.handRevealed) return;
       this.handleTurnTimeout();
-    }, 1200);
+    }, 1600);
   }
 
   public getClientState(socketId: string): MultiplayerClientGameState {
