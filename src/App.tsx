@@ -1968,7 +1968,11 @@ export const App: React.FC = () => {
     <div className="w-full h-full min-h-[100dvh] max-h-[100dvh] flex flex-col bg-slate-950 text-slate-100 select-none overflow-hidden font-sans">
       {/* Top Navbar */}
       {/* Top Bar Header */}
-      <header className="h-11 sm:h-12 bg-slate-900/95 border-b border-amber-600/30 px-2 sm:px-3 flex items-center justify-between z-30 shadow-md select-none">
+      <header
+        className={`${
+          inGame ? 'h-11 sm:h-12' : 'min-h-11 py-1 sm:py-1.5'
+        } bg-slate-900/95 border-b border-amber-600/30 px-2 sm:px-3 flex items-center justify-between gap-2 z-30 shadow-md select-none`}
+      >
         {inGame ? (
           /* Clean, non-intrusive in-game header */
           <>
@@ -2025,12 +2029,14 @@ export const App: React.FC = () => {
             </div>
           </>
         ) : (
-          /* Lobby Header with responsive scrollable items */
+          /* Lobby Header with wrapped visible items (2 rows on compact screens, no horizontal scroll) */
           <>
-            <AzerbaijanLogo size="sm" />
+            <div className="flex-shrink-0">
+              <AzerbaijanLogo size="sm" />
+            </div>
 
-            {/* Right Action Icons & Balance */}
-            <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar max-w-[calc(100vw-115px)] py-0.5">
+            {/* Right Action Icons & Balance — flex-wrap so all buttons are always visible without scrolling */}
+            <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-1.5 py-0.5">
               {/* Profile Picture (Avatar) Quick Selector Button */}
               <button
                 onClick={() => {
