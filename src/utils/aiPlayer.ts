@@ -29,17 +29,35 @@ export interface AIMove {
   tile: TileData;
   branchId: BranchId;
   expectedScore: number;
+  leavesMatchingInHand?: boolean;
 }
 
 export const selectBestAIMove = (
   hand: TileData[],
   board: GameBoard,
-  currentScore: number = 0
+  currentScore: number = 0,
+  variant: '365' | '101' = '365'
 ): AIMove | null => {
   if (hand.length === 0) return null;
 
   // If first move of the hand on empty board
   if (board.tiles.length === 0) {
+    if (variant === '101') {
+      // In 101 mode, there are no opening 5-multiple points.
+      // Prefer shedding heavy doubles first, or highest total pip tile.
+      const sortedFor101 = [...hand].sort((a, b) => {
+        const aDouble = a.left === a.right ? 1 : 0;
+        const bDouble = b.left === b.right ? 1 : 0;
+        if (bDouble !== aDouble) return bDouble - aDouble;
+        return b.left + b.right - (a.left + a.right);
+      });
+      return {
+        tile: sortedFor101[0],
+        branchId: 'main_left',
+        expectedScore: 0
+      };
+    }
+
     // In Baku Telefon 365, only opening doubles score (e.g. [5:5] -> 10 pts).
     // Non-doubles (e.g. [3:2], [4:1]) NEVER score at opening.
     // Also, after 300 points, starting with [5:5] awards 0 points!
@@ -83,11 +101,18 @@ export const selectBestAIMove = (
   for (const tile of hand) {
     const branches = getPlayableBranches(board, tile);
     for (const bId of branches) {
-      const { scoredPoints } = placeTileOnBranch(board, tile, bId);
+      const { board: simBoard, scoredPoints } = placeTileOnBranch(board, tile, bId);
+      const remainingHand = hand.filter((h) => h.id !== tile.id);
+      const newOpenVal = simBoard.branches[bId]?.openValue;
+      const leavesMatchingInHand =
+        newOpenVal !== undefined &&
+        remainingHand.some((h) => h.left === newOpenVal || h.right === newOpenVal);
+
       possibleMoves.push({
         tile,
         branchId: bId,
-        expectedScore: scoredPoints
+        expectedScore: variant === '101' ? 0 : scoredPoints,
+        leavesMatchingInHand
       });
     }
   }
@@ -95,22 +120,39 @@ export const selectBestAIMove = (
   if (possibleMoves.length === 0) return null;
 
   // Sort moves:
-  // 1. Highest scoring move (Telefon 5-multiple)
-  // 2. Doubles (to dispose of risky doubles)
-  // 3. Higher pip tiles (to minimize points in hand in case of Bağlandı)
+  // 1. In 365 mode: Highest scoring move (Telefon 5-multiple)
+  // 2. Urgent [0:0] (Ayaz) disposal when hand is getting small (<= 3 tiles) so it isn't caught solo for 10 pts
+  // 3. Doubles (to dispose of risky doubles)
+  // 4. Higher pip tiles (to minimize points in hand in case of Bağlandı or loss)
+  // 5. Moves that leave a matching number still in AI's remaining hand
   possibleMoves.sort((a, b) => {
-    if (b.expectedScore !== a.expectedScore) {
+    if (variant !== '101' && b.expectedScore !== a.expectedScore) {
       return b.expectedScore - a.expectedScore;
     }
+
+    if (hand.length <= 3) {
+      const aIsZeroZero = a.tile.left === 0 && a.tile.right === 0 ? 1 : 0;
+      const bIsZeroZero = b.tile.left === 0 && b.tile.right === 0 ? 1 : 0;
+      if (bIsZeroZero !== aIsZeroZero) {
+        return bIsZeroZero - aIsZeroZero;
+      }
+    }
+
     const aIsDouble = a.tile.left === a.tile.right ? 1 : 0;
     const bIsDouble = b.tile.left === b.tile.right ? 1 : 0;
     if (bIsDouble !== aIsDouble) {
       return bIsDouble - aIsDouble;
     }
-    // Double blank [0:0] writes 10 points when alone in 101, so AI prioritizes discarding it!
+
     const aPips = a.tile.left === 0 && a.tile.right === 0 ? 10 : a.tile.left + a.tile.right;
     const bPips = b.tile.left === 0 && b.tile.right === 0 ? 10 : b.tile.left + b.tile.right;
-    return bPips - aPips;
+    if (bPips !== aPips) {
+      return bPips - aPips;
+    }
+
+    const aSupport = a.leavesMatchingInHand ? 1 : 0;
+    const bSupport = b.leavesMatchingInHand ? 1 : 0;
+    return bSupport - aSupport;
   });
 
   return possibleMoves[0];

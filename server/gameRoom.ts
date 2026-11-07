@@ -3,7 +3,8 @@ import {
   GameVariant,
   TileData,
   GameBoard,
-  BranchId
+  BranchId,
+  Player
 } from '../src/types/domino';
 import {
   MultiplayerPlayerSlot,
@@ -15,12 +16,16 @@ import {
   findFirstHandStarter,
   roundUpTo5,
   sumHandPips,
-  checkHandReshuffle
+  checkHandReshuffle,
+  evaluateBaglandiWinner
 } from '../src/utils/dominoLogic';
 import {
   findFirstHandStarter101,
   sumHandPips101,
-  getMinBoneyardReserve
+  getMinBoneyardReserve,
+  createInitial101State,
+  process101Round,
+  Match101State
 } from '../src/utils/domino101Logic';
 import {
   createInitialBoard,
@@ -65,6 +70,7 @@ export class GameRoom {
   public isLocked: boolean = false;
   public lastTilePlacedPlayerIndex: number = 0;
   public nextHandStarterIndex: number = 0;
+  public match101State: Match101State = createInitial101State();
 
   private turnTimerInterval: NodeJS.Timeout | null = null;
   private onStateChangeCallback: () => void;
@@ -258,10 +264,18 @@ export class GameRoom {
     this.roundNumber = 1;
     this.isMatchOver = false;
     this.isInstant35 = false;
+    if (this.variant === '101') {
+      this.match101State = createInitial101State();
+    }
 
-    this.players.forEach((p) => {
+    this.players.forEach((p, idx) => {
       p.score = 0;
       p.handRoundPoints = 0;
+      if (this.mode === '4p_duo') {
+        p.team = idx % 2 === 0 ? 1 : 2;
+      } else if (this.mode === '2p_solo') {
+        p.team = idx === 0 ? 1 : 2;
+      }
     });
 
     this.startHand(true, 0);
@@ -440,18 +454,18 @@ export class GameRoom {
       !canAnyTileBePlayed(this.board, drawableBoneyard);
 
     if (isGloballyBlocked || noMovePossible) {
-      let minPips = 999;
-      let lowestPlayer = 0;
-      this.players.forEach((p) => {
-        const h = this.secretHands.get(p.id) || [];
-        const pips = this.variant === '101' ? sumHandPips101(h) : sumHandPips(h);
-        if (pips < minPips) {
-          minPips = pips;
-          lowestPlayer = p.id;
-        }
-      });
+      const playerHands = this.players.map((p) => ({
+        id: p.id,
+        team: p.team,
+        hand: this.secretHands.get(p.id) || []
+      }));
+      const { winnerIndex: lowestPlayer, isTie } = evaluateBaglandiWinner(
+        playerHands,
+        this.mode,
+        player.id
+      );
       // Player who placed this tile blocked the road!
-      this.finishHand(true, lowestPlayer, player.id);
+      this.finishHand(true, lowestPlayer, player.id, isTie);
       return { success: true };
     }
 
@@ -540,17 +554,17 @@ export class GameRoom {
       !canAnyTileBePlayed(this.board, drawableBoneyard);
 
     if (isGloballyBlocked || noMovePossible) {
-      let minPips = 999;
-      let lowestPlayer = 0;
-      this.players.forEach((p) => {
-        const h = this.secretHands.get(p.id) || [];
-        const pips = this.variant === '101' ? sumHandPips101(h) : sumHandPips(h);
-        if (pips < minPips) {
-          minPips = pips;
-          lowestPlayer = p.id;
-        }
-      });
-      this.finishHand(true, lowestPlayer, player.id);
+      const playerHands = this.players.map((p) => ({
+        id: p.id,
+        team: p.team,
+        hand: this.secretHands.get(p.id) || []
+      }));
+      const { winnerIndex: lowestPlayer, isTie } = evaluateBaglandiWinner(
+        playerHands,
+        this.mode,
+        player.id
+      );
+      this.finishHand(true, lowestPlayer, player.id, isTie);
       return { success: true };
     }
 
@@ -610,19 +624,18 @@ export class GameRoom {
 
     // Check Bağlandı (all players passed consecutively)
     if (this.consecutivePasses >= this.players.length) {
-      let minPips = 999;
-      let lowestPlayer = 0;
+      const playerHands = this.players.map((p) => ({
+        id: p.id,
+        team: p.team,
+        hand: this.secretHands.get(p.id) || []
+      }));
+      const { winnerIndex: lowestPlayer, isTie } = evaluateBaglandiWinner(
+        playerHands,
+        this.mode,
+        this.lastTilePlacedPlayerIndex
+      );
 
-      this.players.forEach((p) => {
-        const h = this.secretHands.get(p.id) || [];
-        const pips = this.variant === '101' ? sumHandPips101(h) : sumHandPips(h);
-        if (pips < minPips) {
-          minPips = pips;
-          lowestPlayer = p.id;
-        }
-      });
-
-      this.finishHand(true, lowestPlayer, this.lastTilePlacedPlayerIndex);
+      this.finishHand(true, lowestPlayer, this.lastTilePlacedPlayerIndex, isTie);
       return { success: true };
     }
 
@@ -634,7 +647,12 @@ export class GameRoom {
     return { success: true };
   }
 
-  private finishHand(endedInBaglandi: boolean, winnerIndex: number, blockerIndex?: number): void {
+  private finishHand(
+    endedInBaglandi: boolean,
+    winnerIndex: number,
+    blockerIndex?: number,
+    isBaglandiTie: boolean = false
+  ): void {
     this.clearTurnTimer();
     this.handRevealed = true;
     this.revealPhase = 1;
@@ -642,44 +660,6 @@ export class GameRoom {
     const blocker = blockerIndex !== undefined ? blockerIndex : this.lastTilePlacedPlayerIndex;
     // Azerbaijani rule: In 101 and 365, whoever blocked the road (placed last tile) starts next hand!
     this.nextHandStarterIndex = endedInBaglandi ? blocker : winnerIndex;
-
-    const winnerP = this.players[winnerIndex] || this.players[0];
-    const winningTeam = winnerP.team;
-
-    // Calculate raw opponent leftover pips
-    let rawOpponentPips = 0;
-    this.players.forEach((p) => {
-      const isOpponent =
-        this.mode === '4p_duo' ? p.team !== winningTeam : p.id !== winnerIndex;
-      if (isOpponent) {
-        const h = this.secretHands.get(p.id) || [];
-        rawOpponentPips += this.variant === '101' ? sumHandPips101(h) : sumHandPips(h);
-      }
-    });
-
-    let bonus = 0;
-    if (this.variant === '101') {
-      bonus = rawOpponentPips; // 101 rejimində rəqibin əlində qalan xallar birbaşa qalibə yazılır
-    } else {
-      // 300 rule: no hand bonus after 300
-      const winnerScore =
-        this.mode === '4p_duo'
-          ? this.players.find((p) => p.team === winningTeam)?.score || 0
-          : winnerP.score;
-      if (winnerScore < 300 && rawOpponentPips > 0) {
-        bonus = roundUpTo5(rawOpponentPips);
-      }
-    }
-
-    // Award bonus
-    this.players.forEach((p) => {
-      const isWinner =
-        this.mode === '4p_duo' ? p.team === winningTeam : p.id === winnerIndex;
-      if (isWinner) {
-        p.score += bonus;
-        p.handRoundPoints += bonus;
-      }
-    });
 
     // Construct revealed hands for all clients to inspect
     const revealedHands: { playerIndex: number; hand: TileData[] }[] = [];
@@ -690,8 +670,102 @@ export class GameRoom {
       });
     });
 
+    if (this.variant === '101') {
+      const fullPlayers: Player[] = this.players.map((p, idx) => ({
+        id: p.id,
+        name: p.name,
+        isAI: p.isAI,
+        hand: [...(this.secretHands.get(p.id) || [])],
+        score: p.score,
+        handRoundPoints: p.handRoundPoints,
+        team: p.team || (idx % 2 === 0 ? 1 : 2),
+        avatarId: p.avatarId
+      }));
+
+      const res = process101Round(
+        this.match101State,
+        fullPlayers,
+        endedInBaglandi ? blocker : winnerIndex,
+        endedInBaglandi
+      );
+
+      this.match101State = res.nextMatchState;
+
+      this.players.forEach((p, idx) => {
+        const pTeam = p.team || (idx % 2 === 0 ? 1 : 2);
+        const newScore =
+          this.players.length === 3
+            ? res.nextMatchState.playerAccounts?.[p.id]?.mainScore ?? 0
+            : pTeam === 1
+            ? res.nextMatchState.team1.mainScore
+            : res.nextMatchState.team2.mainScore;
+        const delta = Math.max(0, newScore - p.score);
+        p.score = newScore;
+        p.handRoundPoints += delta;
+      });
+
+      this.handResults = {
+        isBaglandi: endedInBaglandi,
+        isSeka: res.isSeka,
+        ayazCaught: res.ayazCaught,
+        winnerIndex: res.winnerPlayerIndex,
+        winnerTeam: res.winnerTeam ?? undefined,
+        bonusPoints: res.roundRawPoints,
+        rawPips: res.roundRawPoints,
+        blockerIndex: endedInBaglandi ? blocker : undefined,
+        revealedHands
+      };
+
+      this.isMatchOver = res.isMatchOver;
+      if (res.isMatchOver) {
+        this.matchWinnerIndex = res.winnerPlayerIndex;
+      }
+
+      this.notifyState();
+      return;
+    }
+
+    const winnerP = this.players[winnerIndex] || this.players[0];
+    const winningTeam = winnerP.team;
+
+    // Calculate raw opponent leftover pips
+    let rawOpponentPips = 0;
+    if (!(endedInBaglandi && isBaglandiTie)) {
+      this.players.forEach((p) => {
+        const isOpponent =
+          this.mode === '4p_duo' ? p.team !== winningTeam : p.id !== winnerIndex;
+        if (isOpponent) {
+          const h = this.secretHands.get(p.id) || [];
+          rawOpponentPips += sumHandPips(h);
+        }
+      });
+    }
+
+    let bonus = 0;
+    // 300 rule: no hand bonus after 300
+    const winnerScore =
+      this.mode === '4p_duo'
+        ? this.players.find((p) => p.team === winningTeam)?.score || 0
+        : winnerP.score;
+    if (!(endedInBaglandi && isBaglandiTie) && winnerScore < 300 && rawOpponentPips > 0) {
+      bonus = roundUpTo5(rawOpponentPips);
+    }
+
+    // Award bonus
+    if (!(endedInBaglandi && isBaglandiTie)) {
+      this.players.forEach((p) => {
+        const isWinner =
+          this.mode === '4p_duo' ? p.team === winningTeam : p.id === winnerIndex;
+        if (isWinner) {
+          p.score += bonus;
+          p.handRoundPoints += bonus;
+        }
+      });
+    }
+
     this.handResults = {
       isBaglandi: endedInBaglandi,
+      isSeka: endedInBaglandi && isBaglandiTie,
       winnerIndex,
       winnerTeam: winningTeam,
       bonusPoints: bonus,
@@ -700,15 +774,15 @@ export class GameRoom {
       revealedHands
     };
 
-    // Check Match Victory (Target 101 or 365)
+    // Check Match Victory (Target 365)
     let highestScore = 0;
     this.players.forEach((p) => {
       if (p.score > highestScore) highestScore = p.score;
     });
 
-    const targetScore = this.variant === '101' ? 101 : 365;
+    const targetScore = 365;
     if (highestScore >= targetScore) {
-      if (this.variant === '365' && endedInBaglandi) {
+      if (endedInBaglandi) {
         // Over 365 ended in baglandi: must play extra hand
         this.isMatchOver = false;
       } else {
@@ -810,7 +884,7 @@ export class GameRoom {
         ? this.players.find((p) => p.team === activePlayer.team)?.score || 0
         : activePlayer.score;
 
-    let bestMove = selectBestAIMove(hand, this.board, botScore);
+    let bestMove = selectBestAIMove(hand, this.board, botScore, this.variant);
 
     const minReserve = getMinBoneyardReserve(this.variant, this.mode);
     const isGloballyBlocked = isBoardGloballyBlocked(this.board);
@@ -831,7 +905,7 @@ export class GameRoom {
       }
       this.secretHands.set(activePlayer.id, hand);
       activePlayer.handCount = hand.length;
-      bestMove = selectBestAIMove(hand, this.board, botScore);
+      bestMove = selectBestAIMove(hand, this.board, botScore, this.variant);
     }
 
     if (bestMove) {
@@ -886,7 +960,8 @@ export class GameRoom {
       handResults: this.handResults,
       isMatchOver: this.isMatchOver,
       matchWinnerIndex: this.matchWinnerIndex,
-      isInstant35: this.isInstant35
+      isInstant35: this.isInstant35,
+      match101State: this.match101State
     };
   }
 

@@ -157,6 +157,53 @@ export const sumHandPips = (hand: TileData[]): number => {
   return hand.reduce((acc, t) => acc + (t ? (t.left || 0) + (t.right || 0) : 0), 0);
 };
 
+// Evaluate winner when the board is blocked ("Bağlandı") across both Solo and Team (4p_duo) modes,
+// properly detecting ties ("Seka").
+export const evaluateBaglandiWinner = (
+  players: { id: number; team?: 1 | 2; hand: TileData[] }[],
+  mode: GameMode,
+  blockerIndex: number = 0
+): { winnerIndex: number; isTie: boolean } => {
+  if (mode === '4p_duo') {
+    let t1Pips = 0;
+    let t2Pips = 0;
+    players.forEach((p) => {
+      const team = p.team || (p.id % 2 === 0 ? 1 : 2);
+      if (team === 1) t1Pips += sumHandPips(p.hand);
+      else t2Pips += sumHandPips(p.hand);
+    });
+
+    if (t1Pips === t2Pips) {
+      return { winnerIndex: blockerIndex, isTie: true };
+    }
+    const winTeam = t1Pips < t2Pips ? 1 : 2;
+    const teamPlayers = players.filter(
+      (p) => (p.team || (p.id % 2 === 0 ? 1 : 2)) === winTeam
+    );
+    const best = teamPlayers.reduce((prev, curr) =>
+      sumHandPips(curr.hand) < sumHandPips(prev.hand) ? curr : prev
+    );
+    return { winnerIndex: best ? best.id : blockerIndex, isTie: false };
+  }
+
+  let minPips = 9999;
+  let minPlayers: number[] = [];
+  players.forEach((p) => {
+    const pips = sumHandPips(p.hand);
+    if (pips < minPips) {
+      minPips = pips;
+      minPlayers = [p.id];
+    } else if (pips === minPips) {
+      minPlayers.push(p.id);
+    }
+  });
+
+  if (minPlayers.length > 1) {
+    return { winnerIndex: blockerIndex, isTie: true };
+  }
+  return { winnerIndex: minPlayers[0] ?? blockerIndex, isTie: false };
+};
+
 // Check if a move results in a score (Telefon 5-multiple)
 export const calculateBoardScore = (openEnds: OpenEnd[]): number => {
   if (openEnds.length === 0) return 0;

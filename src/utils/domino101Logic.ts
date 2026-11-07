@@ -290,7 +290,8 @@ export const process101Round = (
     if (hasAyazInHand(p.hand)) {
       ayazCaught = true;
     }
-    if (p.team === 1) {
+    const pTeam = p.team || (p.id % 2 === 0 ? 1 : 2);
+    if (pTeam === 1) {
       team1Pips += pips;
     } else {
       team2Pips += pips;
@@ -307,7 +308,7 @@ export const process101Round = (
       winningTeam = 1;
       roundRawPoints = team2Pips;
       // Winner is the team 1 player with smallest remaining hand
-      const t1Players = players.filter((p) => p.team === 1);
+      const t1Players = players.filter((p) => (p.team || (p.id % 2 === 0 ? 1 : 2)) === 1);
       const best = t1Players.reduce((prev, curr) =>
         sumHandPips101(curr.hand) < sumHandPips101(prev.hand) ? curr : prev
       );
@@ -315,7 +316,7 @@ export const process101Round = (
     } else if (team2Pips < team1Pips) {
       winningTeam = 2;
       roundRawPoints = team1Pips;
-      const t2Players = players.filter((p) => p.team === 2);
+      const t2Players = players.filter((p) => (p.team || (p.id % 2 === 0 ? 1 : 2)) === 2);
       const best = t2Players.reduce((prev, curr) =>
         sumHandPips101(curr.hand) < sumHandPips101(prev.hand) ? curr : prev
       );
@@ -345,8 +346,8 @@ export const process101Round = (
     }
   } else {
     // Normal out (one player emptied their hand)
-    const winningPlayer = players[lastTilePlacedPlayerIndex];
-    winningTeam = winningPlayer.team as 1 | 2;
+    const winningPlayer = players[lastTilePlacedPlayerIndex] || players[0];
+    winningTeam = (winningPlayer.team || (winningPlayer.id % 2 === 0 ? 1 : 2)) as 1 | 2;
     winnerPlayerIndex = lastTilePlacedPlayerIndex;
     // Points captured are the opposing team's entire remaining pips
     roundRawPoints = winningTeam === 1 ? team2Pips : team1Pips;

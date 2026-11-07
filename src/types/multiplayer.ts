@@ -71,6 +71,8 @@ export interface MultiplayerClientGameState {
   revealPhase: 0 | 1 | 2;
   handResults: {
     isBaglandi: boolean;
+    isSeka?: boolean;
+    ayazCaught?: boolean;
     winnerIndex: number;
     winnerTeam?: 1 | 2;
     bonusPoints: number;

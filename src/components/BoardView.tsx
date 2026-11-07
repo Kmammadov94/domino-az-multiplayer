@@ -217,16 +217,21 @@ export const BoardView: React.FC<BoardViewProps> = ({
         {board.tiles.map((placed, idx) => {
           const tileW = placed.isVertical ? TILE_SHORT : TILE_LONG;
           const tileH = placed.isVertical ? TILE_LONG : TILE_SHORT;
+          const isLastPlaced = idx === board.tiles.length - 1 && board.tiles.length > 0;
 
           return (
             <div
               key={`${placed.tile.id}-${idx}`}
-              className="absolute transition-all duration-300"
+              className={`absolute transition-all duration-300 ${
+                isLastPlaced
+                  ? 'ring-2 ring-cyan-400/90 shadow-[0_0_20px_rgba(34,211,238,0.85)] rounded-[7px]'
+                  : ''
+              }`}
               style={{
                 left: `${placed.x}px`,
                 top: `${placed.y}px`,
                 transform: 'translate(-50%, -50%)',
-                zIndex: placed.isSpinner ? 20 : 10
+                zIndex: isLastPlaced ? 25 : placed.isSpinner ? 20 : 10
               }}
             >
               <DominoTile

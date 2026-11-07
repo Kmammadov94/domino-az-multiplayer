@@ -24,7 +24,8 @@ import {
   findFirstHandStarter,
   roundUpTo5,
   sumHandPips,
-  checkHandReshuffle
+  checkHandReshuffle,
+  evaluateBaglandiWinner
 } from './utils/dominoLogic';
 import {
   GameBoard,
@@ -678,6 +679,12 @@ export const App: React.FC = () => {
 
   const dailyCheck = checkDailyClaim(stats);
   const turnTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aiJustDrewRef = useRef<boolean>(false);
+  const [opponentActionNotice, setOpponentActionNotice] = useState<{
+    playerIndex: number;
+    text: string;
+    type: 'draw' | 'pass';
+  } | null>(null);
 
   // Synchronize sound toggle
   useEffect(() => {
@@ -866,7 +873,8 @@ export const App: React.FC = () => {
     endedInBaglandi: boolean,
     roundWinnerPlayerIndex: number,
     finalPlayers: Player[],
-    blockerIndex?: number
+    blockerIndex?: number,
+    isBaglandiTie: boolean = false
   ) => {
     // Clear any pending AI turn timers immediately
     if (turnTimeoutRef.current) {
@@ -889,7 +897,7 @@ export const App: React.FC = () => {
       const res = process101Round(
         match101State,
         finalPlayers,
-        roundWinnerPlayerIndex,
+        endedInBaglandi ? effectiveBlocker : roundWinnerPlayerIndex,
         endedInBaglandi
       );
 
@@ -947,6 +955,7 @@ export const App: React.FC = () => {
     }
 
     setIsBaglandi(endedInBaglandi);
+    setIs101Seka(endedInBaglandi && isBaglandiTie);
     setWinnerIndex(roundWinnerPlayerIndex);
 
     // Immediately commit the updated hands (including emptied hand)
@@ -956,20 +965,22 @@ export const App: React.FC = () => {
     const winningTeam = winnerP?.team;
     setWinnerTeam(winningTeam);
 
-    // Calculate Opponents' leftover pips
+    // Calculate Opponents' leftover pips (0 if blocked game ended in exact tie)
     let rawOpponentPips = 0;
-    if (mode === '4p_duo') {
-      finalPlayers.forEach((p) => {
-        if (p.team !== winningTeam) {
-          rawOpponentPips += sumHandPips(p.hand);
-        }
-      });
-    } else {
-      finalPlayers.forEach((p, idx) => {
-        if (idx !== roundWinnerPlayerIndex) {
-          rawOpponentPips += sumHandPips(p.hand);
-        }
-      });
+    if (!(endedInBaglandi && isBaglandiTie)) {
+      if (mode === '4p_duo') {
+        finalPlayers.forEach((p) => {
+          if (p.team !== winningTeam) {
+            rawOpponentPips += sumHandPips(p.hand);
+          }
+        });
+      } else {
+        finalPlayers.forEach((p, idx) => {
+          if (idx !== roundWinnerPlayerIndex) {
+            rawOpponentPips += sumHandPips(p.hand);
+          }
+        });
+      }
     }
 
     // 300 Point Rule: After 300, score from opponents' hand is NOT calculated!
@@ -979,7 +990,7 @@ export const App: React.FC = () => {
         : winnerP.score;
 
     let bonus = 0;
-    if (winnerCurrentTotalScore < 300 && rawOpponentPips > 0) {
+    if (!(endedInBaglandi && isBaglandiTie) && winnerCurrentTotalScore < 300 && rawOpponentPips > 0) {
       bonus = roundUpTo5(rawOpponentPips);
     }
 
@@ -1000,6 +1011,7 @@ export const App: React.FC = () => {
       // Step 3: After another 900ms, finalize scores and show Modal
       setTimeout(() => {
         const playersWithBonus = finalPlayers.map((p, idx) => {
+          if (endedInBaglandi && isBaglandiTie) return p;
           const isWinner =
             mode === '4p_duo' ? p.team === winningTeam : idx === roundWinnerPlayerIndex;
           if (isWinner) {
@@ -1273,16 +1285,12 @@ export const App: React.FC = () => {
       !canAnyTileBePlayed(nextBoard, drawableBoneyard);
 
     if (isGloballyBlocked || noUnplayedMoveExists) {
-      let minPips = 999;
-      let lowestPlayer = 0;
-      updatedPlayers.forEach((p, idx) => {
-        const pips = gameVariant === '101' ? sumHandPips101(p.hand) : sumHandPips(p.hand);
-        if (pips < minPips) {
-          minPips = pips;
-          lowestPlayer = idx;
-        }
-      });
-      finishHand(true, lowestPlayer, updatedPlayers, playerIndex);
+      const { winnerIndex: lowestPlayer, isTie } = evaluateBaglandiWinner(
+        updatedPlayers,
+        mode,
+        playerIndex
+      );
+      finishHand(true, lowestPlayer, updatedPlayers, playerIndex, isTie);
       return;
     }
 
@@ -1397,16 +1405,12 @@ export const App: React.FC = () => {
       !canAnyTileBePlayed(nextBoard, drawableBoneyard);
 
     if (isGloballyBlocked || noUnplayedMoveExists) {
-      let minPips = 999;
-      let lowestPlayer = 0;
-      updatedPlayers.forEach((p, idx) => {
-        const pips = gameVariant === '101' ? sumHandPips101(p.hand) : sumHandPips(p.hand);
-        if (pips < minPips) {
-          minPips = pips;
-          lowestPlayer = idx;
-        }
-      });
-      finishHand(true, lowestPlayer, updatedPlayers, playerIndex);
+      const { winnerIndex: lowestPlayer, isTie } = evaluateBaglandiWinner(
+        updatedPlayers,
+        mode,
+        playerIndex
+      );
+      finishHand(true, lowestPlayer, updatedPlayers, playerIndex, isTie);
       return;
     }
 
@@ -1522,16 +1526,12 @@ export const App: React.FC = () => {
 
     if (nextPassCount >= players.length) {
       // Game Blocked ("Bağlandı")
-      let minPips = 999;
-      let lowestPlayer = 0;
-      players.forEach((p, idx) => {
-        const pips = sumHandPips(p.hand);
-        if (pips < minPips) {
-          minPips = pips;
-          lowestPlayer = idx;
-        }
-      });
-      finishHand(true, lowestPlayer, players);
+      const { winnerIndex: lowestPlayer, isTie } = evaluateBaglandiWinner(
+        players,
+        mode,
+        lastTilePlacedPlayerIndex
+      );
+      finishHand(true, lowestPlayer, players, lastTilePlacedPlayerIndex, isTie);
       return;
     }
 
@@ -1550,7 +1550,13 @@ export const App: React.FC = () => {
       clearTimeout(turnTimeoutRef.current);
     }
 
+    // Use a slightly quicker delay (800ms) right after drawing from the bazaar,
+    // and the normal 1550ms delay when starting a turn or playing a tile.
+    const delayMs = aiJustDrewRef.current ? 800 : 1550;
+
     turnTimeoutRef.current = setTimeout(() => {
+      aiJustDrewRef.current = false;
+
       // If AI is forced to play a specific opening tile
       if (board.tiles.length === 0 && forcedTile) {
         executeMove(currentTurn, forcedTile, 'main_left');
@@ -1562,7 +1568,7 @@ export const App: React.FC = () => {
         mode === '4p_duo'
           ? players.find((p) => p.team === activePlayer.team)?.score || 0
           : activePlayer.score;
-      const bestMove = selectBestAIMove(activePlayer.hand, board, aiScore);
+      const bestMove = selectBestAIMove(activePlayer.hand, board, aiScore, gameVariant);
 
       // If Double Combos are enabled, check if AI can score with a combo!
       if (allowDoubleCombo) {
@@ -1588,16 +1594,12 @@ export const App: React.FC = () => {
         // If the board is blocked, or neither players nor drawable boneyard has any playable tile,
         // declare Bağlandı immediately without forcing useless boneyard draws!
         if (isGloballyBlocked || (!players.some((p) => canAnyTileBePlayed(board, p.hand)) && !canBazaarHelp)) {
-          let minPips = 999;
-          let lowestPlayer = 0;
-          players.forEach((p, idx) => {
-            const pips = gameVariant === '101' ? sumHandPips101(p.hand) : sumHandPips(p.hand);
-            if (pips < minPips) {
-              minPips = pips;
-              lowestPlayer = idx;
-            }
-          });
-          finishHand(true, lowestPlayer, players, lastTilePlacedPlayerIndex);
+          const { winnerIndex: lowestPlayer, isTie } = evaluateBaglandiWinner(
+            players,
+            mode,
+            lastTilePlacedPlayerIndex
+          );
+          finishHand(true, lowestPlayer, players, lastTilePlacedPlayerIndex, isTie);
           return;
         }
 
@@ -1606,6 +1608,14 @@ export const App: React.FC = () => {
           const countToDraw = gameVariant === '101' ? Math.min(2, drawableBoneyard.length) : 1;
           const drawn = boneyard.slice(0, countToDraw);
           const nextBoneyard = boneyard.slice(countToDraw);
+          sounds.playTileDraw();
+          aiJustDrewRef.current = true;
+          setOpponentActionNotice({
+            playerIndex: currentTurn,
+            text: `📥 Bazardan ${countToDraw} daş çəkdi`,
+            type: 'draw'
+          });
+          setTimeout(() => setOpponentActionNotice(null), 1300);
           setBoneyard(nextBoneyard);
 
           const updatedPlayers = players.map((p, idx) => {
@@ -1618,28 +1628,30 @@ export const App: React.FC = () => {
         } else {
           // AI passes
           sounds.playPassKnock();
+          setOpponentActionNotice({
+            playerIndex: currentTurn,
+            text: '🚫 Pas keçdi',
+            type: 'pass'
+          });
+          setTimeout(() => setOpponentActionNotice(null), 1500);
           const nextPassCount = consecutivePasses + 1;
           setConsecutivePasses(nextPassCount);
 
           if (nextPassCount >= players.length) {
             // "Bağlandı"
-            let minPips = 999;
-            let lowestPlayer = 0;
-            players.forEach((p, idx) => {
-              const pips = gameVariant === '101' ? sumHandPips101(p.hand) : sumHandPips(p.hand);
-              if (pips < minPips) {
-                minPips = pips;
-                lowestPlayer = idx;
-              }
-            });
-            finishHand(true, lowestPlayer, players, lastTilePlacedPlayerIndex);
+            const { winnerIndex: lowestPlayer, isTie } = evaluateBaglandiWinner(
+              players,
+              mode,
+              lastTilePlacedPlayerIndex
+            );
+            finishHand(true, lowestPlayer, players, lastTilePlacedPlayerIndex, isTie);
             return;
           }
 
           setCurrentTurn((currentTurn + 1) % players.length);
         }
       }
-    }, 1600); // 1.6s deliberation delay so players can observe bot decisions and track moves
+    }, delayMs);
 
     return () => {
       if (turnTimeoutRef.current) clearTimeout(turnTimeoutRef.current);
@@ -2489,7 +2501,7 @@ export const App: React.FC = () => {
                 equippedFrame={stats.equippedFrame}
                 equippedTitle={stats.equippedTitle}
                 variant={effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant}
-                match101State={match101State}
+                match101State={effectiveInMultiplayer ? (mpGameState?.match101State || match101State) : match101State}
               />
             </div>
 
@@ -2596,6 +2608,7 @@ export const App: React.FC = () => {
               const oppIdx = effectivePlayers.findIndex((_, i) => i !== localPlayerIndex);
               const opponent = effectivePlayers[oppIdx] || effectivePlayers[1];
               const isOpponentTurn = effectiveTurn === oppIdx && !effectiveHandRevealed;
+              const oppNotice = opponentActionNotice?.playerIndex === oppIdx ? opponentActionNotice : null;
               return (
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center">
                   <div
@@ -2642,6 +2655,15 @@ export const App: React.FC = () => {
                     )}
                     <span className="text-xs group-hover:scale-125 transition-transform">🎁</span>
                   </div>
+                  {oppNotice && (
+                    <div className={`mb-1 px-2.5 py-0.5 rounded-full text-[10px] font-black shadow-lg border animate-bounce ${
+                      oppNotice.type === 'draw'
+                        ? 'bg-cyan-950/95 border-cyan-400 text-cyan-200'
+                        : 'bg-rose-950/95 border-rose-400 text-rose-200'
+                    }`}>
+                      {oppNotice.text}
+                    </div>
+                  )}
                   <div className={`flex items-center gap-1.5 transition-all ${isOpponentTurn ? 'ring-2 ring-amber-400/50 rounded-lg p-0.5 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
                     {opponent?.hand.map((tile, i) => (
                       <DominoTile
@@ -2666,14 +2688,32 @@ export const App: React.FC = () => {
               const rightOpponent = effectivePlayers[rightIdx];
               const isLeftTurn = effectiveTurn === leftIdx && !effectiveHandRevealed;
               const isRightTurn = effectiveTurn === rightIdx && !effectiveHandRevealed;
+              const leftNotice = opponentActionNotice?.playerIndex === leftIdx ? opponentActionNotice : null;
+              const rightNotice = opponentActionNotice?.playerIndex === rightIdx ? opponentActionNotice : null;
               return (
                 <>
                   <div className="absolute top-2 left-[36%] -translate-x-1/2 z-10 flex flex-col items-center">
-                    <div className={`flex items-center gap-1 mb-1 backdrop-blur-sm px-2 py-0.5 rounded-full border shadow transition-all ${
-                      isLeftTurn
-                        ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
-                        : 'bg-slate-900/80 border-slate-700/60'
-                    }`}>
+                    <div
+                      onClick={() => {
+                        triggerHaptic('light');
+                        if (leftOpponent) {
+                          const targetSlot = mpGameState?.players[leftIdx];
+                          setGiftTargetPlayer({
+                            index: leftIdx,
+                            name: leftOpponent.name,
+                            isBot: leftOpponent.isAI || !effectiveInMultiplayer,
+                            playerTag: targetSlot?.playerTag,
+                            playerId: targetSlot?.playerId
+                          });
+                        }
+                      }}
+                      title={`${leftOpponent?.name} üçün hədiyyə göndər`}
+                      className={`flex items-center gap-1 mb-1 backdrop-blur-sm px-2 py-0.5 rounded-full border shadow cursor-pointer active:scale-95 transition-all group ${
+                        isLeftTurn
+                          ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
+                          : 'bg-slate-900/80 hover:bg-slate-800/90 border-slate-700/60'
+                      }`}
+                    >
                       <div className="relative">
                         <AvatarView
                           avatarId={leftOpponent?.avatarId || 'avatar_tea_master'}
@@ -2695,7 +2735,17 @@ export const App: React.FC = () => {
                           🎯 Növbə
                         </span>
                       )}
+                      <span className="text-[10px] group-hover:scale-125 transition-transform">🎁</span>
                     </div>
+                    {leftNotice && (
+                      <div className={`mb-1 px-2 py-0.5 rounded-full text-[9px] font-black shadow border animate-bounce ${
+                        leftNotice.type === 'draw'
+                          ? 'bg-cyan-950/95 border-cyan-400 text-cyan-200'
+                          : 'bg-rose-950/95 border-rose-400 text-rose-200'
+                      }`}>
+                        {leftNotice.text}
+                      </div>
+                    )}
                     <div className={`flex items-center gap-1 transition-all ${isLeftTurn ? 'ring-2 ring-amber-400/50 rounded-md p-0.5' : ''}`}>
                       {leftOpponent?.hand.map((tile, i) => (
                         <DominoTile
@@ -2711,11 +2761,27 @@ export const App: React.FC = () => {
                   </div>
 
                   <div className="absolute top-2 left-[66%] -translate-x-1/2 z-10 flex flex-col items-center">
-                    <div className={`flex items-center gap-1 mb-1 backdrop-blur-sm px-2 py-0.5 rounded-full border shadow transition-all ${
-                      isRightTurn
-                        ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
-                        : 'bg-slate-900/80 border-slate-700/60'
-                    }`}>
+                    <div
+                      onClick={() => {
+                        triggerHaptic('light');
+                        if (rightOpponent) {
+                          const targetSlot = mpGameState?.players[rightIdx];
+                          setGiftTargetPlayer({
+                            index: rightIdx,
+                            name: rightOpponent.name,
+                            isBot: rightOpponent.isAI || !effectiveInMultiplayer,
+                            playerTag: targetSlot?.playerTag,
+                            playerId: targetSlot?.playerId
+                          });
+                        }
+                      }}
+                      title={`${rightOpponent?.name} üçün hədiyyə göndər`}
+                      className={`flex items-center gap-1 mb-1 backdrop-blur-sm px-2 py-0.5 rounded-full border shadow cursor-pointer active:scale-95 transition-all group ${
+                        isRightTurn
+                          ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
+                          : 'bg-slate-900/80 hover:bg-slate-800/90 border-slate-700/60'
+                      }`}
+                    >
                       <div className="relative">
                         <AvatarView
                           avatarId={rightOpponent?.avatarId || 'avatar_sheki_guest'}
@@ -2737,7 +2803,17 @@ export const App: React.FC = () => {
                           🎯 Növbə
                         </span>
                       )}
+                      <span className="text-[10px] group-hover:scale-125 transition-transform">🎁</span>
                     </div>
+                    {rightNotice && (
+                      <div className={`mb-1 px-2 py-0.5 rounded-full text-[9px] font-black shadow border animate-bounce ${
+                        rightNotice.type === 'draw'
+                          ? 'bg-cyan-950/95 border-cyan-400 text-cyan-200'
+                          : 'bg-rose-950/95 border-rose-400 text-rose-200'
+                      }`}>
+                        {rightNotice.text}
+                      </div>
+                    )}
                     <div className={`flex items-center gap-1 transition-all ${isRightTurn ? 'ring-2 ring-amber-400/50 rounded-md p-0.5' : ''}`}>
                       {rightOpponent?.hand.map((tile, i) => (
                         <DominoTile
@@ -2766,6 +2842,9 @@ export const App: React.FC = () => {
               const isTopTurn = effectiveTurn === topIdx && !effectiveHandRevealed;
               const isLeftTurn = effectiveTurn === leftIdx && !effectiveHandRevealed;
               const isRightTurn = effectiveTurn === rightIdx && !effectiveHandRevealed;
+              const topNotice = opponentActionNotice?.playerIndex === topIdx ? opponentActionNotice : null;
+              const leftNotice = opponentActionNotice?.playerIndex === leftIdx ? opponentActionNotice : null;
+              const rightNotice = opponentActionNotice?.playerIndex === rightIdx ? opponentActionNotice : null;
               return (
                 <>
                   {/* Top Partner */}
@@ -2814,6 +2893,15 @@ export const App: React.FC = () => {
                       )}
                       <span className="text-xs group-hover:scale-125 transition-transform">🎁</span>
                     </div>
+                    {topNotice && (
+                      <div className={`mb-1 px-2 py-0.5 rounded-full text-[9px] font-black shadow border animate-bounce ${
+                        topNotice.type === 'draw'
+                          ? 'bg-cyan-950/95 border-cyan-400 text-cyan-200'
+                          : 'bg-rose-950/95 border-rose-400 text-rose-200'
+                      }`}>
+                        {topNotice.text}
+                      </div>
+                    )}
                     <div className={`flex items-center gap-1.5 transition-all ${isTopTurn ? 'ring-2 ring-amber-400/50 rounded-lg p-0.5 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
                       {topPartner?.hand.map((tile, i) => (
                         <DominoTile
@@ -2829,7 +2917,7 @@ export const App: React.FC = () => {
                   </div>
 
                   {/* Upper Left Opponent */}
-                  <div className="absolute left-3 top-16 z-10 flex flex-col items-center">
+                  <div className="absolute left-1.5 sm:left-3 top-14 sm:top-16 z-10 flex flex-col items-start sm:items-center">
                     <div
                       onClick={() => {
                         triggerHaptic('light');
@@ -2874,7 +2962,16 @@ export const App: React.FC = () => {
                       )}
                       <span className="text-[10px] group-hover:scale-125 transition-transform">🎁</span>
                     </div>
-                    <div className={`flex flex-col items-center gap-1 transition-all ${isLeftTurn ? 'ring-2 ring-amber-400/50 rounded-lg p-0.5 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
+                    {leftNotice && (
+                      <div className={`mb-1 px-2 py-0.5 rounded-full text-[9px] font-black shadow border animate-bounce ${
+                        leftNotice.type === 'draw'
+                          ? 'bg-cyan-950/95 border-cyan-400 text-cyan-200'
+                          : 'bg-rose-950/95 border-rose-400 text-rose-200'
+                      }`}>
+                        {leftNotice.text}
+                      </div>
+                    )}
+                    <div className={`flex flex-col items-center ${!effectiveHandRevealed ? '-space-y-3.5 sm:space-y-0 sm:gap-1' : 'gap-1'} transition-all ${isLeftTurn ? 'ring-2 ring-amber-400/50 rounded-lg p-0.5 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
                       {leftOpponent?.hand.map((tile, i) => (
                         <DominoTile
                           key={tile.id || i}
@@ -2889,7 +2986,7 @@ export const App: React.FC = () => {
                   </div>
 
                   {/* Upper Right Opponent */}
-                  <div className="absolute right-3 top-16 z-10 flex flex-col items-center">
+                  <div className="absolute right-1.5 sm:right-3 top-14 sm:top-16 z-10 flex flex-col items-end sm:items-center">
                     <div
                       onClick={() => {
                         triggerHaptic('light');
@@ -2934,7 +3031,16 @@ export const App: React.FC = () => {
                       )}
                       <span className="text-[10px] group-hover:scale-125 transition-transform">🎁</span>
                     </div>
-                    <div className={`flex flex-col items-center gap-1 transition-all ${isRightTurn ? 'ring-2 ring-amber-400/50 rounded-lg p-0.5 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
+                    {rightNotice && (
+                      <div className={`mb-1 px-2 py-0.5 rounded-full text-[9px] font-black shadow border animate-bounce ${
+                        rightNotice.type === 'draw'
+                          ? 'bg-cyan-950/95 border-cyan-400 text-cyan-200'
+                          : 'bg-rose-950/95 border-rose-400 text-rose-200'
+                      }`}>
+                        {rightNotice.text}
+                      </div>
+                    )}
+                    <div className={`flex flex-col items-center ${!effectiveHandRevealed ? '-space-y-3.5 sm:space-y-0 sm:gap-1' : 'gap-1'} transition-all ${isRightTurn ? 'ring-2 ring-amber-400/50 rounded-lg p-0.5 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
                       {rightOpponent?.hand.map((tile, i) => (
                         <DominoTile
                           key={tile.id || i}
@@ -3105,9 +3211,9 @@ export const App: React.FC = () => {
         onNextHand={handleNextHandAction}
         onRestartMatch={handleRestartMatchAction}
         variant={effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant}
-        match101State={match101State}
-        isSeka={is101Seka}
-        ayazCaught={is101AyazCaught}
+        match101State={effectiveInMultiplayer ? (mpGameState?.match101State || match101State) : match101State}
+        isSeka={effectiveInMultiplayer ? !!mpGameState?.handResults?.isSeka : is101Seka}
+        ayazCaught={effectiveInMultiplayer ? !!mpGameState?.handResults?.ayazCaught : is101AyazCaught}
       />
 
       <MultiplayerLobbyModal
