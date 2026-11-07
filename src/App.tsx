@@ -2577,7 +2577,7 @@ export const App: React.FC = () => {
 
             {/* Reshuffle Notice Banner */}
             {effectiveReshuffleNotice && (
-              <div className="absolute top-14 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center pointer-events-none animate-fade-in">
+              <div className="absolute top-24 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center pointer-events-none animate-fade-in">
                 <div className="bg-amber-950/95 border-2 border-amber-400 rounded-2xl px-5 py-2.5 shadow-[0_0_35px_rgba(251,191,36,0.6)] flex items-center gap-2.5 max-w-md text-center">
                   <RotateCcw className="w-4 h-4 text-amber-400 animate-spin flex-shrink-0" />
                   <span className="text-amber-200 text-xs sm:text-sm font-black tracking-wide">
@@ -2587,23 +2587,23 @@ export const App: React.FC = () => {
               </div>
             )}
 
-            {/* Sleek, Non-Intrusive Turn Indicator Mini-Pill (Optimized for Mobile visibility) */}
+            {/* Sleek Turn Indicator Mini-Pill (Positioned below the opponent tiles/avatar so it never overlaps!) */}
             {!effectiveHandRevealed && !effectiveForcedTile && (
-              <div className="absolute top-2.5 left-1/2 -translate-x-1/2 z-20 pointer-events-none transition-all">
+              <div className="absolute top-14 sm:top-16 left-1/2 -translate-x-1/2 z-20 pointer-events-none transition-all">
                 {isMyTurn ? (
-                  <div className="bg-emerald-950/85 border border-emerald-400/60 text-emerald-300 px-3 py-1 rounded-full shadow-[0_2px_12px_rgba(16,185,129,0.3)] flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider backdrop-blur-md animate-fade-in">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
+                  <div className="bg-emerald-950/90 border-2 border-emerald-400 text-emerald-300 px-3.5 py-1 rounded-full shadow-[0_4px_16px_rgba(16,185,129,0.5)] flex items-center gap-1.5 text-[11px] sm:text-xs font-black uppercase tracking-wider backdrop-blur-md animate-fade-in">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping inline-block" />
                     <span>{t.yourTurn}</span>
                     {effectiveInMultiplayer && mpGameState?.turnTimeRemaining !== undefined && (
-                      <span className="text-emerald-400 font-mono text-[10px] ml-1 bg-emerald-900/60 px-1.5 py-0.5 rounded-full">
+                      <span className="text-emerald-300 font-mono text-[10px] ml-1 bg-emerald-900/80 px-1.5 py-0.5 rounded-full border border-emerald-500/40">
                         ⏱ {mpGameState.turnTimeRemaining}s
                       </span>
                     )}
                   </div>
                 ) : (
-                  <div className="bg-slate-950/80 border border-slate-700/60 text-slate-300 px-2.5 py-1 rounded-full shadow-md flex items-center gap-1.5 text-[11px] font-bold backdrop-blur-md">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse inline-block" />
-                    <span className="text-amber-300 font-bold max-w-[100px] truncate">
+                  <div className="bg-slate-950/90 border border-amber-500/60 text-slate-200 px-3 py-1 rounded-full shadow-lg flex items-center gap-1.5 text-[11px] font-bold backdrop-blur-md">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse inline-block" />
+                    <span className="text-amber-300 font-bold max-w-[110px] truncate">
                       {effectivePlayers[effectiveTurn]?.name}
                     </span>
                     <span className="text-slate-400 text-[10px]">{t.aiThinking}</span>

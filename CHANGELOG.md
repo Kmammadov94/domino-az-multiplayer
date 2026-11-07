@@ -4,6 +4,15 @@ Bütün yeniləmələr, düzəlişlər, funksionallıqlar və versiya dəyişikl
 
 ---
 
+## [1.1.2] — 2026-11-07 (İnterfeys & Növbə İndikatoru Yerləşməsi)
+
+### 🎨 Vizual & UI Təkmilləşdirməsi
+- **Növbə İndikatorunun Yeri Dəyişdirildi**:
+  - Əvvəl `Sizin gedişinizdir` və ya `Rəqib düşünür...` bildiriş həbi ekranın ən yuxarı mərkəzində yerləşdiyi üçün rəqibin daşları və avatarı ilə üst-üstə düşürdü.
+  - İndikator rəqib avatarı və daşlarının dərhal altına (`top-14 sm:top-16`) endirildi; beləliklə həm rəqibin xalları və daşları, həm də növbə göstəricisi üst-üstə düşmədən aydın görünür.
+
+---
+
 ## [1.1.1] — 2026-11-07 (Mobil Brauzer Giriş Körpüsü & Avtomatik Qayıdış)
 
 ### 🔄 Mobil Tətbiqə Giriş & Sinxronizasiya Axını
