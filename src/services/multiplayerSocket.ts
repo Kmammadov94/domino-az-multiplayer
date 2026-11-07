@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import { GameMode, GameVariant } from '../types/domino';
 import { DoubleComboMove } from '../utils/comboEngine';
+import { getBackendServerUrl } from '../utils/storage';
 import {
   MultiplayerClientGameState,
   MultiplayerRoomSummary,
@@ -14,27 +15,7 @@ class MultiplayerSocketService {
 
   constructor() {
     if (typeof window !== 'undefined') {
-      const metaEnv = (import.meta as unknown as { env?: Record<string, string> }).env;
-      if (metaEnv?.VITE_SERVER_URL) {
-        this.serverUrl = metaEnv.VITE_SERVER_URL;
-      } else {
-        const port = window.location.port;
-        const hostname = window.location.hostname || 'localhost';
-
-        if (port === '3000') {
-          // Vite dev or preview running on 3000 -> Multiplayer server is on 3001
-          this.serverUrl = `http://${hostname}:3001`;
-        } else if (port === '3001') {
-          // Served directly by Node.js server
-          this.serverUrl = window.location.origin;
-        } else if (!port && (window.location.protocol === 'capacitor:' || window.location.protocol === 'file:')) {
-          // Capacitor Android default fallback to local backend or host machine
-          this.serverUrl = 'http://10.0.2.2:3001';
-        } else {
-          // Production custom domain or port
-          this.serverUrl = window.location.origin;
-        }
-      }
+      this.serverUrl = getBackendServerUrl();
     }
   }
 

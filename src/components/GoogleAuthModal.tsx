@@ -1,6 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Cloud, CheckCircle, ShieldAlert, LogOut, X, Sparkles } from 'lucide-react';
-import { GoogleUserProfile } from '../utils/storage';
+import React, { useState, useEffect, useRef } from 'react';
+import { Cloud, CheckCircle, ShieldAlert, LogOut, X, Smartphone, ExternalLink, Loader2 } from 'lucide-react';
+import {
+  GoogleUserProfile,
+  isNativeMobileApp,
+  getBackendServerUrl,
+  PRODUCTION_SERVER_URL
+} from '../utils/storage';
 
 export const GOOGLE_CLIENT_ID =
   '345163175505-a7dv01uno2tof42k31omil6p5c9do20g.apps.googleusercontent.com';
@@ -11,6 +16,7 @@ interface GoogleAuthModalProps {
   currentUser: GoogleUserProfile | null;
   onSignIn: (user: GoogleUserProfile) => void;
   onSignOut: () => void;
+  apkAuthSessionId?: string | null;
 }
 
 export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
@@ -18,13 +24,33 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
   onClose,
   currentUser,
   onSignIn,
-  onSignOut
+  onSignOut,
+  apkAuthSessionId = null
 }) => {
   const [gisLoaded, setGisLoaded] = useState(false);
   const [gisError, setGisError] = useState<string | null>(null);
+  const [waitingForMobileBrowser, setWaitingForMobileBrowser] = useState(false);
+  const [apkBridgeCompleted, setApkBridgeCompleted] = useState(false);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isNative = isNativeMobileApp();
 
   useEffect(() => {
-    if (!isOpen) return;
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      setWaitingForMobileBrowser(false);
+      return;
+    }
 
     let attempts = 0;
     const checkGis = () => {
@@ -35,13 +61,38 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
       } else if (attempts < 20) {
         attempts++;
         setTimeout(checkGis, 250);
-      } else {
+      } else if (!isNative) {
         setGisError('Google Identity Services xidməti yüklənə bilmədi.');
       }
     };
 
     checkGis();
-  }, [isOpen]);
+  }, [isOpen, apkAuthSessionId]);
+
+  const handleCompleteSignIn = async (profile: GoogleUserProfile) => {
+    onSignIn(profile);
+
+    // If this browser tab was opened from the Android APK (?apk_auth=...), send the profile to the bridge endpoint!
+    if (apkAuthSessionId) {
+      try {
+        await fetch(`${getBackendServerUrl()}/api/apk-auth/${encodeURIComponent(apkAuthSessionId)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user: profile })
+        });
+        setApkBridgeCompleted(true);
+        // Attempt automatic deep-link redirect back into the Android APK
+        setTimeout(() => {
+          window.location.href = 'intent://auth#Intent;scheme=dominoaz;package=az.domino.telefon365;end';
+        }, 600);
+        return;
+      } catch (e) {
+        console.warn('Failed to send APK bridge auth:', e);
+      }
+    }
+
+    onClose();
+  };
 
   const initGoogleGis = (googleIdApi: any) => {
     try {
@@ -51,7 +102,6 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
         callback: (response: { credential?: string }) => {
           if (response.credential) {
             try {
-              // Decode payload from Google JWT
               const base64Url = response.credential.split('.')[1];
               const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
               const jsonPayload = decodeURIComponent(
@@ -61,14 +111,13 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
                   .join('')
               );
               const payload = JSON.parse(jsonPayload);
-              onSignIn({
+              handleCompleteSignIn({
                 googleId: payload.sub,
                 email: payload.email,
                 name: payload.name || payload.given_name || 'Google Oyunçusu',
                 picture: payload.picture,
                 signedInAt: Date.now()
               });
-              onClose();
             } catch (err) {
               console.error('Failed to parse Google JWT credential:', err);
             }
@@ -91,19 +140,53 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
         });
       }
 
-      // Automatically open Google One-Tap prompt
-      googleIdApi.prompt();
+      if (!isNative) {
+        googleIdApi.prompt();
+      }
     } catch (e: any) {
       console.warn('GIS Init Error:', e);
-      setGisError(e?.message || 'Google xidmətinə qoşulma xətası');
+      if (!isNative) {
+        setGisError(e?.message || 'Google xidmətinə qoşulma xətası');
+      }
     }
   };
 
-  const handleManualPrompt = () => {
-    const win = window as any;
-    if (win.google?.accounts?.id) {
-      win.google.accounts.id.prompt();
+  // Start Mobile Browser Auth Bridge for Android APK (avoids WebView origin_mismatch 100%)
+  const handleStartMobileBrowserAuth = () => {
+    const sessionId = `apk_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    setWaitingForMobileBrowser(true);
+    setGisError(null);
+
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
     }
+
+    const baseUrl = getBackendServerUrl() || PRODUCTION_SERVER_URL;
+    const bridgeUrl = `${baseUrl}/?apk_auth=${encodeURIComponent(sessionId)}`;
+
+    // Open in system browser (Chrome / Custom Tab) where https://domino-az-multiplayer.onrender.com is an authorized origin
+    window.open(bridgeUrl, '_system');
+
+    // Poll backend every 1.5s for completion
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`${baseUrl}/api/apk-auth/${encodeURIComponent(sessionId)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.authenticated && data?.user) {
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
+            setWaitingForMobileBrowser(false);
+            onSignIn(data.user);
+            onClose();
+          }
+        }
+      } catch {
+        // Ignore transient network errors while user is in browser
+      }
+    }, 1500);
   };
 
   if (!isOpen) return null;
@@ -122,7 +205,6 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
         {/* Modal Header */}
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center shadow-lg p-2 flex-shrink-0">
-            {/* Google colored G svg logo */}
             <svg viewBox="0 0 24 24" className="w-6 h-6">
               <path
                 fill="#4285F4"
@@ -147,12 +229,31 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
               Google ilə Giriş et
             </h2>
             <span className="text-[11px] text-amber-300 font-semibold block">
-              Rəsmi Google One-Tap & Təhlükəsiz Bulud
+              Rəsmi Google Hesabı & Təhlükəsiz Bulud Sinxronizasiyası
             </span>
           </div>
         </div>
 
-        {currentUser ? (
+        {apkBridgeCompleted && currentUser ? (
+          <div className="flex flex-col items-center py-5 text-center gap-3">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center text-emerald-400 shadow-lg">
+              <CheckCircle className="w-9 h-9" />
+            </div>
+            <h3 className="text-base font-black text-emerald-300">
+              Giriş Uğurla Tamamlandı!
+            </h3>
+            <p className="text-xs text-slate-300 max-w-xs">
+              <strong>{currentUser.name}</strong> hesabınız Domino PRO mobil tətbiqinə bağlandı.
+            </p>
+            <a
+              href="intent://auth#Intent;scheme=dominoaz;package=az.domino.telefon365;end"
+              className="mt-2 w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 text-slate-950 font-black text-sm shadow-lg flex items-center justify-center gap-2"
+            >
+              <Smartphone className="w-4 h-4" />
+              <span>Domino PRO Tətbiqinə Qayıt</span>
+            </a>
+          </div>
+        ) : currentUser ? (
           /* Already Signed In View */
           <div className="flex flex-col items-center py-4 text-center">
             <div className="relative mb-3">
@@ -179,6 +280,16 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
               <Cloud className="w-4 h-4 text-emerald-400" />
               <span>Qızıllarınız və tərəqqiniz buludla sinxronlaşdırılıb</span>
             </div>
+
+            {apkAuthSessionId && (
+              <button
+                onClick={() => handleCompleteSignIn(currentUser)}
+                className="w-full mt-4 py-3 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-black text-xs shadow-lg flex items-center justify-center gap-2"
+              >
+                <Smartphone className="w-4 h-4" />
+                <span>Bu Hesabı Mobil Tətbiqə Göndər</span>
+              </button>
+            )}
 
             <div className="w-full mt-6 pt-4 border-t border-slate-800 flex items-center justify-between gap-3">
               <button
@@ -215,38 +326,37 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
               </div>
             </div>
 
-            {/* Official Google Button Container (rendered directly by Google's native SDK) */}
-            <div className="flex flex-col items-center justify-center my-2 min-h-[48px]">
-              <div id="google-official-btn" className="flex justify-center w-full"></div>
-
-              {/* Fallback button that invokes Google prompt */}
-              {!gisLoaded && (
+            {/* If running inside Android APK, show 1-Tap Mobile Browser Auth Bridge */}
+            {isNative && (
+              <div className="flex flex-col items-center gap-2 bg-slate-950/70 border border-emerald-500/40 rounded-2xl p-3.5">
                 <button
                   type="button"
-                  onClick={handleManualPrompt}
-                  className="w-full max-w-[280px] py-2.5 px-4 rounded-full bg-white hover:bg-slate-100 text-slate-800 font-bold text-xs sm:text-sm transition shadow-lg flex items-center justify-center gap-2.5 active:scale-95 border border-slate-300"
+                  onClick={handleStartMobileBrowserAuth}
+                  className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-xs sm:text-sm transition shadow-lg flex items-center justify-center gap-2 active:scale-95"
                 >
-                  <svg viewBox="0 0 24 24" className="w-4 h-4">
-                    <path
-                      fill="#4285F4"
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                    />
-                  </svg>
-                  <span>Google ilə Davam et</span>
+                  {waitingForMobileBrowser ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Brauzerdə giriş gözlənilir...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ExternalLink className="w-4 h-4" />
+                      <span>Mobil Brauzer ilə Google Girişi</span>
+                    </>
+                  )}
                 </button>
-              )}
+                <span className="text-[10px] text-slate-400 text-center">
+                  {waitingForMobileBrowser
+                    ? 'Açılan səhifədə Google hesabınızı seçin, tətbiq avtomatik daxil olacaq.'
+                    : 'Mobil APK-da ən sürətli və xətasız rəsmi Google girişi'}
+                </span>
+              </div>
+            )}
+
+            {/* Official Google Button Container (rendered directly by Google's native SDK) */}
+            <div className="flex flex-col items-center justify-center my-1 min-h-[48px]">
+              <div id="google-official-btn" className="flex justify-center w-full"></div>
             </div>
 
             {gisError && (

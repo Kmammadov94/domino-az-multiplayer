@@ -117,7 +117,7 @@ app.post('/api/user-stats', (req, res) => {
       picture: picture || existing.profile?.picture || ''
     },
     stats: mergedStats,
-    claimedGrants: existingGrants,
+    claimedGrants: existing.claimedGrants || [],
     updatedAt: Date.now()
   };
 
@@ -128,6 +128,36 @@ app.post('/api/user-stats', (req, res) => {
     profile: userDatabase[googleId].profile,
     stats: mergedStats
   });
+});
+
+// Temporary store for Mobile APK Google Auth Handshake Sessions (expires after 5 minutes)
+const apkAuthSessions = new Map<string, { user: any; createdAt: number }>();
+
+app.post('/api/apk-auth/:sessionId', (req, res) => {
+  const { sessionId } = req.params;
+  const { user } = req.body || {};
+  if (!sessionId || !user || !user.googleId) {
+    return res.status(400).json({ error: 'Invalid session or user payload' });
+  }
+  apkAuthSessions.set(sessionId, { user, createdAt: Date.now() });
+  // Cleanup expired sessions older than 5 minutes
+  const now = Date.now();
+  for (const [k, v] of apkAuthSessions.entries()) {
+    if (now - v.createdAt > 5 * 60 * 1000) {
+      apkAuthSessions.delete(k);
+    }
+  }
+  res.json({ success: true });
+});
+
+app.get('/api/apk-auth/:sessionId', (req, res) => {
+  const { sessionId } = req.params;
+  const record = apkAuthSessions.get(sessionId);
+  if (!record) {
+    return res.json({ authenticated: false });
+  }
+  apkAuthSessions.delete(sessionId);
+  res.json({ authenticated: true, user: record.user });
 });
 
 // Fetch user stats endpoint

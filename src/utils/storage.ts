@@ -6,6 +6,40 @@ const STORAGE_KEY = 'az_domino_telefon365_v1';
 const GOOGLE_USER_KEY = 'az_domino_google_user_v1';
 const GUEST_DISMISS_KEY = 'az_domino_guest_banner_dismissed';
 
+export const PRODUCTION_SERVER_URL = 'https://domino-az-multiplayer.onrender.com';
+
+export const isNativeMobileApp = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const cap = (window as any).Capacitor;
+  if (cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform()) {
+    return true;
+  }
+  const { protocol, hostname, port } = window.location;
+  if (protocol === 'capacitor:' || protocol === 'file:') return true;
+  // Capacitor Android with androidScheme: 'https' runs on https://localhost with no port
+  if (!port && hostname === 'localhost' && protocol === 'https:') return true;
+  return false;
+};
+
+export const getBackendServerUrl = (): string => {
+  if (typeof window === 'undefined') return PRODUCTION_SERVER_URL;
+  const metaEnv = (import.meta as unknown as { env?: Record<string, string> }).env;
+  if (metaEnv?.VITE_SERVER_URL) {
+    return metaEnv.VITE_SERVER_URL;
+  }
+  if (isNativeMobileApp()) {
+    return PRODUCTION_SERVER_URL;
+  }
+  const { port, hostname, origin } = window.location;
+  if (port === '3000') {
+    return `http://${hostname || 'localhost'}:3001`;
+  }
+  if (port === '3001') {
+    return origin;
+  }
+  return origin;
+};
+
 export interface GoogleUserProfile {
   googleId: string;
   email: string;
@@ -115,7 +149,8 @@ export const syncWithCloud = async (
   isInitialLogin: boolean = false
 ): Promise<PlayerStats> => {
   try {
-    const res = await fetch('/api/user-stats', {
+    const baseUrl = getBackendServerUrl();
+    const res = await fetch(`${baseUrl}/api/user-stats`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

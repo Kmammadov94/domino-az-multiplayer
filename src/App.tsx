@@ -119,7 +119,15 @@ export const App: React.FC = () => {
   const [showDailyReward, setShowDailyReward] = useState<boolean>(false);
   const [showRules, setShowRules] = useState<boolean>(false);
   const [showGameEnd, setShowGameEnd] = useState<boolean>(false);
-  const [showGoogleAuthModal, setShowGoogleAuthModal] = useState<boolean>(false);
+  const [apkAuthSessionId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const p = new URLSearchParams(window.location.search).get('apk_auth');
+    return p ? p.trim() : null;
+  });
+  const [showGoogleAuthModal, setShowGoogleAuthModal] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return Boolean(new URLSearchParams(window.location.search).get('apk_auth'));
+  });
 
   // Google User & Cloud Sync State
   const [googleUser, setGoogleUser] = useState<GoogleUserProfile | null>(loadGoogleUser);
@@ -3250,6 +3258,7 @@ export const App: React.FC = () => {
         isOpen={showGoogleAuthModal}
         onClose={() => setShowGoogleAuthModal(false)}
         currentUser={googleUser}
+        apkAuthSessionId={apkAuthSessionId}
         onSignIn={(user) => {
           saveGoogleUser(user);
           setGoogleUser(user);
