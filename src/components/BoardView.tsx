@@ -21,7 +21,7 @@ interface BoardViewProps {
   variant?: '365' | '101';
 }
 
-export const BoardView: React.FC<BoardViewProps> = ({
+export const BoardView: React.FC<BoardViewProps> = React.memo(({
   board,
   skin,
   tableThemeId = DEFAULT_TABLE_THEME_ID,
@@ -373,4 +373,4 @@ export const BoardView: React.FC<BoardViewProps> = ({
       </div>
     </div>
   );
-};
+});

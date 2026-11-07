@@ -12,6 +12,9 @@ import {
 class MultiplayerSocketService {
   private socket: Socket | null = null;
   private serverUrl: string = '';
+  private roomSummaryListeners = new Set<(summary: MultiplayerRoomSummary) => void>();
+  private roomStateListeners = new Set<(state: MultiplayerClientGameState) => void>();
+  private chatListeners = new Set<(msg: ChatMessage) => void>();
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -28,10 +31,19 @@ class MultiplayerSocketService {
         reconnectionDelay: 1000,
         timeout: 10000
       });
+      this.roomSummaryListeners.forEach((cb) => this.socket?.on('room_summary', cb));
+      this.roomStateListeners.forEach((cb) => this.socket?.on('room_state', cb));
+      this.chatListeners.forEach((cb) => this.socket?.on('chat_message', cb));
     } else if (this.socket.disconnected) {
       this.socket.connect();
     }
     return this.socket;
+  }
+
+  public disconnectIfIdle(): void {
+    if (this.socket && this.socket.connected) {
+      this.socket.disconnect();
+    }
   }
 
   public getSocket(): Socket | null {
@@ -277,26 +289,29 @@ class MultiplayerSocketService {
   }
 
   public onRoomSummary(callback: (summary: MultiplayerRoomSummary) => void): () => void {
-    const s = this.connect();
-    s.on('room_summary', callback);
+    this.roomSummaryListeners.add(callback);
+    this.socket?.on('room_summary', callback);
     return () => {
-      s.off('room_summary', callback);
+      this.roomSummaryListeners.delete(callback);
+      this.socket?.off('room_summary', callback);
     };
   }
 
   public onRoomState(callback: (state: MultiplayerClientGameState) => void): () => void {
-    const s = this.connect();
-    s.on('room_state', callback);
+    this.roomStateListeners.add(callback);
+    this.socket?.on('room_state', callback);
     return () => {
-      s.off('room_state', callback);
+      this.roomStateListeners.delete(callback);
+      this.socket?.off('room_state', callback);
     };
   }
 
   public onChatMessage(callback: (msg: ChatMessage) => void): () => void {
-    const s = this.connect();
-    s.on('chat_message', callback);
+    this.chatListeners.add(callback);
+    this.socket?.on('chat_message', callback);
     return () => {
-      s.off('chat_message', callback);
+      this.chatListeners.delete(callback);
+      this.socket?.off('chat_message', callback);
     };
   }
 }

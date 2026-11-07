@@ -496,14 +496,19 @@ export class GameRoom {
     }
 
     const hand = this.secretHands.get(player.id) || [];
+    const steps = combo.moves || (combo as any).tiles || [];
+    if (!Array.isArray(steps) || steps.length < 2) {
+      return { success: false, error: 'Yanlış kombo məlumatı!' };
+    }
+
     // Verify all combo tiles exist in hand
-    const hasAll = combo.tiles.every((ct) => hand.some((h) => h.id === ct.tile.id));
+    const hasAll = steps.every((ct) => hand.some((h) => h.id === ct.tile.id));
     if (!hasAll) {
       return { success: false, error: 'Kombodakı bəzi daşlar əlinizdə yoxdur!' };
     }
 
     let tempBoard = this.board;
-    for (const item of combo.tiles) {
+    for (const item of steps) {
       const res = placeTileOnBranch(tempBoard, item.tile, item.branchId);
       tempBoard = res.board;
     }
@@ -515,13 +520,13 @@ export class GameRoom {
     const scored = combo.expectedScore;
     if (scored > 0) {
       this.lastScoredPoints = {
-        playerName: `${player.name} (${combo.tiles.length}-li Qoşa)`,
+        playerName: `${player.name} (${steps.length}-li Qoşa)`,
         points: scored
       };
     }
 
     // Remove combo tiles from secret hand
-    const comboTileIds = new Set(combo.tiles.map((c) => c.tile.id));
+    const comboTileIds = new Set(steps.map((c) => c.tile.id));
     const nextHand = hand.filter((t) => !comboTileIds.has(t.id));
     this.secretHands.set(player.id, nextHand);
     player.handCount = nextHand.length;

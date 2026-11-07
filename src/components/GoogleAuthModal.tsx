@@ -178,8 +178,19 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
       window.open(bridgeUrl, '_system');
     }
 
-    // Poll backend every 1.2s for completion
+    // Poll backend every 1.2s for completion (capped at 120 attempts / ~2.5 minutes to avoid battery drain if abandoned)
+    let pollAttempts = 0;
     pollIntervalRef.current = setInterval(async () => {
+      pollAttempts++;
+      if (pollAttempts > 120) {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+        setWaitingForMobileBrowser(false);
+        setGisError('Giriş vaxtı bitdi. Yenidən cəhd edin.');
+        return;
+      }
       try {
         const res = await fetch(`${baseUrl}/api/apk-auth/${encodeURIComponent(sessionId)}`);
         if (res.ok) {

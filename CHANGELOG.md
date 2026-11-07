@@ -4,6 +4,31 @@ Bütün yeniləmələr, düzəlişlər, funksionallıqlar və versiya dəyişikl
 
 ---
 
+## [1.1.5] — 2026-11-07 (Performans, Batareya Qənaəti və Kritik Kod Audit Düzəlişləri)
+
+### 🔋 Batareya Qənaəti & Mobil Performans Təkmilləşdirmələri
+- **60–120 FPS Daş Sürüşdürmə Zamanı Sıfır Re-render (`src/App.tsx`)**:
+  - Əvvəl oyunçu daşı barmağı ilə ekranda sürüşdürərkən hər kadrda (`pointermove` / `touchmove`) `setDragPosition` React state yenilənir və bütün oyun ağacını (`Header`, `ScoreBoard`, `BoardView`, bütün 28 daş və modalları) saniyədə 60–120 dəfə yenidən hesablayırdı.
+  - İndi sürüşdürülən daşın koordinatları birbaşa DOM ref (`dragOverlayRef.current.style`) üzərindən yenilənir, hədəf qolların maqnit tutma yoxlaması isə `requestAnimationFrame` və keşlənmiş koordinatlarla (`cachedBranchCenters`) icra olunur — sürüşdürmə zamanı React re-render sayı **0**-a endirildi.
+- **`DominoTile` və `BoardView` Komponentlərinin Memoizasiyası (`src/components/DominoTile.tsx`, `src/components/BoardView.tsx`)**:
+  - `DominoTile` xüsusi müqayisə funksiyası ilə `React.memo`-ya büküldü ki, masadakı və əllərdəki daşlar dəyişmədikdə SVG-lər yenidən çəkilməsin.
+  - `BoardView` `React.memo`-ya büküldü və `playableTileIds`, `playableBranches`, `branchExpectedScores`, `availableCombos` hesablamaları `useMemo` ilə optimallaşdırıldı.
+- **Oflayn Rejimdə Lazımsız WebSocket Bağlantısının Qarşısının Alınması (`src/services/multiplayerSocket.ts`, `src/App.tsx`)**:
+  - Əvvəl tətbiq açılan kimi `onRoomSummary` / `onRoomState` abunəlikləri dərhal canlı serverə WebSocket açır və istifadəçi yalnız oflayn botlarla oynasa belə arxa fonda fasiləsiz şəbəkə ping/pong trafikini açıq saxlayaraq batareya sərf edirdi.
+  - İndi WebSocket yalnız istifadəçi həqiqətən onlayn otaq yaratdıqda, qoşulduqda və ya yarımçıq onlayn sessiyası olduqda açılır; otaqdan çıxdıqda isə `disconnectIfIdle()` ilə dərhal bağlanır.
+- **Arxa Fonda WebAudio DSP-nin Dayandırılması (`src/utils/sound.ts`, `src/App.tsx`)**:
+  - Tətbiq arxa fona keçdikdə və ya ekran söndükdə (`visibilitychange` və Capacitor `appStateChange`) `AudioContext` avtomatik `suspend()` edilir, oyuna qayıtdıqda isə `resume()` olunur.
+- **Google Mobil Brauzer Körpüsündə Sonsuz Sorğuların Məhdudlaşdırılması (`src/components/GoogleAuthModal.tsx`)**:
+  - İstifadəçi brauzerdə girişi yarımçıq qoyduqda `/api/apk-auth/:sessionId` sorğusunun sonsuza qədər işləməsinin qarşısını almaq üçün maksimum vaxt limiti (120 cəhd / ~2.5 dəqiqə) əlavə edildi.
+
+### 🐛 Kritik Xəta & Yaddaş Sızması (Memory Leak) Düzəlişləri
+- **Onlayn Multiplayer-də Qoşa Kombo (Simultaneous Double Combo) Server Çökməsi Düzəldildi (`server/gameRoom.ts`)**:
+  - `DoubleComboMove` tipində gedişlər `combo.moves` massivində saxlanıldığı halda, serverdə `executeCombo` metodu `combo.tiles.every(...)` oxumağa çalışırdı və oyunçu onlayn oyunda eyni anda 2 qoşa daş oynadıqda server xəta verirdi. `combo.moves` dəstəyi ilə tam düzəldildi.
+- **Capacitor `appUrlOpen` Dinləyici Sızması (`src/App.tsx`)**:
+  - `useEffect(..., [stats])` hər dəfə qızıl/statistika dəyişdikdə yeni native `CapApp.addListener('appUrlOpen')` yaradır və Capacitor v8-də `addListener` Promise qaytardığı üçün köhnə dinləyicini silə bilmirdi. `statsRef` və tək `[]` mount effekti ilə Promise düzgün təmizləndi.
+
+---
+
 ## [1.1.4] — 2026-11-07 (Sizin və Rəqibin Xallarının, Daşlarının və Növbə İndikatorunun Ayrılması)
 
 ### 🎨 İnterfeys (UI / UX) Düzəlişləri

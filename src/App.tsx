@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   GameMode,
   Language,
@@ -155,8 +155,9 @@ export const App: React.FC = () => {
 
   // Drag and Drop State
   const [draggedTile, setDraggedTile] = useState<TileData | null>(null);
-  const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
   const [hoveredBranch, setHoveredBranch] = useState<BranchId | null>(null);
+  const dragOverlayRef = useRef<HTMLDivElement | null>(null);
+  const dragInitialPointRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // End of Hand Reveal & Calculation State
   const [handRevealed, setHandRevealed] = useState<boolean>(false);
@@ -204,11 +205,20 @@ export const App: React.FC = () => {
   const [floatingScore, setFloatingScore] = useState<FloatingScoreItem | null>(null);
   const [isScreenShaking, setIsScreenShaking] = useState<boolean>(false);
 
-  // Listen for native deep link appUrlOpen (dominoaz://auth) from system browser after Google Sign-In
+  const statsRef = useRef<PlayerStats>(stats);
   useEffect(() => {
-    let handler: any = null;
+    statsRef.current = stats;
+  }, [stats]);
+
+  // Listen for native deep link appUrlOpen (dominoaz://auth) from system browser after Google Sign-In
+  // and suspend/resume WebAudio DSP & background resources when app goes to background to save mobile battery.
+  useEffect(() => {
+    let removed = false;
+    let urlListenerHandle: { remove: () => Promise<void> } | null = null;
+    let stateListenerHandle: { remove: () => Promise<void> } | null = null;
+
     try {
-      handler = CapApp.addListener('appUrlOpen', async (data: { url: string }) => {
+      CapApp.addListener('appUrlOpen', async (data: { url: string }) => {
         if (!data?.url) return;
         try {
           await CapBrowser.close().catch(() => {});
@@ -234,22 +244,50 @@ export const App: React.FC = () => {
             setGoogleUser(userProfile);
             setShowGuestWarning(false);
             setShowGoogleAuthModal(false);
-            syncWithCloud(userProfile, stats, true).then((synced) => {
+            syncWithCloud(userProfile, statsRef.current, true).then((synced) => {
               if (synced) setStats(synced);
             });
           }
         } catch (err) {
           console.warn('Failed to parse incoming deep link auth:', err);
         }
-      });
+      })
+        .then((h) => {
+          if (removed) h.remove().catch(() => {});
+          else urlListenerHandle = h;
+        })
+        .catch(() => {});
+
+      CapApp.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) {
+          sounds.resume();
+        } else {
+          sounds.suspend();
+        }
+      })
+        .then((h) => {
+          if (removed) h.remove().catch(() => {});
+          else stateListenerHandle = h;
+        })
+        .catch(() => {});
     } catch {}
 
-    return () => {
-      if (handler && typeof handler.remove === 'function') {
-        handler.remove();
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        sounds.suspend();
+      } else {
+        sounds.resume();
       }
     };
-  }, [stats]);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      removed = true;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (urlListenerHandle) urlListenerHandle.remove().catch(() => {});
+      if (stateListenerHandle) stateListenerHandle.remove().catch(() => {});
+    };
+  }, []);
 
   // Setup multiplayer socket events & query param auto-join / session reconnection
   useEffect(() => {
@@ -663,6 +701,7 @@ export const App: React.FC = () => {
 
   const handleLeaveRoom = () => {
     multiplayerSocket.leaveRoom();
+    multiplayerSocket.disconnectIfIdle();
     try {
       localStorage.removeItem('domino_mp_session');
       window.history.replaceState(null, '', window.location.pathname);
@@ -1205,6 +1244,7 @@ export const App: React.FC = () => {
   const handleForfeitAction = () => {
     if (isMultiplayer) {
       multiplayerSocket.leaveRoom();
+      multiplayerSocket.disconnectIfIdle();
       try {
         localStorage.removeItem('domino_mp_session');
         window.history.replaceState(null, '', window.location.pathname);
@@ -1818,74 +1858,87 @@ export const App: React.FC = () => {
     : humanPlayer?.hand || [];
   const isMyTurn = effectiveIsMyTurn;
 
-  const playableTileIds: string[] = [];
-  if (isMyTurn && humanPlayer) {
-    if (effectiveBoard.tiles.length === 0) {
-      if (effectiveForcedTile) {
-        playableTileIds.push(effectiveForcedTile.id);
-      } else {
-        humanHand.forEach((t) => playableTileIds.push(t.id));
-      }
-    } else {
-      humanHand.forEach((t) => {
-        const branches = getPlayableBranches(effectiveBoard, t);
-        if (branches.length > 0) {
-          playableTileIds.push(t.id);
+  const playableTileIds: string[] = useMemo(() => {
+    const ids: string[] = [];
+    if (isMyTurn && humanPlayer) {
+      if (effectiveBoard.tiles.length === 0) {
+        if (effectiveForcedTile) {
+          ids.push(effectiveForcedTile.id);
+        } else {
+          humanHand.forEach((t) => ids.push(t.id));
         }
-      });
+      } else {
+        humanHand.forEach((t) => {
+          const branches = getPlayableBranches(effectiveBoard, t);
+          if (branches.length > 0) {
+            ids.push(t.id);
+          }
+        });
+      }
     }
-  }
+    return ids;
+  }, [isMyTurn, humanPlayer, effectiveBoard, effectiveForcedTile, humanHand]);
 
   const humanHasPlayableMove = playableTileIds.length > 0;
   const currentMinReserve = getMinBoneyardReserve(
     effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant,
     effectiveInMultiplayer ? (mpGameState?.mode || '4p_duo') : mode
   );
-  const currentDrawableBoneyard = boneyard.slice(0, Math.max(0, boneyard.length - currentMinReserve));
-  const isCurrentBoardBlocked =
-    isBoardGloballyBlocked(effectiveBoard) ||
-    (!effectiveInMultiplayer &&
-      currentDrawableBoneyard.length > 0 &&
-      !canAnyTileBePlayed(effectiveBoard, currentDrawableBoneyard) &&
-      !effectivePlayers.some((p) => canAnyTileBePlayed(effectiveBoard, p.hand)));
-  const playableBranches = selectedTile
-    ? getPlayableBranches(effectiveBoard, selectedTile)
-    : [];
+  const currentDrawableBoneyard = useMemo(
+    () => boneyard.slice(0, Math.max(0, boneyard.length - currentMinReserve)),
+    [boneyard, currentMinReserve]
+  );
+  const isCurrentBoardBlocked = useMemo(
+    () =>
+      isBoardGloballyBlocked(effectiveBoard) ||
+      (!effectiveInMultiplayer &&
+        currentDrawableBoneyard.length > 0 &&
+        !canAnyTileBePlayed(effectiveBoard, currentDrawableBoneyard) &&
+        !effectivePlayers.some((p) => canAnyTileBePlayed(effectiveBoard, p.hand))),
+    [effectiveBoard, effectiveInMultiplayer, currentDrawableBoneyard, effectivePlayers]
+  );
+  const playableBranches = useMemo(
+    () => (selectedTile ? getPlayableBranches(effectiveBoard, selectedTile) : []),
+    [selectedTile, effectiveBoard]
+  );
 
   // Calculate expected scores for highlighted target branches
-  const branchExpectedScores: Record<BranchId, number> = {} as Record<
-    BranchId,
-    number
-  >;
-  if (selectedTile && playableBranches.length > 0) {
-    playableBranches.forEach((bId) => {
-      const { scoredPoints } = placeTileOnBranch(effectiveBoard, selectedTile, bId);
-      branchExpectedScores[bId] = scoredPoints;
-    });
-  }
+  const branchExpectedScores: Record<BranchId, number> = useMemo(() => {
+    const scores = {} as Record<BranchId, number>;
+    if (selectedTile && playableBranches.length > 0) {
+      playableBranches.forEach((bId) => {
+        const { scoredPoints } = placeTileOnBranch(effectiveBoard, selectedTile, bId);
+        scores[bId] = scoredPoints;
+      });
+    }
+    return scores;
+  }, [selectedTile, playableBranches, effectiveBoard]);
 
   // Available Simultaneous Double Combos for human player
-  const availableCombos =
-    allowDoubleCombo && isMyTurn && humanHand.length > 0
-      ? findDoubleCombos(humanHand, effectiveBoard)
-      : [];
+  const availableCombos = useMemo(
+    () =>
+      allowDoubleCombo && isMyTurn && humanHand.length > 0
+        ? findDoubleCombos(humanHand, effectiveBoard)
+        : [],
+    [allowDoubleCombo, isMyTurn, humanHand, effectiveBoard]
+  );
 
-  // Drag and Drop Handlers
+  // Drag and Drop Handlers (Direct DOM ref updates for 60fps zero-re-render dragging)
   const handleStartDrag = (tile: TileData, point: { x: number; y: number }) => {
     if (effectiveHandRevealed) return;
     if (effectiveInMultiplayer) {
       if (!effectiveIsMyTurn) return;
       if (effectiveForcedTile && tile.id !== effectiveForcedTile.id) return;
+      dragInitialPointRef.current = point;
       setSelectedTile(tile);
       setDraggedTile(tile);
-      setDragPosition(point);
       return;
     }
     if (currentTurn !== 0 || handRevealed) return;
     if (forcedTile && tile.id !== forcedTile.id) return;
+    dragInitialPointRef.current = point;
     setSelectedTile(tile);
     setDraggedTile(tile);
-    setDragPosition(point);
     triggerHaptic('light');
   };
 
@@ -1894,6 +1947,31 @@ export const App: React.FC = () => {
     if (!draggedTile) return;
 
     let currentHovered: BranchId | null = null;
+    let rafId: number | null = null;
+    let latestX = dragInitialPointRef.current.x;
+    let latestY = dragInitialPointRef.current.y;
+
+    // Cache target branch bounding centers once on drag start (and refresh slightly after BoardView renders target rings)
+    let cachedBranchCenters: Array<{ bId: BranchId; cx: number; cy: number }> = [];
+    const refreshBranchCache = () => {
+      const list: Array<{ bId: BranchId; cx: number; cy: number }> = [];
+      for (const bId of playableBranches) {
+        const targets = document.querySelectorAll(`[data-branch-id="${bId}"]`);
+        targets.forEach((node) => {
+          const rect = node.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) {
+            list.push({
+              bId,
+              cx: rect.left + rect.width / 2,
+              cy: rect.top + rect.height / 2
+            });
+          }
+        });
+      }
+      cachedBranchCenters = list;
+    };
+    refreshBranchCache();
+    const cacheTimer = setTimeout(refreshBranchCache, 40);
 
     const findTargetBranchAtPoint = (cx: number, cy: number): BranchId | null => {
       // 1. Direct hit via elementFromPoint
@@ -1905,23 +1983,19 @@ export const App: React.FC = () => {
         if (playableBranches.includes(bId)) return bId;
       }
 
-      // 2. Proximity hit test: Check distance to all active target rings on the board
-      // A generous magnetic radius of 140px ensures fat-finger touches snap cleanly!
+      // 2. Proximity hit test using cached target ring centers (or fallback query if empty)
+      if (cachedBranchCenters.length === 0 && playableBranches.length > 0) {
+        refreshBranchCache();
+      }
       let bestBranch: BranchId | null = null;
       let minDistance = 140;
 
-      for (const bId of playableBranches) {
-        const targets = document.querySelectorAll(`[data-branch-id="${bId}"]`);
-        targets.forEach((node) => {
-          const rect = node.getBoundingClientRect();
-          const centerX = rect.left + rect.width / 2;
-          const centerY = rect.top + rect.height / 2;
-          const dist = Math.hypot(cx - centerX, cy - centerY);
-          if (dist < minDistance) {
-            minDistance = dist;
-            bestBranch = bId;
-          }
-        });
+      for (const item of cachedBranchCenters) {
+        const dist = Math.hypot(cx - item.cx, cy - item.cy);
+        if (dist < minDistance) {
+          minDistance = dist;
+          bestBranch = item.bId;
+        }
       }
 
       if (bestBranch) return bestBranch;
@@ -1940,18 +2014,33 @@ export const App: React.FC = () => {
     };
 
     const updateDragPosition = (cx: number, cy: number) => {
-      setDragPosition({ x: cx, y: cy });
-      const target = findTargetBranchAtPoint(cx, cy);
-      if (target !== currentHovered) {
-        currentHovered = target;
-        setHoveredBranch(target);
-        if (target) {
-          triggerHaptic('light');
-        }
+      latestX = cx;
+      latestY = cy;
+      // Immediately move the floating tile overlay via DOM style (zero React re-renders!)
+      if (dragOverlayRef.current) {
+        dragOverlayRef.current.style.left = `${cx}px`;
+        dragOverlayRef.current.style.top = `${cy - 20}px`;
+      }
+      if (rafId === null) {
+        rafId = requestAnimationFrame(() => {
+          rafId = null;
+          const target = findTargetBranchAtPoint(latestX, latestY);
+          if (target !== currentHovered) {
+            currentHovered = target;
+            setHoveredBranch(target);
+            if (target) {
+              triggerHaptic('light');
+            }
+          }
+        });
       }
     };
 
     const finishDrag = (cx: number, cy: number) => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
       const targetBranch = findTargetBranchAtPoint(cx, cy);
       if (targetBranch) {
         triggerHaptic('medium');
@@ -1962,7 +2051,6 @@ export const App: React.FC = () => {
         }
       }
       setDraggedTile(null);
-      setDragPosition(null);
       setHoveredBranch(null);
     };
 
@@ -1991,7 +2079,6 @@ export const App: React.FC = () => {
         finishDrag(t.clientX, t.clientY);
       } else {
         setDraggedTile(null);
-        setDragPosition(null);
         setHoveredBranch(null);
       }
     };
@@ -2004,6 +2091,8 @@ export const App: React.FC = () => {
     window.addEventListener('touchcancel', handleTouchEnd, { passive: false });
 
     return () => {
+      clearTimeout(cacheTimer);
+      if (rafId !== null) cancelAnimationFrame(rafId);
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
       window.removeEventListener('pointercancel', handlePointerUp);
@@ -3286,13 +3375,14 @@ export const App: React.FC = () => {
         )}
       </main>
 
-      {/* Floating Dragged Domino Avatar (Follows Cursor / Touch, offset above finger on mobile) */}
-      {draggedTile && dragPosition && (
+      {/* Floating Dragged Domino Avatar (Follows Cursor / Touch via direct DOM ref — 0 React re-renders!) */}
+      {draggedTile && (
         <div
-          className="fixed pointer-events-none z-50 transform -translate-x-1/2 -translate-y-full mb-3 select-none"
+          ref={dragOverlayRef}
+          className="fixed pointer-events-none z-50 transform -translate-x-1/2 -translate-y-full mb-3 select-none will-change-transform"
           style={{
-            left: `${dragPosition.x}px`,
-            top: `${dragPosition.y - 20}px`,
+            left: `${dragInitialPointRef.current.x}px`,
+            top: `${dragInitialPointRef.current.y - 20}px`,
             filter: 'drop-shadow(0 25px 40px rgba(0,0,0,0.9))'
           }}
         >

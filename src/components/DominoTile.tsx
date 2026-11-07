@@ -27,7 +27,7 @@ const PIP_POSITIONS: Record<PipValue, [number, number][]> = {
   6: [[26, 22], [74, 22], [26, 50], [74, 50], [26, 78], [74, 78]]
 };
 
-export const DominoTile: React.FC<DominoTileProps> = ({
+const DominoTileComponent: React.FC<DominoTileProps> = ({
   tile,
   skin,
   isVertical = true,
@@ -252,3 +252,22 @@ export const DominoTile: React.FC<DominoTileProps> = ({
     </div>
   );
 };
+
+export const DominoTile = React.memo(
+  DominoTileComponent,
+  (prev, next) =>
+    prev.tile?.id === next.tile?.id &&
+    prev.tile?.left === next.tile?.left &&
+    prev.tile?.right === next.tile?.right &&
+    prev.skin.id === next.skin.id &&
+    prev.isVertical === next.isVertical &&
+    prev.isFaceDown === next.isFaceDown &&
+    prev.isPlayable === next.isPlayable &&
+    prev.isSelected === next.isSelected &&
+    prev.isSpinner === next.isSpinner &&
+    prev.scale === next.scale &&
+    prev.customWidth === next.customWidth &&
+    prev.customHeight === next.customHeight &&
+    prev.className === next.className &&
+    prev.onClick === next.onClick
+);
