@@ -65,7 +65,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#4a2810',
     tileBorder: '#231206',
     pipColor: '#fde047',
-    accentPipColor: '#ea580c',
+    accentPipColor: '#38bdf8',
     spinnerColor: '#d97706'
   },
   // 4. Walnut Wood
@@ -109,7 +109,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#eab308',
     tileBorder: '#854d0e',
     pipColor: '#451a03',
-    accentPipColor: '#b91c1c',
+    accentPipColor: '#dc2626',
     spinnerColor: '#b91c1c',
     glowEffect: '0 0 15px rgba(234, 179, 8, 0.6)'
   },
@@ -156,7 +156,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#0092bc',
     tileBorder: '#0f172a',
     pipColor: '#ffffff',
-    accentPipColor: '#e4002b',
+    accentPipColor: '#fbbf24',
     spinnerColor: '#f59e0b',
     glowEffect: '0 0 14px rgba(228, 0, 43, 0.45)',
     isFlagSkin: true,
@@ -182,7 +182,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#0057b7',
     tileBorder: '#0f172a',
     pipColor: '#ffffff',
-    accentPipColor: '#ffd700',
+    accentPipColor: '#dc2626',
     spinnerColor: '#ffd700',
     glowEffect: '0 0 14px rgba(0, 87, 183, 0.55)',
     isFlagSkin: true,
@@ -207,7 +207,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#7f1d1d',
     tileBorder: '#450a0a',
     pipColor: '#fef08a',
-    accentPipColor: '#ef4444',
+    accentPipColor: '#38bdf8',
     spinnerColor: '#f59e0b',
     glowEffect: '0 0 14px rgba(239, 68, 68, 0.5)'
   },
@@ -230,7 +230,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#172554',
     tileBorder: '#0f172a',
     pipColor: '#e0f2fe',
-    accentPipColor: '#38bdf8',
+    accentPipColor: '#fbbf24',
     spinnerColor: '#38bdf8',
     glowEffect: '0 0 12px rgba(59, 130, 246, 0.4)'
   },
@@ -253,7 +253,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#3b0764',
     tileBorder: '#2e1065',
     pipColor: '#fae8ff',
-    accentPipColor: '#f43f5e',
+    accentPipColor: '#facc15',
     spinnerColor: '#facc15'
   },
   // 10. Diamond Platinum
@@ -275,7 +275,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#cbd5e1',
     tileBorder: '#475569',
     pipColor: '#0284c7',
-    accentPipColor: '#f59e0b',
+    accentPipColor: '#dc2626',
     spinnerColor: '#0ea5e9',
     glowEffect: '0 0 15px rgba(14, 165, 233, 0.5)'
   },
@@ -298,7 +298,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#7c2d12',
     tileBorder: '#431407',
     pipColor: '#ffedd5',
-    accentPipColor: '#dc2626',
+    accentPipColor: '#38bdf8',
     spinnerColor: '#f97316'
   },
   // 12. Sheki Shabaka
@@ -477,7 +477,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#9f1239',
     tileBorder: '#4c0519',
     pipColor: '#fef08a',
-    accentPipColor: '#f43f5e',
+    accentPipColor: '#38bdf8',
     spinnerColor: '#fb923c'
   },
   // 20. Rose Gold Luxe
@@ -499,7 +499,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#fb7185',
     tileBorder: '#9f1239',
     pipColor: '#4c0519',
-    accentPipColor: '#e11d48',
+    accentPipColor: '#0284c7',
     spinnerColor: '#ffe4e6',
     glowEffect: '0 0 12px rgba(251, 113, 133, 0.5)'
   },
@@ -546,7 +546,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#382012',
     tileBorder: '#1c0f08',
     pipColor: '#fbbf24',
-    accentPipColor: '#dc2626',
+    accentPipColor: '#38bdf8',
     spinnerColor: '#d97706'
   },
   // 23. Transylvania Count (Dracula 1897)
@@ -663,7 +663,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#a90432',
     tileBorder: '#3b0710',
     pipColor: '#ffffff',
-    accentPipColor: '#fbbf24',
+    accentPipColor: '#0284c7',
     spinnerColor: '#fdb912',
     glowEffect: '0 0 14px rgba(253, 185, 18, 0.5)',
     stripes: ['#a90432', '#fdb912']
@@ -687,7 +687,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#002d72',
     tileBorder: '#0f172a',
     pipColor: '#ffffff',
-    accentPipColor: '#fed100',
+    accentPipColor: '#dc2626',
     spinnerColor: '#fed100',
     glowEffect: '0 0 14px rgba(254, 209, 0, 0.5)',
     stripes: ['#002d72', '#fed100']
@@ -711,7 +711,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#111111',
     tileBorder: '#000000',
     pipColor: '#e11d48',
-    accentPipColor: '#ffffff',
+    accentPipColor: '#06b6d4',
     spinnerColor: '#e11d48',
     glowEffect: '0 0 14px rgba(255, 255, 255, 0.45)',
     stripes: ['#111111', '#ffffff', '#111111']
@@ -735,7 +735,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#670020',
     tileBorder: '#1e1018',
     pipColor: '#ffffff',
-    accentPipColor: '#38bdf8',
+    accentPipColor: '#fbbf24',
     spinnerColor: '#1c95d4',
     glowEffect: '0 0 14px rgba(28, 149, 212, 0.45)',
     stripes: ['#670020', '#1c95d4']
@@ -759,7 +759,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#004d98',
     tileBorder: '#0d1730',
     pipColor: '#edbb00',
-    accentPipColor: '#e11d48',
+    accentPipColor: '#38bdf8',
     spinnerColor: '#edbb00',
     glowEffect: '0 0 14px rgba(237, 187, 0, 0.5)',
     stripes: ['#004d98', '#a50044', '#004d98']
@@ -783,7 +783,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#ffffff',
     tileBorder: '#d97706',
     pipColor: '#4f46e5',
-    accentPipColor: '#f59e0b',
+    accentPipColor: '#dc2626',
     spinnerColor: '#f59e0b',
     glowEffect: '0 0 16px rgba(245, 158, 11, 0.55)',
     stripes: ['#ffffff', '#f1f5f9', '#ffffff']
@@ -807,7 +807,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#09090b',
     tileBorder: '#e2e8f0',
     pipColor: '#e2e8f0',
-    accentPipColor: '#fbbf24',
+    accentPipColor: '#dc2626',
     spinnerColor: '#fbbf24',
     glowEffect: '0 0 15px rgba(251, 191, 36, 0.45)',
     stripes: ['#09090b', '#ffffff', '#09090b']
@@ -831,7 +831,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#1e3a8a',
     tileBorder: '#be185d',
     pipColor: '#ffffff',
-    accentPipColor: '#ec4899',
+    accentPipColor: '#facc15',
     spinnerColor: '#ec4899',
     glowEffect: '0 0 15px rgba(236, 72, 153, 0.5)',
     stripes: ['#1e3a8a', '#ec4899']
@@ -855,7 +855,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#111111',
     tileBorder: '#450a0a',
     pipColor: '#ffffff',
-    accentPipColor: '#dc2626',
+    accentPipColor: '#38bdf8',
     spinnerColor: '#dc2626',
     glowEffect: '0 0 14px rgba(220, 38, 38, 0.45)',
     stripes: ['#111111', '#dc2626', '#111111']
@@ -879,7 +879,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#0a0a0a',
     tileBorder: '#0369a1',
     pipColor: '#f8fafc',
-    accentPipColor: '#38bdf8',
+    accentPipColor: '#f59e0b',
     spinnerColor: '#f59e0b',
     glowEffect: '0 0 14px rgba(2, 132, 199, 0.45)',
     stripes: ['#0a0a0a', '#0284c7', '#0a0a0a']

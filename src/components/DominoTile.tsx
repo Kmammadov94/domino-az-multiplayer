@@ -127,11 +127,11 @@ const DominoTileComponent: React.FC<DominoTileProps> = ({
               <circle
                 cx={cx}
                 cy={cy}
-                r={dotRadius + 0.7}
+                r={dotRadius + 0.8}
                 fill="none"
-                stroke={isCenterDot ? accentColor : 'rgba(0,0,0,0.35)'}
+                stroke="rgba(0,0,0,0.4)"
                 strokeWidth={isCenterDot ? 1.2 : 0.8}
-                opacity={isCenterDot ? 0.75 : 0.4}
+                opacity={isCenterDot ? 0.8 : 0.5}
               />
               {/* Pip main bold dot */}
               <circle
@@ -139,8 +139,8 @@ const DominoTileComponent: React.FC<DominoTileProps> = ({
                 cy={cy}
                 r={dotRadius}
                 fill={currentPipColor}
-                stroke={isCenterDot ? 'rgba(255,255,255,0.45)' : skin.isFlagSkin ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.18)'}
-                strokeWidth={isCenterDot ? 1 : (skin.isFlagSkin ? 0.9 : 0.5)}
+                stroke={skin.isFlagSkin || skin.stripes ? 'rgba(0,0,0,0.55)' : isCenterDot ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.2)'}
+                strokeWidth={skin.isFlagSkin || skin.stripes ? 1.2 : 0.8}
               />
               {/* Pip glossy gleam */}
               <circle

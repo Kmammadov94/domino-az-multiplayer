@@ -11,7 +11,8 @@ Bütün yeniləmələr, düzəlişlər, funksionallıqlar və versiya dəyişikl
 
 ### 👁️ Daş Gözlərinin Aydınlaşdırılması & 4 və 5 Daşlarının Əlçatanlıq Fərqləndirilməsi (`src/components/DominoTile.tsx`, `src/types/domino.ts`, `src/data/skins.ts`)
 - **Rəngarəng Mərkəz Gözləri (`accentPipColor`)**:
-  - 4 və 5 daşlarının kiçik mobil ekranlarda və zəif işıqlandırmada dərhal bir baxışda seçilməsi üçün 5-in (və 1-in) mərkəz gözü seçilmiş daş dəstinə (skin) uyğunlaşdırılmış parlaq xüsusi vurğu rəngi ilə (`accentPipColor`, məs. klassik sümükdə qırmızı, qarada parlaq kian, zümrüddə mavi, qoz ağacında moruq) rəngləndi.
+  - 4 və 5 daşlarının kiçik mobil ekranlarda və zəif işıqlandırmada dərhal bir baxışda seçilməsi üçün 5-in (və 1-in) mərkəz gözü seçilmiş daş dəstinə (skin) uyğunlaşdırılmış parlaq xüsusi vurğu rəngi ilə (`accentPipColor`) rəngləndi.
+  - **Fon Rəngi ilə Toqquşmaların Düzəldilməsi**: Daş dəstlərinin fon rəngləri ilə mərkəz nöqtəsinin eyni olması tamamilə aradan qaldırıldı (məsələn, Ukrayna dəstində sarı zolaq üzərində itən sarı nöqtə parlaq qırmızı ilə əvəz olundu; zolaqlı və bayraq dəstlərinə kontrastlı qoruyucu haşiyə tətbiq edildi).
 - **Daha Aydın Çərçivə & Oyma Halqa Effekti**:
   - Bütün domino gözlərinin ətrafına kontrastlı oyma çərçivə halqası əlavə olundu; parlaq və ya qaranlıq zəmində daş nöqtələrinin itməsinin qarşısı alındı.
 - Bütün 38 daş dəsti (`DOMINO_SKINS`) yeni `accentPipColor` xüsusiyyəti ilə harmonik şəkildə yeniləndi.
