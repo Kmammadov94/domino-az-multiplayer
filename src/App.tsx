@@ -882,11 +882,16 @@ export const App: React.FC = () => {
     let dealt = dealHands(currentMode, fullDeck);
     let reshuffle = checkHandReshuffle(dealt.hands);
 
-    // Baku Reshuffle Rule: 5 of a kind without double, or 6/7 of a kind -> reshuffle for EVERYONE!
+    // Baku Reshuffle Rule: 5+ doubles, 5 of a kind without double, or 6/7 of a kind -> reshuffle for EVERYONE!
     if (reshuffle) {
       const offendingPlayer = currentPlayers[reshuffle.playerIndex]?.name || 'Oyunçu';
       const detailStr =
-        reshuffle.reason === '5_no_double'
+        reshuffle.reason === '5_or_more_doubles'
+          ? ((t as any).reshuffle5Doubles || '{count} ədəd qoşa daş').replace(
+              '{count}',
+              reshuffle.count.toString()
+            )
+          : reshuffle.reason === '5_no_double'
           ? (t.reshuffle5NoDouble || 'qoşasız 5 ədəd "{pip}" daşı').replace(
               '{pip}',
               reshuffle.pip.toString()
@@ -2325,79 +2330,56 @@ export const App: React.FC = () => {
       {/* Main Container */}
       <main className={`flex-1 relative flex flex-col min-h-0 ${!inGame ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'}`}>
         {!inGame ? (
-          /* Lobby / Game Mode Selection Screen */
-          <div className="flex-1 flex flex-col items-center justify-start sm:justify-center p-3 sm:p-6 bg-radial from-slate-900 via-slate-950 to-black relative min-h-full py-4 sm:py-8 pb-20">
-            <div className="max-w-md w-full my-auto bg-slate-900/90 border border-amber-500/30 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col items-center text-center">
-              {/* Domino Art Logo */}
-              <div className="flex items-center gap-2 mb-4">
-                <DominoTile
-                  tile={{ id: 'm-3-2', left: 3, right: 2 }}
-                  skin={activeSkin}
-                  scale={0.7}
-                  isVertical={false}
-                />
-                <DominoTile
-                  tile={{ id: 'm-6-6', left: 6, right: 6 }}
-                  skin={activeSkin}
-                  scale={0.7}
-                  isVertical={true}
-                />
-              </div>
+          /* Lobby / Game Mode Selection Screen — Clean, Breathable Frontpage Layout */
+          <div className="flex-1 flex flex-col items-center justify-start sm:justify-center p-3 sm:p-5 bg-radial from-slate-900 via-slate-950 to-black relative min-h-full py-3 sm:py-6 pb-16">
+            <div className="max-w-md w-full my-auto bg-slate-900/90 border border-amber-500/25 rounded-3xl p-4 sm:p-5 shadow-2xl flex flex-col items-center text-center">
+              {/* Top Header Row inside Card: Logo on Left, Player Profile Pill on Right */}
+              <div className="w-full flex items-center justify-between gap-2 mb-3 pb-3 border-b border-slate-800/80">
+                <div className="flex items-center gap-2 text-left">
+                  <AzerbaijanLogo size="md" showSubtitle={false} />
+                </div>
 
-              <AzerbaijanLogo size="lg" showSubtitle={true} className="mb-2" />
-              <p className="text-xs text-slate-400 mb-2">
-                {t.modes.title}
-              </p>
-
-              {/* Player Avatar Pill in Lobby */}
-              <button
-                onClick={() => {
-                  setStoreInitialTab('avatars');
-                  setShowStore(true);
-                }}
-                className="mb-4 px-3.5 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700/80 border border-amber-500/40 flex items-center gap-2.5 transition active:scale-95 group shadow-md"
-              >
-                <AvatarView
-                  avatarId={stats.equippedAvatar || DEFAULT_AVATAR_ID}
-                  frameId={stats.equippedFrame}
-                  size={34}
-                  showBorder={true}
-                />
-                <div className="flex flex-col text-left">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-black text-amber-300 group-hover:text-amber-200">
+                {/* Compact Player Profile & Skin Selector Pill */}
+                <button
+                  onClick={() => {
+                    setStoreInitialTab('avatars');
+                    setShowStore(true);
+                  }}
+                  className="px-2.5 py-1 rounded-full bg-slate-800/90 hover:bg-slate-700/90 border border-amber-500/40 flex items-center gap-2 transition active:scale-95 group shadow"
+                  title="Profil & Daş Dəstini Dəyiş"
+                >
+                  <AvatarView
+                    avatarId={stats.equippedAvatar || DEFAULT_AVATAR_ID}
+                    frameId={stats.equippedFrame}
+                    size={28}
+                    showBorder={true}
+                  />
+                  <div className="flex flex-col text-left">
+                    <span className="text-[11px] font-black text-amber-300 group-hover:text-amber-200 max-w-[90px] truncate leading-tight">
                       {googleUser?.name || 'Siz'}
                     </span>
-                    <span className="text-[9px] bg-amber-500/20 text-amber-300 font-bold px-1.5 py-0.2 rounded border border-amber-500/30">
-                      Dəyiş
+                    <span className="text-[9px] text-slate-400 font-semibold leading-tight truncate max-w-[90px]">
+                      {activeSkin.name[lang]}
                     </span>
                   </div>
-                  <span className="text-[10px] text-amber-400 font-bold flex items-center gap-1">
-                    {PLAYER_TITLES.find((t) => t.id === stats.equippedTitle)?.icon || '☕'} {PLAYER_TITLES.find((t) => t.id === stats.equippedTitle)?.title[lang] || 'Çayxana Ağsaqqalı'}
-                  </span>
-                </div>
-              </button>
+                </button>
+              </div>
 
-              {/* Optional Non-Mandatory Guest Warning Notice Banner */}
+              {/* Optional Non-Mandatory Guest Warning Notice Banner (Compact single line) */}
               {!googleUser && showGuestWarning && (
-                <div className="w-full mb-3.5 bg-gradient-to-r from-amber-950/90 via-slate-900 to-amber-950/90 border border-amber-500/60 rounded-2xl p-3 flex items-center justify-between gap-2.5 shadow-xl animate-fade-in text-left">
-                  <div className="flex items-start gap-2.5 min-w-0">
-                    <ShieldAlert className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-xs font-black text-amber-300">
-                        Qonaq rejimindəsiniz — Tərəqqiniz itə bilər!
-                      </span>
-                      <span className="text-[10px] text-slate-300 leading-tight mt-0.5">
-                        Google ilə daxil olmasanız, brauzer tarixçəsi silindikdə qızıllarınız itəcək. (Məcburi deyil)
-                      </span>
-                    </div>
+                <div className="w-full mb-3 bg-amber-950/60 border border-amber-500/40 rounded-xl px-3 py-2 flex items-center justify-between gap-2 text-left">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <ShieldAlert className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                    <span className="text-[11px] text-amber-200 font-semibold truncate">
+                      Qonaq rejimi — Qızılları buludda qoru:
+                    </span>
                   </div>
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <div className="flex items-center gap-1 flex-shrink-0">
                     <button
                       onClick={() => setShowGoogleAuthModal(true)}
-                      className="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition shadow active:scale-95 whitespace-nowrap"
+                      className="px-2 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] transition shadow active:scale-95 whitespace-nowrap"
                     >
-                      Google ilə Qoru
+                      Google Giriş
                     </button>
                     <button
                       onClick={() => {
@@ -2405,59 +2387,172 @@ export const App: React.FC = () => {
                         setGuestNoticeDismissed(true);
                       }}
                       title="Bildirişi bağla"
-                      className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+                      className="text-slate-400 hover:text-white p-0.5 rounded hover:bg-slate-800 transition"
                     >
-                      <X className="w-4 h-4" />
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* Online Multiplayer Hero Action */}
-              <button
-                onClick={() => setShowMultiplayerLobby(true)}
-                className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-[0_0_30px_rgba(20,184,166,0.35)] transition-all flex items-center justify-between group transform hover:-translate-y-0.5 border-2 border-white/40 mb-2.5"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="p-1.5 bg-slate-950/20 rounded-xl">
-                    <Globe className="w-5 h-5 text-white" />
+              {/* Primary Online Multiplayer Action + Quick Actions */}
+              <div className="w-full flex gap-2 mb-3.5">
+                <button
+                  onClick={() => setShowMultiplayerLobby(true)}
+                  className="flex-1 py-3 px-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-[0_0_25px_rgba(20,184,166,0.3)] transition-all flex items-center justify-between group active:scale-[0.99] border border-white/30"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-1.5 bg-slate-950/20 rounded-xl">
+                      <Globe className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="flex flex-col text-left">
+                      <span className="text-white font-black text-xs sm:text-sm tracking-wide">
+                        Canlı Onlayn Oyna
+                      </span>
+                      <span className="text-[10px] text-emerald-950 font-bold">
+                        Dostlarla otaq və ya ümumi masa
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex flex-col text-left">
-                    <span className="text-white font-black text-sm tracking-wide">
-                      🌐 Canlı Onlayn Oyna
-                    </span>
-                    <span className="text-[10px] text-emerald-950 font-extrabold">
-                      Otaq kodu ilə dostunu dəvət et və ya sürətli oyna
-                    </span>
-                  </div>
-                </div>
-                <span className="text-[10px] bg-slate-950 text-emerald-300 font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
-                  Multiplayer
-                </span>
-              </button>
+                  <span className="text-[9px] bg-slate-950 text-emerald-300 font-black px-2 py-0.5 rounded-full uppercase">
+                    Onlayn
+                  </span>
+                </button>
 
-              {/* Quick Actions Row: ⚡ Tələsik Oyun, 👥 Dostlar, ☕ Mərc Çayxanaları */}
-              <div className="grid grid-cols-3 gap-1.5 w-full mb-3 text-[11px]">
                 <button
                   onClick={() => {
                     triggerHaptic('medium');
                     handleQuickMatch('2p_solo', googleUser?.name || 'Siz');
                   }}
-                  className="py-2.5 px-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:brightness-110 text-slate-950 font-black flex items-center justify-center gap-1 shadow-md active:scale-95 transition"
+                  title="Sürətli 1v1 Onlayn Oyun"
+                  className="py-3 px-3 rounded-2xl bg-gradient-to-b from-amber-400 to-amber-600 hover:brightness-110 text-slate-950 font-black flex flex-col items-center justify-center gap-0.5 shadow-md active:scale-95 transition flex-shrink-0 border border-amber-300/50"
                 >
-                  <Sparkles className="w-3.5 h-3.5 fill-slate-950 flex-shrink-0" />
-                  <span className="truncate">⚡ Tələsik</span>
+                  <Sparkles className="w-4 h-4 fill-slate-950" />
+                  <span className="text-[10px] leading-none">Tələsik</span>
+                </button>
+              </div>
+
+              {/* Game Variant Switcher: Domino 101 vs Domino 365 */}
+              <div className="w-full grid grid-cols-2 gap-1.5 p-1 bg-slate-950/90 rounded-2xl border border-slate-800/80 mb-3 shadow-inner">
+                <button
+                  onClick={() => setGameVariant('101')}
+                  className={`py-2 px-3 rounded-xl font-black text-xs transition flex items-center justify-center gap-1.5 ${
+                    gameVariant === '101'
+                      ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-slate-950 shadow-md font-black'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Trophy className="w-3.5 h-3.5" />
+                  <span>Domino 101</span>
                 </button>
 
+                <button
+                  onClick={() => setGameVariant('365')}
+                  className={`py-2 px-3 rounded-xl font-black text-xs transition flex items-center justify-center gap-1.5 ${
+                    gameVariant === '365'
+                      ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 shadow-md font-black'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Telefon 365</span>
+                </button>
+              </div>
+
+              {/* Offline AI Mode Buttons — Clean 2x2 Grid / Compact Cards */}
+              <div className="w-full space-y-2">
+                {gameVariant === '101' ? (
+                  <>
+                    {/* Featured 4P Duo */}
+                    <button
+                      onClick={() => startMatch('4p_duo', '101')}
+                      className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:brightness-110 text-slate-950 font-black text-xs sm:text-sm shadow-lg transition-all flex items-center justify-between active:scale-[0.99]"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Play className="w-4 h-4 fill-slate-950" />
+                        <span>4 Nəfərlik Qoşa (2 vs 2)</span>
+                      </span>
+                      <span className="text-[10px] bg-slate-950 text-amber-300 font-bold px-2.5 py-0.5 rounded-full">
+                        🤖 Komanda • 101
+                      </span>
+                    </button>
+
+                    {/* 2P and 3P side-by-side */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => startMatch('2p_solo', '101')}
+                        className="py-2.5 px-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-100 font-bold text-xs transition flex flex-col items-start gap-1 active:scale-95"
+                      >
+                        <span className="font-extrabold text-white">2 Nəfərlik Tək</span>
+                        <span className="text-[10px] text-amber-400 font-semibold">🤖 1 vs 1 Bot</span>
+                      </button>
+
+                      <button
+                        onClick={() => startMatch('3p_solo', '101')}
+                        className="py-2.5 px-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-100 font-bold text-xs transition flex flex-col items-start gap-1 active:scale-95"
+                      >
+                        <span className="font-extrabold text-white">3 Nəfərlik Tək</span>
+                        <span className="text-[10px] text-amber-400 font-semibold">🤖 1 vs 2 Bot</span>
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Featured 4P Duo */}
+                    <button
+                      onClick={() => startMatch('4p_duo', '365')}
+                      className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-slate-950 font-black text-xs sm:text-sm shadow-lg transition-all flex items-center justify-between active:scale-[0.99]"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Play className="w-4 h-4 fill-slate-950" />
+                        <span>4 Nəfərlik Qoşa (2 vs 2)</span>
+                      </span>
+                      <span className="text-[10px] bg-slate-950 text-emerald-300 font-bold px-2.5 py-0.5 rounded-full">
+                        🤖 Komanda • 365
+                      </span>
+                    </button>
+
+                    {/* 2P, 3P, 4P Solo in a clean 3-column grid */}
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <button
+                        onClick={() => startMatch('2p_solo', '365')}
+                        className="py-2.5 px-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-100 font-bold text-xs transition flex flex-col items-center gap-0.5 active:scale-95"
+                      >
+                        <span className="font-extrabold text-white">2 Nəfərlik</span>
+                        <span className="text-[10px] text-amber-400 font-semibold">1 vs 1 Bot</span>
+                      </button>
+
+                      <button
+                        onClick={() => startMatch('3p_solo', '365')}
+                        className="py-2.5 px-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-100 font-bold text-xs transition flex flex-col items-center gap-0.5 active:scale-95"
+                      >
+                        <span className="font-extrabold text-white">3 Nəfərlik</span>
+                        <span className="text-[10px] text-amber-400 font-semibold">1 vs 2 Bot</span>
+                      </button>
+
+                      <button
+                        onClick={() => startMatch('4p_solo', '365')}
+                        className="py-2.5 px-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-100 font-bold text-xs transition flex flex-col items-center gap-0.5 active:scale-95"
+                      >
+                        <span className="font-extrabold text-white">4 Nəfərlik</span>
+                        <span className="text-[10px] text-amber-400 font-semibold">1 vs 3 Bot</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Subtle Footer Row: Friends & Teahouses */}
+              <div className="w-full grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-800/80 text-xs">
                 <button
                   onClick={() => {
                     triggerHaptic('light');
                     setShowFriendsModal(true);
                   }}
-                  className="py-2.5 px-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-teal-500/40 text-teal-300 font-bold flex items-center justify-center gap-1 shadow-md active:scale-95 transition"
+                  className="py-2 px-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/70 text-teal-300 font-bold flex items-center justify-center gap-1.5 active:scale-95 transition"
                 >
-                  <Users className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />
-                  <span className="truncate">Dostlar</span>
+                  <Users className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Dostlar</span>
                 </button>
 
                 <button
@@ -2465,191 +2560,11 @@ export const App: React.FC = () => {
                     triggerHaptic('light');
                     setShowTeahousesModal(true);
                   }}
-                  className="py-2.5 px-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-amber-500/40 text-amber-300 font-bold flex items-center justify-center gap-1 shadow-md active:scale-95 transition"
+                  className="py-2 px-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/70 text-amber-300 font-bold flex items-center justify-center gap-1.5 active:scale-95 transition"
                 >
-                  <span className="text-xs">☕</span>
-                  <span className="truncate">Mərclər</span>
+                  <span>☕</span>
+                  <span>Mərc Çayxanaları</span>
                 </button>
-              </div>
-
-              {/* Singleplayer / Offline AI Modes Header */}
-              <div className="flex items-center justify-between w-full px-1 mb-2 mt-1">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
-                  <Bot className="w-4 h-4 text-amber-400" />
-                  <span>Kompüterə (Botlara) Qarşı Oyun:</span>
-                </div>
-                <span className="text-[10px] text-amber-300 font-bold bg-slate-800/90 border border-slate-700 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                  <span>🤖</span>
-                  <span>Oflayn AI</span>
-                </span>
-              </div>
-
-              {/* Game Mode / Variant Switcher: Domino 101 vs Domino 365 */}
-              <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-950/90 rounded-2xl border border-slate-800/80 mb-2.5 shadow-inner">
-                <button
-                  onClick={() => setGameVariant('101')}
-                  className={`py-2 px-3 rounded-xl font-black text-xs transition flex items-center justify-center gap-1.5 ${
-                    gameVariant === '101'
-                      ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-slate-950 shadow-md font-black scale-[1.02]'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Trophy className="w-3.5 h-3.5" />
-                  <span>Domino 101</span>
-                  <span className="text-[9px] bg-slate-950 text-amber-300 px-1.5 py-0.5 rounded-full font-bold">
-                    Klassik
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => setGameVariant('365')}
-                  className={`py-2 px-3 rounded-xl font-black text-xs transition flex items-center justify-center gap-1.5 ${
-                    gameVariant === '365'
-                      ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 shadow-md font-black scale-[1.02]'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Domino 365</span>
-                  <span className="text-[9px] bg-slate-950 text-emerald-300 px-1.5 py-0.5 rounded-full font-bold">
-                    Telefon
-                  </span>
-                </button>
-              </div>
-
-              {/* Mode Buttons */}
-              <div className="w-full space-y-2.5">
-                {gameVariant === '101' ? (
-                  <>
-                    {/* 4 Player Duo */}
-                    <button
-                      onClick={() => startMatch('4p_duo', '101')}
-                      className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-xl transition-all flex items-center justify-between group transform hover:-translate-y-0.5"
-                    >
-                      <span className="flex items-center gap-2">
-                        <Play className="w-4 h-4 fill-slate-950" />
-                        <span>4 Nəfərlik Qoşa (2 vs 2 Cütlük)</span>
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] bg-slate-950 text-slate-300 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                          🤖 3 Botla
-                        </span>
-                        <span className="text-[10px] bg-slate-950 text-amber-300 font-bold px-2 py-0.5 rounded-full">
-                          101 XAL
-                        </span>
-                      </div>
-                    </button>
-
-                    {/* 3 Player Solo */}
-                    <button
-                      onClick={() => startMatch('3p_solo', '101')}
-                      className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition flex items-center justify-between"
-                    >
-                      <span className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-amber-400" />
-                        <span>3 Nəfərlik Tək</span>
-                        <span className="text-slate-400 font-normal text-xs">(3 Oyunçu)</span>
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] bg-slate-950 text-slate-300 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                          🤖 2 Botla
-                        </span>
-                        <span className="text-[10px] bg-slate-950 text-amber-300 font-bold px-2 py-0.5 rounded-full">
-                          101 XAL
-                        </span>
-                      </div>
-                    </button>
-
-                    {/* 2 Player Solo */}
-                    <button
-                      onClick={() => startMatch('2p_solo', '101')}
-                      className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition flex items-center justify-between"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <span>2 Nəfərlik Tək</span>
-                        <span className="text-slate-400 font-normal text-xs">(Siz vs Bot)</span>
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] bg-slate-950 text-slate-300 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                          🤖 1 vs 1 Bot
-                        </span>
-                        <span className="text-[10px] bg-slate-950 text-amber-300 font-bold px-2 py-0.5 rounded-full">
-                          101 XAL
-                        </span>
-                      </div>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => startMatch('4p_duo', '365')}
-                      className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-xl transition-all flex items-center justify-between group transform hover:-translate-y-0.5"
-                    >
-                      <span className="flex items-center gap-2">
-                        <Play className="w-4 h-4 fill-slate-950" />
-                        <span>4 Nəfərlik Qoşa (2 vs 2 Cütlük)</span>
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] bg-slate-950 text-slate-300 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                          🤖 3 Botla
-                        </span>
-                        <span className="text-[10px] bg-slate-950 text-emerald-300 font-bold px-2 py-0.5 rounded-full">
-                          365 XAL
-                        </span>
-                      </div>
-                    </button>
-
-                    <button
-                      onClick={() => startMatch('2p_solo', '365')}
-                      className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition flex items-center justify-between"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <span>2 Nəfərlik Tək</span>
-                        <span className="text-slate-400 font-normal text-xs">(Siz vs Bot)</span>
-                      </span>
-                      <span className="text-amber-400/90 text-xs font-semibold bg-slate-900/60 px-2 py-0.5 rounded-md border border-slate-700/60">
-                        🤖 1 vs 1 Bot
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={() => startMatch('3p_solo', '365')}
-                      className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition flex items-center justify-between"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <span>3 Nəfərlik Tək</span>
-                        <span className="text-slate-400 font-normal text-xs">(Siz vs 2 Bot)</span>
-                      </span>
-                      <span className="text-amber-400/90 text-xs font-semibold bg-slate-900/60 px-2 py-0.5 rounded-md border border-slate-700/60">
-                        🤖 1 vs 2 Bot
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={() => startMatch('4p_solo', '365')}
-                      className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition flex items-center justify-between"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <span>4 Nəfərlik Tək</span>
-                        <span className="text-slate-400 font-normal text-xs">(Siz vs 3 Bot)</span>
-                      </span>
-                      <span className="text-amber-400/90 text-xs font-semibold bg-slate-900/60 px-2 py-0.5 rounded-md border border-slate-700/60">
-                        🤖 1 vs 3 Bot
-                      </span>
-                    </button>
-                  </>
-                )}
-              </div>
-
-              {/* Equipped Skin Pill */}
-              <div
-                onClick={() => setShowStore(true)}
-                className="mt-6 flex items-center gap-2 text-xs text-slate-400 cursor-pointer hover:text-amber-300 transition"
-              >
-                <span>Dəst:</span>
-                <span className="font-bold text-amber-400 underline">
-                  {activeSkin.name[lang]}
-                </span>
               </div>
             </div>
           </div>
@@ -2876,7 +2791,7 @@ export const App: React.FC = () => {
               );
             })()}
 
-            {/* 2. In 3P Trio: Opponent 1 (Top-Left) and Opponent 2 (Top-Right) */}
+            {/* 2. In 3P Trio: Opponent 1 (Lower-Left Side) and Opponent 2 (Lower-Right Side) with Clustered 2-Column Dominoes */}
             {effectivePlayers.length === 3 && (() => {
               const leftIdx = (localPlayerIndex + 1) % 3;
               const rightIdx = (localPlayerIndex + 2) % 3;
@@ -2896,7 +2811,8 @@ export const App: React.FC = () => {
                 : (rightOpponent?.score ?? 0);
               return (
                 <>
-                  <div className="absolute top-1.5 left-[28%] sm:left-[34%] -translate-x-1/2 z-10 flex flex-col items-center">
+                  {/* Left Side Opponent (Moved closer to bottom & 2-column staggered tile cluster) */}
+                  <div className="absolute left-1.5 sm:left-3 bottom-24 sm:bottom-28 z-10 flex flex-col items-start">
                     <div
                       onClick={() => {
                         triggerHaptic('light');
@@ -2915,7 +2831,7 @@ export const App: React.FC = () => {
                       className={`flex items-center gap-1 mb-1 backdrop-blur-sm px-2 py-0.5 rounded-full border shadow cursor-pointer active:scale-95 transition-all group ${
                         isLeftTurn
                           ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
-                          : 'bg-slate-900/80 hover:bg-slate-800/90 border-slate-700/60'
+                          : 'bg-slate-900/85 hover:bg-slate-800/95 border-slate-700/70'
                       }`}
                     >
                       <div className="relative">
@@ -2931,7 +2847,7 @@ export const App: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      <span className={`text-[10px] font-bold ${isLeftTurn ? 'text-amber-300 font-black' : 'text-slate-300'}`}>
+                      <span className={`text-[10px] font-bold max-w-[75px] sm:max-w-[110px] truncate ${isLeftTurn ? 'text-amber-300 font-black' : 'text-slate-200'}`}>
                         {leftOpponent?.name} ({leftOpponent?.hand.length})
                       </span>
                       <span className="px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[9px] font-black">
@@ -2939,7 +2855,7 @@ export const App: React.FC = () => {
                       </span>
                       {isLeftTurn && (
                         <span className="px-1 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[8px] font-black animate-pulse">
-                          🎯 Növbə
+                          🎯
                         </span>
                       )}
                       <span className="text-[10px] group-hover:scale-125 transition-transform">🎁</span>
@@ -2953,21 +2869,23 @@ export const App: React.FC = () => {
                         {leftNotice.text}
                       </div>
                     )}
-                    <div className={`flex items-center gap-1 transition-all ${isLeftTurn ? 'ring-2 ring-amber-400/50 rounded-md p-0.5' : ''}`}>
+                    <div className={`grid grid-cols-2 gap-1 bg-slate-950/45 backdrop-blur-xs p-1 rounded-xl border border-slate-800/60 transition-all ${isLeftTurn ? 'ring-2 ring-amber-400/60 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
                       {leftOpponent?.hand.map((tile, i) => (
-                        <DominoTile
-                          key={tile.id || i}
-                          tile={tile}
-                          skin={activeSkin}
-                          isFaceDown={!effectiveHandRevealed}
-                          scale={0.5}
-                          isVertical={false}
-                        />
+                        <div key={tile.id || i} className={i % 2 === 1 ? 'translate-y-0.5' : ''}>
+                          <DominoTile
+                            tile={tile}
+                            skin={activeSkin}
+                            isFaceDown={!effectiveHandRevealed}
+                            scale={0.44}
+                            isVertical={false}
+                          />
+                        </div>
                       ))}
                     </div>
                   </div>
 
-                  <div className="absolute top-1.5 left-[72%] sm:left-[66%] -translate-x-1/2 z-10 flex flex-col items-center">
+                  {/* Right Side Opponent (Moved closer to bottom & 2-column staggered tile cluster) */}
+                  <div className="absolute right-1.5 sm:right-3 bottom-24 sm:bottom-28 z-10 flex flex-col items-end">
                     <div
                       onClick={() => {
                         triggerHaptic('light');
@@ -2986,7 +2904,7 @@ export const App: React.FC = () => {
                       className={`flex items-center gap-1 mb-1 backdrop-blur-sm px-2 py-0.5 rounded-full border shadow cursor-pointer active:scale-95 transition-all group ${
                         isRightTurn
                           ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
-                          : 'bg-slate-900/80 hover:bg-slate-800/90 border-slate-700/60'
+                          : 'bg-slate-900/85 hover:bg-slate-800/95 border-slate-700/70'
                       }`}
                     >
                       <div className="relative">
@@ -3002,7 +2920,7 @@ export const App: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      <span className={`text-[10px] font-bold ${isRightTurn ? 'text-amber-300 font-black' : 'text-slate-300'}`}>
+                      <span className={`text-[10px] font-bold max-w-[75px] sm:max-w-[110px] truncate ${isRightTurn ? 'text-amber-300 font-black' : 'text-slate-200'}`}>
                         {rightOpponent?.name} ({rightOpponent?.hand.length})
                       </span>
                       <span className="px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[9px] font-black">
@@ -3010,7 +2928,7 @@ export const App: React.FC = () => {
                       </span>
                       {isRightTurn && (
                         <span className="px-1 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[8px] font-black animate-pulse">
-                          🎯 Növbə
+                          🎯
                         </span>
                       )}
                       <span className="text-[10px] group-hover:scale-125 transition-transform">🎁</span>
@@ -3024,16 +2942,17 @@ export const App: React.FC = () => {
                         {rightNotice.text}
                       </div>
                     )}
-                    <div className={`flex items-center gap-1 transition-all ${isRightTurn ? 'ring-2 ring-amber-400/50 rounded-md p-0.5' : ''}`}>
+                    <div className={`grid grid-cols-2 gap-1 bg-slate-950/45 backdrop-blur-xs p-1 rounded-xl border border-slate-800/60 transition-all ${isRightTurn ? 'ring-2 ring-amber-400/60 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
                       {rightOpponent?.hand.map((tile, i) => (
-                        <DominoTile
-                          key={tile.id || i}
-                          tile={tile}
-                          skin={activeSkin}
-                          isFaceDown={!effectiveHandRevealed}
-                          scale={0.5}
-                          isVertical={false}
-                        />
+                        <div key={tile.id || i} className={i % 2 === 1 ? 'translate-y-0.5' : ''}>
+                          <DominoTile
+                            tile={tile}
+                            skin={activeSkin}
+                            isFaceDown={!effectiveHandRevealed}
+                            scale={0.44}
+                            isVertical={false}
+                          />
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -3041,7 +2960,7 @@ export const App: React.FC = () => {
               );
             })()}
 
-            {/* 3. In 4P (Duo or Solo): Partner at Top, Opponents at Upper-Left and Upper-Right */}
+            {/* 3. In 4P (Duo or Solo): Partner at Top, Opponents at Lower-Left and Lower-Right with Clustered 2-Column Dominoes */}
             {effectivePlayers.length === 4 && (() => {
               const topIdx = (localPlayerIndex + 2) % 4;
               const leftIdx = (localPlayerIndex + 1) % 4;
@@ -3129,8 +3048,8 @@ export const App: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Upper Left Opponent */}
-                  <div className="absolute left-1.5 sm:left-3 top-14 sm:top-16 z-10 flex flex-col items-start sm:items-center">
+                  {/* Lower Left Opponent (Moved closer to bottom & 2-column staggered tile cluster) */}
+                  <div className="absolute left-1.5 sm:left-3 bottom-24 sm:bottom-28 z-10 flex flex-col items-start">
                     <div
                       onClick={() => {
                         triggerHaptic('light');
@@ -3145,10 +3064,10 @@ export const App: React.FC = () => {
                           });
                         }
                       }}
-                      className={`flex items-center gap-1 mb-0.5 px-2 py-0.5 rounded-full border shadow cursor-pointer active:scale-95 transition-all group ${
+                      className={`flex items-center gap-1 mb-1 px-2 py-0.5 rounded-full border shadow cursor-pointer active:scale-95 transition-all group ${
                         isLeftTurn
                           ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
-                          : 'bg-slate-900/80 hover:bg-slate-800/90 border-slate-700'
+                          : 'bg-slate-900/85 hover:bg-slate-800/95 border-slate-700'
                       }`}
                       title={`${leftOpponent?.name} üçün hədiyyə göndər`}
                     >
@@ -3165,7 +3084,7 @@ export const App: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      <span className={`text-[10px] font-bold ${isLeftTurn ? 'text-amber-300 font-black' : 'text-slate-300'}`}>
+                      <span className={`text-[10px] font-bold max-w-[75px] sm:max-w-[110px] truncate ${isLeftTurn ? 'text-amber-300 font-black' : 'text-slate-200'}`}>
                         {leftOpponent?.name} ({leftOpponent?.hand.length})
                       </span>
                       <span className="px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[9px] font-black">
@@ -3173,7 +3092,7 @@ export const App: React.FC = () => {
                       </span>
                       {isLeftTurn && (
                         <span className="px-1 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[8px] font-black animate-pulse">
-                          🎯 Növbə
+                          🎯
                         </span>
                       )}
                       <span className="text-[10px] group-hover:scale-125 transition-transform">🎁</span>
@@ -3187,22 +3106,23 @@ export const App: React.FC = () => {
                         {leftNotice.text}
                       </div>
                     )}
-                    <div className={`flex flex-col items-center ${!effectiveHandRevealed ? '-space-y-3.5 sm:space-y-0 sm:gap-1' : 'gap-1'} transition-all ${isLeftTurn ? 'ring-2 ring-amber-400/50 rounded-lg p-0.5 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
+                    <div className={`grid grid-cols-2 gap-1 bg-slate-950/45 backdrop-blur-xs p-1 rounded-xl border border-slate-800/60 transition-all ${isLeftTurn ? 'ring-2 ring-amber-400/60 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
                       {leftOpponent?.hand.map((tile, i) => (
-                        <DominoTile
-                          key={tile.id || i}
-                          tile={tile}
-                          skin={activeSkin}
-                          isFaceDown={!effectiveHandRevealed}
-                          scale={0.45}
-                          isVertical={true}
-                        />
+                        <div key={tile.id || i} className={i % 2 === 1 ? 'translate-y-0.5' : ''}>
+                          <DominoTile
+                            tile={tile}
+                            skin={activeSkin}
+                            isFaceDown={!effectiveHandRevealed}
+                            scale={0.44}
+                            isVertical={false}
+                          />
+                        </div>
                       ))}
                     </div>
                   </div>
 
-                  {/* Upper Right Opponent */}
-                  <div className="absolute right-1.5 sm:right-3 top-14 sm:top-16 z-10 flex flex-col items-end sm:items-center">
+                  {/* Lower Right Opponent (Moved closer to bottom & 2-column staggered tile cluster) */}
+                  <div className="absolute right-1.5 sm:right-3 bottom-24 sm:bottom-28 z-10 flex flex-col items-end">
                     <div
                       onClick={() => {
                         triggerHaptic('light');
@@ -3217,10 +3137,10 @@ export const App: React.FC = () => {
                           });
                         }
                       }}
-                      className={`flex items-center gap-1 mb-0.5 px-2 py-0.5 rounded-full border shadow cursor-pointer active:scale-95 transition-all group ${
+                      className={`flex items-center gap-1 mb-1 px-2 py-0.5 rounded-full border shadow cursor-pointer active:scale-95 transition-all group ${
                         isRightTurn
                           ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
-                          : 'bg-slate-900/80 hover:bg-slate-800/90 border-slate-700'
+                          : 'bg-slate-900/85 hover:bg-slate-800/95 border-slate-700'
                       }`}
                       title={`${rightOpponent?.name} üçün hədiyyə göndər`}
                     >
@@ -3237,7 +3157,7 @@ export const App: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      <span className={`text-[10px] font-bold ${isRightTurn ? 'text-amber-300 font-black' : 'text-slate-300'}`}>
+                      <span className={`text-[10px] font-bold max-w-[75px] sm:max-w-[110px] truncate ${isRightTurn ? 'text-amber-300 font-black' : 'text-slate-200'}`}>
                         {rightOpponent?.name} ({rightOpponent?.hand.length})
                       </span>
                       <span className="px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[9px] font-black">
@@ -3245,7 +3165,7 @@ export const App: React.FC = () => {
                       </span>
                       {isRightTurn && (
                         <span className="px-1 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[8px] font-black animate-pulse">
-                          🎯 Növbə
+                          🎯
                         </span>
                       )}
                       <span className="text-[10px] group-hover:scale-125 transition-transform">🎁</span>
@@ -3259,16 +3179,17 @@ export const App: React.FC = () => {
                         {rightNotice.text}
                       </div>
                     )}
-                    <div className={`flex flex-col items-center ${!effectiveHandRevealed ? '-space-y-3.5 sm:space-y-0 sm:gap-1' : 'gap-1'} transition-all ${isRightTurn ? 'ring-2 ring-amber-400/50 rounded-lg p-0.5 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
+                    <div className={`grid grid-cols-2 gap-1 bg-slate-950/45 backdrop-blur-xs p-1 rounded-xl border border-slate-800/60 transition-all ${isRightTurn ? 'ring-2 ring-amber-400/60 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
                       {rightOpponent?.hand.map((tile, i) => (
-                        <DominoTile
-                          key={tile.id || i}
-                          tile={tile}
-                          skin={activeSkin}
-                          isFaceDown={!effectiveHandRevealed}
-                          scale={0.45}
-                          isVertical={true}
-                        />
+                        <div key={tile.id || i} className={i % 2 === 1 ? 'translate-y-0.5' : ''}>
+                          <DominoTile
+                            tile={tile}
+                            skin={activeSkin}
+                            isFaceDown={!effectiveHandRevealed}
+                            scale={0.44}
+                            isVertical={false}
+                          />
+                        </div>
                       ))}
                     </div>
                   </div>

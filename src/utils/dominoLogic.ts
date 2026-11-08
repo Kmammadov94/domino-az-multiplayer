@@ -45,14 +45,15 @@ export const dealHands = (
   return { hands, boneyard };
 };
 
-// Baku Reshuffle Rule:
-// 1. If a player gets 5 of a kind (e.g. 5 3s) WITHOUT the double (e.g. no [3:3]), reshuffle for everyone!
-// 2. If a player gets 6 or 7 of a kind, DIRECT reshuffle for everyone even if they have the double!
+// Baku Reshuffle Rule (applies across ALL game modes — Singleplayer, Multiplayer, Domino 101 & Telefon 365):
+// 1. If a player gets 5 or more DOUBLES (e.g. [0:0], [1:1], [2:2], [3:3], [4:4]), reshuffle for everyone!
+// 2. If a player gets 5 of a kind (e.g. five 3s) WITHOUT the double (e.g. no [3:3]), reshuffle for everyone!
+// 3. If a player gets 6 or 7 of a kind, DIRECT reshuffle for everyone even if they have the double!
 export interface ReshuffleReason {
   playerIndex: number;
   pip: number;
   count: number;
-  reason: '5_no_double' | '6_or_7_kind';
+  reason: '5_no_double' | '6_or_7_kind' | '5_or_more_doubles';
 }
 
 export const checkHandReshuffle = (hands: TileData[][]): ReshuffleReason | null => {
@@ -62,11 +63,22 @@ export const checkHandReshuffle = (hands: TileData[][]): ReshuffleReason | null 
     const hand = hands[pIdx];
     if (!hand || !Array.isArray(hand)) continue;
 
+    // 1. Check for 5 or more doubles (5, 6, or 7 qoşa daş)
+    const doublesCount = hand.filter((t) => t && t.left === t.right).length;
+    if (doublesCount >= 5) {
+      return {
+        playerIndex: pIdx,
+        pip: -1,
+        count: doublesCount,
+        reason: '5_or_more_doubles'
+      };
+    }
+
     for (let pip = 0; pip <= 6; pip++) {
       const matchingTiles = hand.filter(t => t && (t.left === pip || t.right === pip));
       const count = matchingTiles.length;
 
-      // 6 or 7 of a kind: automatic direct reshuffle for everyone!
+      // 2. 6 or 7 of a kind: automatic direct reshuffle for everyone!
       if (count >= 6) {
         return {
           playerIndex: pIdx,
@@ -76,7 +88,7 @@ export const checkHandReshuffle = (hands: TileData[][]): ReshuffleReason | null 
         };
       }
 
-      // 5 of a kind: reshuffle if they do NOT hold the double [pip:pip]
+      // 3. 5 of a kind: reshuffle if they do NOT hold the double [pip:pip]
       if (count === 5) {
         const hasDouble = hand.some(t => t && t.left === pip && t.right === pip);
         if (!hasDouble) {

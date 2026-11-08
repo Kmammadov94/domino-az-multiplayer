@@ -4,6 +4,26 @@ Bütün yeniləmələr, düzəlişlər, funksionallıqlar və versiya dəyişikl
 
 ---
 
+## [1.1.6] — 2026-11-08 (Google Play Closed Beta v3 — `versionCode 4`, 5+ Qoşa Daş Yenidən Paylanma Qaydası, 3P/4P Yan Rəqib Dizaynı & Təmiz Ana Səhifə)
+
+### 📦 Google Play Closed Beta Yeniləməsi (`versionCode: 4`, `versionName: "1.1.6"`)
+- `android/app/build.gradle` daxilində `versionCode` **3 → 4**, `versionName` isə **"1.1.5" → "1.1.6"** olaraq yeniləndi. Yeni `Domino-AZ-GooglePlay.aab` paketi Google Play Console üçün hazırlandı.
+
+### 🎲 Oyun Qaydaları (Bütün Rejimlərdə: Oflayn AI, Onlayn Multiplayer, Domino 101 & Telefon 365)
+- **5 və ya Daha Çox Qoşa Daş Düşdükdə Yenidən Paylanma (`src/utils/dominoLogic.ts`, `src/App.tsx`, `server/gameRoom.ts`, `src/i18n/translations.ts`, `src/components/RulesModal.tsx`)**:
+  - Qoşasız 5 eyni daş (`5_no_double`) və 6/7 eyni daş (`6_or_7_kind`) qaydaları ilə yanaşı, hər hansı oyunçunun əlinə **5, 6 və ya 7 ədəd qoşa daş (`5_or_more_doubles`)** düşdükdə daşlar hamı üçün avtomatik yenidən qarışdırılır və paylanılır.
+  - Bu qayda həm tək nəfərlik (botlarla), həm onlayn multiplayer, həm **Domino 101**, həm də **Telefon 365** rejimlərində eyni qaydada işləyir.
+
+### 🎨 İnterfeys (UI / UX) Təkmilləşdirmələri
+- **3 və 4 Nəfərlik Oyunlarda Yan Rəqiblərin Aşağıya Yaxınlaşdırılması və 2 Sütunlu Daş Düzülüşü (`src/App.tsx`)**:
+  - 3P və 4P oyunlarında sol və sağ tərəfdəki rəqiblər ekranın yuxarı küncündən daha aşağıya (`bottom-24 sm:bottom-28`) endirildi ki, həm yuxarıdakı tərəfdaş/panel ilə sıxlıq yaratmasın, həm də mərkəzi domino xəttinə mane olmasın.
+  - Yan rəqiblərin daşları tək uzun sətir əvəzinə səliqəli **2 sütunlu pilləli klaster (`grid-cols-2`)** şəklində düzüldü.
+- **Daha Təmiz və Yığcam Ana Səhifə (Lobby) Dizaynı (`src/App.tsx`)**:
+  - Ana səhifədəki artıq başlıqlar, dekorativ daşlar və təkrarlanan sətirlər yığışdırıldı; loqo və oyunçu/dəst seçimi tək başlıq sətrində birləşdirildi.
+  - Onlayn oyun və ⚡ Tələsik düymələri yan-yana yerləşdirildi, oflayn bot rejimləri isə (2P, 3P, 4P) səliqəli şəbəkə (`grid`) kartları şəklində tərtib olundu.
+
+---
+
 ## [1.1.5] — 2026-11-07 (Google Play Closed Beta v2 — `versionCode 3`, Performans, Batareya Qənaəti və Kritik Kod Audit Düzəlişləri)
 
 ### 📦 Google Play Closed Beta Yeniləməsi (`versionCode: 3`, `versionName: "1.1.5"`)

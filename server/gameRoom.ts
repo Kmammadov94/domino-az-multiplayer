@@ -287,11 +287,13 @@ export class GameRoom {
     let dealt = dealHands(this.mode, fullDeck);
     let reshuffle = checkHandReshuffle(dealt.hands);
 
-    // Baku Reshuffle Rule: 5 of a kind without double or 6/7 of a kind -> reshuffle!
+    // Baku Reshuffle Rule: 5+ doubles, 5 of a kind without double, or 6/7 of a kind -> reshuffle!
     if (reshuffle) {
       const offending = this.players[reshuffle.playerIndex]?.name || 'Oyunçu';
       const detail =
-        reshuffle.reason === '5_no_double'
+        reshuffle.reason === '5_or_more_doubles'
+          ? `${reshuffle.count} ədəd qoşa daş`
+          : reshuffle.reason === '5_no_double'
           ? `qoşasız 5 ədəd "${reshuffle.pip}" daşı`
           : `${reshuffle.count} ədəd "${reshuffle.pip}" daşı`;
 

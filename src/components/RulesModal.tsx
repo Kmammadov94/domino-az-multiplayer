@@ -42,7 +42,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose, lang })
                   İlk əldə oyuna <strong>[3:2]</strong> daşı olan oyunçu başlayır. Əgər heç kimdə [3:2] yoxdursa, ən kiçik qoşadan (<strong>[1:1]</strong>-dən başlayaraq; [0:0] başlaya bilməz) başlanılır. Sonrakı əllərdə əvvəlki əlin qalibi istədiyi daşla başlayır.
                 </p>
                 <p className="mt-2 text-amber-200/90 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20 text-xs">
-                  <strong>Yenidən Paylanma Qaydası:</strong> Oyunçulardan hər hansı birinə <strong>qoşasız 5 eyni daş</strong> (məsələn: [3:3] olmadan 5 ədəd «3») düşərsə, yaxud <strong>6 və ya 7 eyni daş</strong> düşərsə (qoşa olsa belə), daşlar hamı üçün mütləq yenidən qarışdırılır və təzədən paylanılır!
+                  <strong>Yenidən Paylanma Qaydası (Bütün Rejimlərdə):</strong> Oyunçulardan hər hansı birinə <strong>5 və ya daha çox qoşa daş</strong> (məsələn: 5 ədəd qoşa), <strong>qoşasız 5 eyni daş</strong> (məsələn: [3:3] olmadan 5 ədəd «3»), yaxud <strong>6 və ya 7 eyni daş</strong> düşərsə, daşlar hamı üçün mütləq yenidən qarışdırılır və təzədən paylanılır!
                 </p>
               </section>
 
@@ -108,7 +108,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose, lang })
                   В первой сдаче начинает обладатель кости <strong>[3:2]</strong>. Если ни у кого нет [3:2], то право хода переходит к младшему дублю начиная с <strong>[1:1]</strong> (дубль [0:0] не начинает). В следующих сдачах начинает победитель предыдущей сдачи любой костью.
                 </p>
                 <p className="mt-2 text-amber-200/90 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20 text-xs">
-                  <strong>Правило пересдачи:</strong> Если игроку при раздаче выпадает <strong>5 костей одного достоинства без дубля</strong> (напр. 5 троек без [3:3]) или <strong>6-7 костей одного достоинства</strong>, объявляется полная пересдача для всех игроков!
+                  <strong>Правило пересдачи (Во всех режимах):</strong> Если игроку при раздаче выпадает <strong>5 и более дублей</strong>, <strong>5 костей одного достоинства без дубля</strong> (напр. 5 троек без [3:3]) или <strong>6-7 костей одного достоинства</strong>, объявляется полная пересдача для всех игроков!
                 </p>
               </section>
 
@@ -164,7 +164,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose, lang })
                   The first hand begins with the player holding <strong>[3:2]</strong>. If no one has [3:2], the lowest double starting from <strong>[1:1]</strong> leads ([0:0] cannot start). In subsequent hands, the winner leads with any tile.
                 </p>
                 <p className="mt-2 text-amber-200/90 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20 text-xs">
-                  <strong>Reshuffle Rule:</strong> If any player is dealt <strong>5 of a kind without the double</strong> (e.g. five 3s without [3:3]) or <strong>6-7 of a kind</strong>, all 28 tiles must be reshuffled and re-dealt for everyone!
+                  <strong>Reshuffle Rule (All Modes):</strong> If any player is dealt <strong>5 or more doubles</strong>, <strong>5 of a kind without the double</strong> (e.g. five 3s without [3:3]), or <strong>6-7 of a kind</strong>, all 28 tiles must be reshuffled and re-dealt for everyone!
                 </p>
               </section>
 
