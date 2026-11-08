@@ -4,6 +4,34 @@ Bütün yeniləmələr, düzəlişlər, funksionallıqlar və versiya dəyişikl
 
 ---
 
+## [1.1.7] — 2026-11-08 (Google Play Closed Beta v4 — `versionCode 5`, Daş Gözlərinin Aydınlaşdırılması & 4 vs 5 Əlçatanlığı, Bazarın Avtomatik Bağlanması, Masa Düzülüşü & Qələbə Mesajları)
+
+### 📦 Google Play Closed Beta Yeniləməsi (`versionCode: 5`, `versionName: "1.1.7"`)
+- `android/app/build.gradle` daxilində `versionCode` **4 → 5**, `versionName` isə **"1.1.6" → "1.1.7"** olaraq yeniləndi. Yeni `Domino-AZ-GooglePlay.aab` paketi Google Play Console üçün hazırlandı.
+
+### 👁️ Daş Gözlərinin Aydınlaşdırılması & 4 və 5 Daşlarının Əlçatanlıq Fərqləndirilməsi (`src/components/DominoTile.tsx`, `src/types/domino.ts`, `src/data/skins.ts`)
+- **Rəngarəng Mərkəz Gözləri (`accentPipColor`)**:
+  - 4 və 5 daşlarının kiçik mobil ekranlarda və zəif işıqlandırmada dərhal bir baxışda seçilməsi üçün 5-in (və 1-in) mərkəz gözü seçilmiş daş dəstinə (skin) uyğunlaşdırılmış parlaq xüsusi vurğu rəngi ilə (`accentPipColor`, məs. klassik sümükdə qırmızı, qarada parlaq kian, zümrüddə mavi, qoz ağacında moruq) rəngləndi.
+- **Daha Aydın Çərçivə & Oyma Halqa Effekti**:
+  - Bütün domino gözlərinin ətrafına kontrastlı oyma çərçivə halqası əlavə olundu; parlaq və ya qaranlıq zəmində daş nöqtələrinin itməsinin qarşısı alındı.
+- Bütün 38 daş dəsti (`DOMINO_SKINS`) yeni `accentPipColor` xüsusiyyəti ilə harmonik şəkildə yeniləndi.
+
+### 🛒 Bazarın Avtomatik Bağlanması (`src/components/BazaarTray.tsx`)
+- Oyunçu bazardan daş götürdükdə və ya gediş imkanı yarandıqda/əl bitdikdə bazar tepsisi (`BazaarTray`) avtomatik bağlanır; növbəti ələ və ya rəqibin növbəsinə açıq qalmır.
+
+### 🏆 Qələbə Mesajlarının Təkmilləşdirilməsi (`src/components/GameEndModal.tsx`)
+- 1v1 (2 nəfərlik tək) və bütün solo rejimlərdə əl bitəndə "Komandanız Qazandı!" mesajı əvəzinə doğru olaraq **"Siz Qazandınız!"** göstərilir. Komanda mesajı yalnız 4 nəfərlik qoşa (2 vs 2) rejimində saxlanıldı.
+
+### 🎨 Stol və Masa Düzülüşü Təkmilləşdirmələri (`src/App.tsx`)
+- **3 və 4 Nəfərlik Rejimdə Yan Rəqiblərin Şaquli Mərkəzləşdirilməsi**:
+  - Sol və sağ tərəfdəki rəqiblərin mövqeyi çox aşağıdan mərkəzə (`top-[44%] -translate-y-1/2`) qaldırıldı; masa boyunca balanslı və rahat yerləşdi.
+- **4P Duo Tərəfdaş və 2P Rəqib Daşlarının Yığcamlaşdırılması**:
+  - Yuxarıdakı oyunçunun daşları ekranın sağ və soluna həddindən artıq uzanmaması üçün örtüşən (`-space-x-3.5 sm:-space-x-4`) yığcam kart/daş stili ilə mərkəzləşdirildi.
+- **Balanslı və Geniş Ana Səhifə (Lobby) Nisbətləri**:
+  - Ana səhifə kartının ölçüləri və şaquli nisbətləri (`max-w-lg`, `min-h-[76vh] sm:min-h-[80vh]`, rahat daxili boşluqlar) genişləndirildi; ekranın ortasında balaca qutucuq kimi qalması və yuxarı-aşağıdakı boşluq tam aradan qaldırıldı.
+
+---
+
 ## [1.1.6] — 2026-11-08 (Google Play Closed Beta v3 — `versionCode 4`, 5+ Qoşa Daş Yenidən Paylanma Qaydası, 3P/4P Yan Rəqib Dizaynı & Təmiz Ana Səhifə)
 
 ### 📦 Google Play Closed Beta Yeniləməsi (`versionCode: 4`, `versionName: "1.1.6"`)

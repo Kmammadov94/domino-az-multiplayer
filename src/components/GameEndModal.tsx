@@ -287,7 +287,9 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
                 <span className="text-amber-400">🤝 Seka! (Bərabərlik)</span>
               ) : userWon ? (
                 <span className="text-emerald-400">
-                  {isBaglandi ? 'Bağlandı! Komandanız Qazandı!' : 'Domino! Komandanız Qazandı!'}
+                  {isBaglandi
+                    ? (mode === '4p_duo' ? 'Bağlandı! Komandanız Qazandı!' : 'Bağlandı! Siz Qazandınız!')
+                    : (mode === '4p_duo' ? 'Domino! Komandanız Qazandı!' : 'Domino! Siz Qazandınız!')}
                 </span>
               ) : (
                 <span className="text-amber-300">

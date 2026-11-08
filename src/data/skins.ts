@@ -21,6 +21,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#fcf8eb',
     tileBorder: '#27201b',
     pipColor: '#171412',
+    accentPipColor: '#dc2626',
     spinnerColor: '#c59b27'
   },
   // 2. Ebony Dark
@@ -42,6 +43,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#1c1c1f',
     tileBorder: '#4a4a52',
     pipColor: '#f1f5f9',
+    accentPipColor: '#38bdf8',
     spinnerColor: '#e2e8f0'
   },
   // 3. Vintage Teahouse Wood
@@ -63,6 +65,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#4a2810',
     tileBorder: '#231206',
     pipColor: '#fde047',
+    accentPipColor: '#ea580c',
     spinnerColor: '#d97706'
   },
   // 4. Walnut Wood
@@ -84,6 +87,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#5c3a21',
     tileBorder: '#382010',
     pipColor: '#fef3c7',
+    accentPipColor: '#e11d48',
     spinnerColor: '#fbbf24'
   },
   // 5. Royal Gold
@@ -105,6 +109,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#eab308',
     tileBorder: '#854d0e',
     pipColor: '#451a03',
+    accentPipColor: '#b91c1c',
     spinnerColor: '#b91c1c',
     glowEffect: '0 0 15px rgba(234, 179, 8, 0.6)'
   },
@@ -127,6 +132,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#064e3b',
     tileBorder: '#022c22',
     pipColor: '#f0fdf4',
+    accentPipColor: '#38bdf8',
     spinnerColor: '#fbbf24',
     glowEffect: '0 0 12px rgba(16, 185, 129, 0.4)'
   },
@@ -150,6 +156,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#0092bc',
     tileBorder: '#0f172a',
     pipColor: '#ffffff',
+    accentPipColor: '#e4002b',
     spinnerColor: '#f59e0b',
     glowEffect: '0 0 14px rgba(228, 0, 43, 0.45)',
     isFlagSkin: true,
@@ -175,6 +182,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#0057b7',
     tileBorder: '#0f172a',
     pipColor: '#ffffff',
+    accentPipColor: '#ffd700',
     spinnerColor: '#ffd700',
     glowEffect: '0 0 14px rgba(0, 87, 183, 0.55)',
     isFlagSkin: true,
@@ -199,6 +207,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#7f1d1d',
     tileBorder: '#450a0a',
     pipColor: '#fef08a',
+    accentPipColor: '#ef4444',
     spinnerColor: '#f59e0b',
     glowEffect: '0 0 14px rgba(239, 68, 68, 0.5)'
   },
@@ -221,6 +230,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#172554',
     tileBorder: '#0f172a',
     pipColor: '#e0f2fe',
+    accentPipColor: '#38bdf8',
     spinnerColor: '#38bdf8',
     glowEffect: '0 0 12px rgba(59, 130, 246, 0.4)'
   },
@@ -243,6 +253,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#3b0764',
     tileBorder: '#2e1065',
     pipColor: '#fae8ff',
+    accentPipColor: '#f43f5e',
     spinnerColor: '#facc15'
   },
   // 10. Diamond Platinum
@@ -264,6 +275,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#cbd5e1',
     tileBorder: '#475569',
     pipColor: '#0284c7',
+    accentPipColor: '#f59e0b',
     spinnerColor: '#0ea5e9',
     glowEffect: '0 0 15px rgba(14, 165, 233, 0.5)'
   },
@@ -286,6 +298,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#7c2d12',
     tileBorder: '#431407',
     pipColor: '#ffedd5',
+    accentPipColor: '#dc2626',
     spinnerColor: '#f97316'
   },
   // 12. Sheki Shabaka
@@ -307,6 +320,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#0f3a40',
     tileBorder: '#082327',
     pipColor: '#fef08a',
+    accentPipColor: '#e11d48',
     spinnerColor: '#ef4444'
   },
   // 13. Gobustan Stone
@@ -328,6 +342,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#57534e',
     tileBorder: '#292524',
     pipColor: '#e7e5e4',
+    accentPipColor: '#f97316',
     spinnerColor: '#a8a29e'
   },
   // 14. Absheron Buta
@@ -349,6 +364,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#0d9488',
     tileBorder: '#115e59',
     pipColor: '#f0fdfa',
+    accentPipColor: '#f59e0b',
     spinnerColor: '#facc15'
   },
   // 15. Black Gold
@@ -370,6 +386,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#0a0a0a',
     tileBorder: '#d97706',
     pipColor: '#fbbf24',
+    accentPipColor: '#ef4444',
     spinnerColor: '#f59e0b',
     glowEffect: '0 0 10px rgba(245, 158, 11, 0.4)'
   },
@@ -392,6 +409,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#0f172a',
     tileBorder: '#06b6d4',
     pipColor: '#22d3ee',
+    accentPipColor: '#f43f5e',
     spinnerColor: '#ec4899',
     glowEffect: '0 0 16px rgba(34, 211, 238, 0.7)'
   },
@@ -414,6 +432,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#f8fafc',
     tileBorder: '#94a3b8',
     pipColor: '#334155',
+    accentPipColor: '#dc2626',
     spinnerColor: '#b45309'
   },
   // 18. Carbon Stealth
@@ -435,6 +454,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#1f2023',
     tileBorder: '#ef4444',
     pipColor: '#ef4444',
+    accentPipColor: '#22c55e',
     spinnerColor: '#ffffff',
     glowEffect: '0 0 10px rgba(239, 68, 68, 0.4)'
   },
@@ -457,6 +477,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#9f1239',
     tileBorder: '#4c0519',
     pipColor: '#fef08a',
+    accentPipColor: '#f43f5e',
     spinnerColor: '#fb923c'
   },
   // 20. Rose Gold Luxe
@@ -478,6 +499,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#fb7185',
     tileBorder: '#9f1239',
     pipColor: '#4c0519',
+    accentPipColor: '#e11d48',
     spinnerColor: '#ffe4e6',
     glowEffect: '0 0 12px rgba(251, 113, 133, 0.5)'
   },
@@ -501,6 +523,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#e8e2d2',
     tileBorder: '#1c1b18',
     pipColor: '#181715',
+    accentPipColor: '#dc2626',
     spinnerColor: '#78716c',
     glowEffect: '0 0 12px rgba(120, 113, 108, 0.4)'
   },
@@ -523,6 +546,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#382012',
     tileBorder: '#1c0f08',
     pipColor: '#fbbf24',
+    accentPipColor: '#dc2626',
     spinnerColor: '#d97706'
   },
   // 23. Transylvania Count (Dracula 1897)
@@ -544,6 +568,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#0a0a0a',
     tileBorder: '#991b1b',
     pipColor: '#dc2626',
+    accentPipColor: '#f1f5f9',
     spinnerColor: '#f1f5f9',
     glowEffect: '0 0 16px rgba(220, 38, 38, 0.65)'
   },
@@ -566,6 +591,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#fbf7ff',
     tileBorder: '#6b21a8',
     pipColor: '#581c87',
+    accentPipColor: '#e11d48',
     spinnerColor: '#eab308',
     glowEffect: '0 0 12px rgba(147, 51, 234, 0.4)'
   },
@@ -588,6 +614,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#18181b',
     tileBorder: '#65a30d',
     pipColor: '#a3e635',
+    accentPipColor: '#38bdf8',
     spinnerColor: '#f97316',
     glowEffect: '0 0 15px rgba(163, 230, 53, 0.55)'
   },
@@ -610,6 +637,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#022c22',
     tileBorder: '#eab308',
     pipColor: '#10b981',
+    accentPipColor: '#facc15',
     spinnerColor: '#fef08a',
     glowEffect: '0 0 16px rgba(16, 185, 129, 0.6)'
   },
@@ -635,6 +663,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#a90432',
     tileBorder: '#3b0710',
     pipColor: '#ffffff',
+    accentPipColor: '#fbbf24',
     spinnerColor: '#fdb912',
     glowEffect: '0 0 14px rgba(253, 185, 18, 0.5)',
     stripes: ['#a90432', '#fdb912']
@@ -658,6 +687,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#002d72',
     tileBorder: '#0f172a',
     pipColor: '#ffffff',
+    accentPipColor: '#fed100',
     spinnerColor: '#fed100',
     glowEffect: '0 0 14px rgba(254, 209, 0, 0.5)',
     stripes: ['#002d72', '#fed100']
@@ -681,6 +711,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#111111',
     tileBorder: '#000000',
     pipColor: '#e11d48',
+    accentPipColor: '#ffffff',
     spinnerColor: '#e11d48',
     glowEffect: '0 0 14px rgba(255, 255, 255, 0.45)',
     stripes: ['#111111', '#ffffff', '#111111']
@@ -704,6 +735,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#670020',
     tileBorder: '#1e1018',
     pipColor: '#ffffff',
+    accentPipColor: '#38bdf8',
     spinnerColor: '#1c95d4',
     glowEffect: '0 0 14px rgba(28, 149, 212, 0.45)',
     stripes: ['#670020', '#1c95d4']
@@ -727,6 +759,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#004d98',
     tileBorder: '#0d1730',
     pipColor: '#edbb00',
+    accentPipColor: '#e11d48',
     spinnerColor: '#edbb00',
     glowEffect: '0 0 14px rgba(237, 187, 0, 0.5)',
     stripes: ['#004d98', '#a50044', '#004d98']
@@ -750,6 +783,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#ffffff',
     tileBorder: '#d97706',
     pipColor: '#4f46e5',
+    accentPipColor: '#f59e0b',
     spinnerColor: '#f59e0b',
     glowEffect: '0 0 16px rgba(245, 158, 11, 0.55)',
     stripes: ['#ffffff', '#f1f5f9', '#ffffff']
@@ -773,6 +807,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#09090b',
     tileBorder: '#e2e8f0',
     pipColor: '#e2e8f0',
+    accentPipColor: '#fbbf24',
     spinnerColor: '#fbbf24',
     glowEffect: '0 0 15px rgba(251, 191, 36, 0.45)',
     stripes: ['#09090b', '#ffffff', '#09090b']
@@ -796,6 +831,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#1e3a8a',
     tileBorder: '#be185d',
     pipColor: '#ffffff',
+    accentPipColor: '#ec4899',
     spinnerColor: '#ec4899',
     glowEffect: '0 0 15px rgba(236, 72, 153, 0.5)',
     stripes: ['#1e3a8a', '#ec4899']
@@ -819,6 +855,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#111111',
     tileBorder: '#450a0a',
     pipColor: '#ffffff',
+    accentPipColor: '#dc2626',
     spinnerColor: '#dc2626',
     glowEffect: '0 0 14px rgba(220, 38, 38, 0.45)',
     stripes: ['#111111', '#dc2626', '#111111']
@@ -842,6 +879,7 @@ export const DOMINO_SKINS: DominoSkin[] = [
     tileFace: '#0a0a0a',
     tileBorder: '#0369a1',
     pipColor: '#f8fafc',
+    accentPipColor: '#38bdf8',
     spinnerColor: '#f59e0b',
     glowEffect: '0 0 14px rgba(2, 132, 199, 0.45)',
     stripes: ['#0a0a0a', '#0284c7', '#0a0a0a']

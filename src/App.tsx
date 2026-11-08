@@ -2330,228 +2330,234 @@ export const App: React.FC = () => {
       {/* Main Container */}
       <main className={`flex-1 relative flex flex-col min-h-0 ${!inGame ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'}`}>
         {!inGame ? (
-          /* Lobby / Game Mode Selection Screen — Clean, Breathable Frontpage Layout */
-          <div className="flex-1 flex flex-col items-center justify-start sm:justify-center p-3 sm:p-5 bg-radial from-slate-900 via-slate-950 to-black relative min-h-full py-3 sm:py-6 pb-16">
-            <div className="max-w-md w-full my-auto bg-slate-900/90 border border-amber-500/25 rounded-3xl p-4 sm:p-5 shadow-2xl flex flex-col items-center text-center">
-              {/* Top Header Row inside Card: Logo on Left, Player Profile Pill on Right */}
-              <div className="w-full flex items-center justify-between gap-2 mb-3 pb-3 border-b border-slate-800/80">
-                <div className="flex items-center gap-2 text-left">
-                  <AzerbaijanLogo size="md" showSubtitle={false} />
-                </div>
+          /* Lobby / Game Mode Selection Screen — Well-proportioned, Engaging Frontpage Layout */
+          <div className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 bg-radial from-slate-900 via-slate-950 to-black relative min-h-full py-4 sm:py-8 pb-16">
+            <div className="max-w-lg w-full bg-slate-900/90 border border-amber-500/30 rounded-3xl p-5 sm:p-7 shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col justify-between min-h-[76vh] sm:min-h-[80vh] text-center backdrop-blur-md relative overflow-hidden">
+              {/* Subtle decorative glow accent */}
+              <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
-                {/* Compact Player Profile & Skin Selector Pill */}
-                <button
-                  onClick={() => {
-                    setStoreInitialTab('avatars');
-                    setShowStore(true);
-                  }}
-                  className="px-2.5 py-1 rounded-full bg-slate-800/90 hover:bg-slate-700/90 border border-amber-500/40 flex items-center gap-2 transition active:scale-95 group shadow"
-                  title="Profil & Daş Dəstini Dəyiş"
-                >
-                  <AvatarView
-                    avatarId={stats.equippedAvatar || DEFAULT_AVATAR_ID}
-                    frameId={stats.equippedFrame}
-                    size={28}
-                    showBorder={true}
-                  />
-                  <div className="flex flex-col text-left">
-                    <span className="text-[11px] font-black text-amber-300 group-hover:text-amber-200 max-w-[90px] truncate leading-tight">
-                      {googleUser?.name || 'Siz'}
-                    </span>
-                    <span className="text-[9px] text-slate-400 font-semibold leading-tight truncate max-w-[90px]">
-                      {activeSkin.name[lang]}
-                    </span>
+              {/* TOP SECTION: Header & Profile */}
+              <div>
+                {/* Top Header Row inside Card: Logo on Left, Player Profile Pill on Right */}
+                <div className="w-full flex items-center justify-between gap-2 mb-4 pb-3.5 border-b border-slate-800/90">
+                  <div className="flex items-center gap-2 text-left">
+                    <AzerbaijanLogo size="md" showSubtitle={true} />
                   </div>
-                </button>
-              </div>
 
-              {/* Optional Non-Mandatory Guest Warning Notice Banner (Compact single line) */}
-              {!googleUser && showGuestWarning && (
-                <div className="w-full mb-3 bg-amber-950/60 border border-amber-500/40 rounded-xl px-3 py-2 flex items-center justify-between gap-2 text-left">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <ShieldAlert className="w-4 h-4 text-amber-400 flex-shrink-0" />
-                    <span className="text-[11px] text-amber-200 font-semibold truncate">
-                      Qonaq rejimi — Qızılları buludda qoru:
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <button
-                      onClick={() => setShowGoogleAuthModal(true)}
-                      className="px-2 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] transition shadow active:scale-95 whitespace-nowrap"
-                    >
-                      Google Giriş
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowGuestWarning(false);
-                        setGuestNoticeDismissed(true);
-                      }}
-                      title="Bildirişi bağla"
-                      className="text-slate-400 hover:text-white p-0.5 rounded hover:bg-slate-800 transition"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Primary Online Multiplayer Action + Quick Actions */}
-              <div className="w-full flex gap-2 mb-3.5">
-                <button
-                  onClick={() => setShowMultiplayerLobby(true)}
-                  className="flex-1 py-3 px-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-[0_0_25px_rgba(20,184,166,0.3)] transition-all flex items-center justify-between group active:scale-[0.99] border border-white/30"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-1.5 bg-slate-950/20 rounded-xl">
-                      <Globe className="w-4 h-4 text-white" />
-                    </div>
+                  {/* Compact Player Profile & Skin Selector Pill */}
+                  <button
+                    onClick={() => {
+                      setStoreInitialTab('avatars');
+                      setShowStore(true);
+                    }}
+                    className="px-3 py-1.5 rounded-full bg-slate-800/95 hover:bg-slate-700/95 border border-amber-500/50 flex items-center gap-2 transition active:scale-95 group shadow-lg"
+                    title="Profil & Daş Dəstini Dəyiş"
+                  >
+                    <AvatarView
+                      avatarId={stats.equippedAvatar || DEFAULT_AVATAR_ID}
+                      frameId={stats.equippedFrame}
+                      size={32}
+                      showBorder={true}
+                    />
                     <div className="flex flex-col text-left">
-                      <span className="text-white font-black text-xs sm:text-sm tracking-wide">
-                        Canlı Onlayn Oyna
+                      <span className="text-xs font-black text-amber-300 group-hover:text-amber-200 max-w-[100px] truncate leading-tight">
+                        {googleUser?.name || 'Siz'}
                       </span>
-                      <span className="text-[10px] text-emerald-950 font-bold">
-                        Dostlarla otaq və ya ümumi masa
+                      <span className="text-[10px] text-slate-400 font-semibold leading-tight truncate max-w-[100px]">
+                        {activeSkin.name[lang]}
                       </span>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Optional Non-Mandatory Guest Warning Notice Banner */}
+                {!googleUser && showGuestWarning && (
+                  <div className="w-full mb-4 bg-amber-950/70 border border-amber-500/40 rounded-2xl px-3.5 py-2.5 flex items-center justify-between gap-2 text-left">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <ShieldAlert className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                      <span className="text-xs text-amber-200 font-semibold truncate">
+                        Qonaq rejimi — Qızılları buludda qoru:
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <button
+                        onClick={() => setShowGoogleAuthModal(true)}
+                        className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition shadow active:scale-95 whitespace-nowrap"
+                      >
+                        Google Giriş
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowGuestWarning(false);
+                          setGuestNoticeDismissed(true);
+                        }}
+                        title="Bildirişi bağla"
+                        className="text-slate-400 hover:text-white p-0.5 rounded hover:bg-slate-800 transition"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-                  <span className="text-[9px] bg-slate-950 text-emerald-300 font-black px-2 py-0.5 rounded-full uppercase">
-                    Onlayn
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    triggerHaptic('medium');
-                    handleQuickMatch('2p_solo', googleUser?.name || 'Siz');
-                  }}
-                  title="Sürətli 1v1 Onlayn Oyun"
-                  className="py-3 px-3 rounded-2xl bg-gradient-to-b from-amber-400 to-amber-600 hover:brightness-110 text-slate-950 font-black flex flex-col items-center justify-center gap-0.5 shadow-md active:scale-95 transition flex-shrink-0 border border-amber-300/50"
-                >
-                  <Sparkles className="w-4 h-4 fill-slate-950" />
-                  <span className="text-[10px] leading-none">Tələsik</span>
-                </button>
-              </div>
-
-              {/* Game Variant Switcher: Domino 101 vs Domino 365 */}
-              <div className="w-full grid grid-cols-2 gap-1.5 p-1 bg-slate-950/90 rounded-2xl border border-slate-800/80 mb-3 shadow-inner">
-                <button
-                  onClick={() => setGameVariant('101')}
-                  className={`py-2 px-3 rounded-xl font-black text-xs transition flex items-center justify-center gap-1.5 ${
-                    gameVariant === '101'
-                      ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-slate-950 shadow-md font-black'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Trophy className="w-3.5 h-3.5" />
-                  <span>Domino 101</span>
-                </button>
-
-                <button
-                  onClick={() => setGameVariant('365')}
-                  className={`py-2 px-3 rounded-xl font-black text-xs transition flex items-center justify-center gap-1.5 ${
-                    gameVariant === '365'
-                      ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 shadow-md font-black'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Telefon 365</span>
-                </button>
-              </div>
-
-              {/* Offline AI Mode Buttons — Clean 2x2 Grid / Compact Cards */}
-              <div className="w-full space-y-2">
-                {gameVariant === '101' ? (
-                  <>
-                    {/* Featured 4P Duo */}
-                    <button
-                      onClick={() => startMatch('4p_duo', '101')}
-                      className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:brightness-110 text-slate-950 font-black text-xs sm:text-sm shadow-lg transition-all flex items-center justify-between active:scale-[0.99]"
-                    >
-                      <span className="flex items-center gap-2">
-                        <Play className="w-4 h-4 fill-slate-950" />
-                        <span>4 Nəfərlik Qoşa (2 vs 2)</span>
-                      </span>
-                      <span className="text-[10px] bg-slate-950 text-amber-300 font-bold px-2.5 py-0.5 rounded-full">
-                        🤖 Komanda • 101
-                      </span>
-                    </button>
-
-                    {/* 2P and 3P side-by-side */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => startMatch('2p_solo', '101')}
-                        className="py-2.5 px-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-100 font-bold text-xs transition flex flex-col items-start gap-1 active:scale-95"
-                      >
-                        <span className="font-extrabold text-white">2 Nəfərlik Tək</span>
-                        <span className="text-[10px] text-amber-400 font-semibold">🤖 1 vs 1 Bot</span>
-                      </button>
-
-                      <button
-                        onClick={() => startMatch('3p_solo', '101')}
-                        className="py-2.5 px-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-100 font-bold text-xs transition flex flex-col items-start gap-1 active:scale-95"
-                      >
-                        <span className="font-extrabold text-white">3 Nəfərlik Tək</span>
-                        <span className="text-[10px] text-amber-400 font-semibold">🤖 1 vs 2 Bot</span>
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    {/* Featured 4P Duo */}
-                    <button
-                      onClick={() => startMatch('4p_duo', '365')}
-                      className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-slate-950 font-black text-xs sm:text-sm shadow-lg transition-all flex items-center justify-between active:scale-[0.99]"
-                    >
-                      <span className="flex items-center gap-2">
-                        <Play className="w-4 h-4 fill-slate-950" />
-                        <span>4 Nəfərlik Qoşa (2 vs 2)</span>
-                      </span>
-                      <span className="text-[10px] bg-slate-950 text-emerald-300 font-bold px-2.5 py-0.5 rounded-full">
-                        🤖 Komanda • 365
-                      </span>
-                    </button>
-
-                    {/* 2P, 3P, 4P Solo in a clean 3-column grid */}
-                    <div className="grid grid-cols-3 gap-1.5">
-                      <button
-                        onClick={() => startMatch('2p_solo', '365')}
-                        className="py-2.5 px-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-100 font-bold text-xs transition flex flex-col items-center gap-0.5 active:scale-95"
-                      >
-                        <span className="font-extrabold text-white">2 Nəfərlik</span>
-                        <span className="text-[10px] text-amber-400 font-semibold">1 vs 1 Bot</span>
-                      </button>
-
-                      <button
-                        onClick={() => startMatch('3p_solo', '365')}
-                        className="py-2.5 px-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-100 font-bold text-xs transition flex flex-col items-center gap-0.5 active:scale-95"
-                      >
-                        <span className="font-extrabold text-white">3 Nəfərlik</span>
-                        <span className="text-[10px] text-amber-400 font-semibold">1 vs 2 Bot</span>
-                      </button>
-
-                      <button
-                        onClick={() => startMatch('4p_solo', '365')}
-                        className="py-2.5 px-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-100 font-bold text-xs transition flex flex-col items-center gap-0.5 active:scale-95"
-                      >
-                        <span className="font-extrabold text-white">4 Nəfərlik</span>
-                        <span className="text-[10px] text-amber-400 font-semibold">1 vs 3 Bot</span>
-                      </button>
-                    </div>
-                  </>
                 )}
+
+                {/* Primary Online Multiplayer Action + Quick Actions */}
+                <div className="w-full flex gap-2.5 mb-4">
+                  <button
+                    onClick={() => setShowMultiplayerLobby(true)}
+                    className="flex-1 py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-[0_0_30px_rgba(20,184,166,0.35)] transition-all flex items-center justify-between group active:scale-[0.99] border border-white/30"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-slate-950/25 rounded-xl">
+                        <Globe className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="flex flex-col text-left">
+                        <span className="text-white font-black text-sm sm:text-base tracking-wide">
+                          Canlı Onlayn Oyna
+                        </span>
+                        <span className="text-[11px] text-emerald-950 font-bold">
+                          Dostlarla otaq və ya ümumi masa
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] bg-slate-950 text-emerald-300 font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow">
+                      Onlayn
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      triggerHaptic('medium');
+                      handleQuickMatch('2p_solo', googleUser?.name || 'Siz');
+                    }}
+                    title="Sürətli 1v1 Onlayn Oyun"
+                    className="py-3.5 px-4 rounded-2xl bg-gradient-to-b from-amber-400 to-amber-600 hover:brightness-110 text-slate-950 font-black flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 transition flex-shrink-0 border border-amber-300/50"
+                  >
+                    <Sparkles className="w-5 h-5 fill-slate-950" />
+                    <span className="text-[11px] leading-none font-black">Tələsik</span>
+                  </button>
+                </div>
+
+                {/* Game Variant Switcher: Domino 101 vs Domino 365 */}
+                <div className="w-full grid grid-cols-2 gap-2 p-1.5 bg-slate-950/90 rounded-2xl border border-slate-800/90 mb-4 shadow-inner">
+                  <button
+                    onClick={() => setGameVariant('101')}
+                    className={`py-2.5 px-3 rounded-xl font-black text-xs sm:text-sm transition flex items-center justify-center gap-2 ${
+                      gameVariant === '101'
+                        ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-slate-950 shadow-md font-black'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Trophy className="w-4 h-4" />
+                    <span>Domino 101</span>
+                  </button>
+
+                  <button
+                    onClick={() => setGameVariant('365')}
+                    className={`py-2.5 px-3 rounded-xl font-black text-xs sm:text-sm transition flex items-center justify-center gap-2 ${
+                      gameVariant === '365'
+                        ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 shadow-md font-black'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>Telefon 365</span>
+                  </button>
+                </div>
+
+                {/* Offline AI Mode Buttons */}
+                <div className="w-full space-y-2.5">
+                  {gameVariant === '101' ? (
+                    <>
+                      {/* Featured 4P Duo */}
+                      <button
+                        onClick={() => startMatch('4p_duo', '101')}
+                        className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:brightness-110 text-slate-950 font-black text-xs sm:text-sm shadow-lg transition-all flex items-center justify-between active:scale-[0.99]"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <Play className="w-4 h-4 fill-slate-950" />
+                          <span className="text-sm font-black">4 Nəfərlik Qoşa (2 vs 2)</span>
+                        </span>
+                        <span className="text-[11px] bg-slate-950 text-amber-300 font-bold px-3 py-1 rounded-full shadow">
+                          🤖 Komanda • 101
+                        </span>
+                      </button>
+
+                      {/* 2P and 3P side-by-side */}
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <button
+                          onClick={() => startMatch('2p_solo', '101')}
+                          className="py-3 px-3.5 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-slate-100 font-bold text-xs sm:text-sm transition flex flex-col items-start gap-1 active:scale-95 shadow"
+                        >
+                          <span className="font-extrabold text-white text-xs sm:text-sm">2 Nəfərlik Tək</span>
+                          <span className="text-[11px] text-amber-400 font-semibold">🤖 1 vs 1 Bot</span>
+                        </button>
+
+                        <button
+                          onClick={() => startMatch('3p_solo', '101')}
+                          className="py-3 px-3.5 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-slate-100 font-bold text-xs sm:text-sm transition flex flex-col items-start gap-1 active:scale-95 shadow"
+                        >
+                          <span className="font-extrabold text-white text-xs sm:text-sm">3 Nəfərlik Tək</span>
+                          <span className="text-[11px] text-amber-400 font-semibold">🤖 1 vs 2 Bot</span>
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Featured 4P Duo */}
+                      <button
+                        onClick={() => startMatch('4p_duo', '365')}
+                        className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-slate-950 font-black text-xs sm:text-sm shadow-lg transition-all flex items-center justify-between active:scale-[0.99]"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <Play className="w-4 h-4 fill-slate-950" />
+                          <span className="text-sm font-black">4 Nəfərlik Qoşa (2 vs 2)</span>
+                        </span>
+                        <span className="text-[11px] bg-slate-950 text-emerald-300 font-bold px-3 py-1 rounded-full shadow">
+                          🤖 Komanda • 365
+                        </span>
+                      </button>
+
+                      {/* 2P, 3P, 4P Solo in a clean 3-column grid */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          onClick={() => startMatch('2p_solo', '365')}
+                          className="py-3 px-2 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-slate-100 font-bold text-xs transition flex flex-col items-center gap-1 active:scale-95 shadow"
+                        >
+                          <span className="font-extrabold text-white">2 Nəfərlik</span>
+                          <span className="text-[10px] text-amber-400 font-semibold">1 vs 1 Bot</span>
+                        </button>
+
+                        <button
+                          onClick={() => startMatch('3p_solo', '365')}
+                          className="py-3 px-2 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-slate-100 font-bold text-xs transition flex flex-col items-center gap-1 active:scale-95 shadow"
+                        >
+                          <span className="font-extrabold text-white">3 Nəfərlik</span>
+                          <span className="text-[10px] text-amber-400 font-semibold">1 vs 2 Bot</span>
+                        </button>
+
+                        <button
+                          onClick={() => startMatch('4p_solo', '365')}
+                          className="py-3 px-2 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-slate-100 font-bold text-xs transition flex flex-col items-center gap-1 active:scale-95 shadow"
+                        >
+                          <span className="font-extrabold text-white">4 Nəfərlik</span>
+                          <span className="text-[10px] text-amber-400 font-semibold">1 vs 3 Bot</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
-              {/* Subtle Footer Row: Friends & Teahouses */}
-              <div className="w-full grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-800/80 text-xs">
+              {/* BOTTOM SECTION: Friends & Teahouses */}
+              <div className="w-full grid grid-cols-2 gap-2.5 mt-5 pt-3.5 border-t border-slate-800/90 text-xs sm:text-sm">
                 <button
                   onClick={() => {
                     triggerHaptic('light');
                     setShowFriendsModal(true);
                   }}
-                  className="py-2 px-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/70 text-teal-300 font-bold flex items-center justify-center gap-1.5 active:scale-95 transition"
+                  className="py-2.5 px-3 rounded-2xl bg-slate-800/70 hover:bg-slate-800 border border-slate-700/80 text-teal-300 font-bold flex items-center justify-center gap-2 active:scale-95 transition shadow"
                 >
-                  <Users className="w-3.5 h-3.5 text-teal-400" />
+                  <Users className="w-4 h-4 text-teal-400" />
                   <span>Dostlar</span>
                 </button>
 
@@ -2560,7 +2566,7 @@ export const App: React.FC = () => {
                     triggerHaptic('light');
                     setShowTeahousesModal(true);
                   }}
-                  className="py-2 px-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/70 text-amber-300 font-bold flex items-center justify-center gap-1.5 active:scale-95 transition"
+                  className="py-2.5 px-3 rounded-2xl bg-slate-800/70 hover:bg-slate-800 border border-slate-700/80 text-amber-300 font-bold flex items-center justify-center gap-2 active:scale-95 transition shadow"
                 >
                   <span>☕</span>
                   <span>Mərc Çayxanaları</span>
@@ -2775,16 +2781,17 @@ export const App: React.FC = () => {
                       {oppNotice.text}
                     </div>
                   )}
-                  <div className={`flex items-center gap-1.5 transition-all ${isOpponentTurn ? 'ring-2 ring-amber-400/50 rounded-lg p-0.5 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
+                  <div className={`flex items-center -space-x-3 sm:-space-x-4 transition-all px-1.5 py-0.5 rounded-xl ${isOpponentTurn ? 'ring-2 ring-amber-400/50 bg-amber-950/20 p-0.5 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
                     {opponent?.hand.map((tile, i) => (
-                      <DominoTile
-                        key={tile.id || i}
-                        tile={tile}
-                        skin={activeSkin}
-                        isFaceDown={!effectiveHandRevealed}
-                        scale={0.55}
-                        isVertical={false}
-                      />
+                      <div key={tile.id || i} style={{ zIndex: i }}>
+                        <DominoTile
+                          tile={tile}
+                          skin={activeSkin}
+                          isFaceDown={!effectiveHandRevealed}
+                          scale={0.48}
+                          isVertical={false}
+                        />
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -2811,8 +2818,8 @@ export const App: React.FC = () => {
                 : (rightOpponent?.score ?? 0);
               return (
                 <>
-                  {/* Left Side Opponent (Moved closer to bottom & 2-column staggered tile cluster) */}
-                  <div className="absolute left-1.5 sm:left-3 bottom-24 sm:bottom-28 z-10 flex flex-col items-start">
+                  {/* Left Side Opponent (Centered vertically on left edge & 2-column staggered tile cluster) */}
+                  <div className="absolute left-1.5 sm:left-3 top-[44%] -translate-y-1/2 z-10 flex flex-col items-start">
                     <div
                       onClick={() => {
                         triggerHaptic('light');
@@ -2884,8 +2891,8 @@ export const App: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Right Side Opponent (Moved closer to bottom & 2-column staggered tile cluster) */}
-                  <div className="absolute right-1.5 sm:right-3 bottom-24 sm:bottom-28 z-10 flex flex-col items-end">
+                  {/* Right Side Opponent (Centered vertically on right edge & 2-column staggered tile cluster) */}
+                  <div className="absolute right-1.5 sm:right-3 top-[44%] -translate-y-1/2 z-10 flex flex-col items-end">
                     <div
                       onClick={() => {
                         triggerHaptic('light');
@@ -3034,22 +3041,23 @@ export const App: React.FC = () => {
                         {topNotice.text}
                       </div>
                     )}
-                    <div className={`flex items-center gap-1.5 transition-all ${isTopTurn ? 'ring-2 ring-amber-400/50 rounded-lg p-0.5 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
+                    <div className={`flex items-center -space-x-3 sm:-space-x-4 transition-all px-1.5 py-0.5 rounded-xl ${isTopTurn ? 'ring-2 ring-amber-400/50 bg-amber-950/20 p-0.5 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
                       {topPartner?.hand.map((tile, i) => (
-                        <DominoTile
-                          key={tile.id || i}
-                          tile={tile}
-                          skin={activeSkin}
-                          isFaceDown={!effectiveHandRevealed}
-                          scale={0.55}
-                          isVertical={false}
-                        />
+                        <div key={tile.id || i} style={{ zIndex: i }}>
+                          <DominoTile
+                            tile={tile}
+                            skin={activeSkin}
+                            isFaceDown={!effectiveHandRevealed}
+                            scale={0.48}
+                            isVertical={false}
+                          />
+                        </div>
                       ))}
                     </div>
                   </div>
 
-                  {/* Lower Left Opponent (Moved closer to bottom & 2-column staggered tile cluster) */}
-                  <div className="absolute left-1.5 sm:left-3 bottom-24 sm:bottom-28 z-10 flex flex-col items-start">
+                  {/* Left Side Opponent (Centered vertically on left edge & 2-column staggered tile cluster) */}
+                  <div className="absolute left-1.5 sm:left-3 top-[44%] -translate-y-1/2 z-10 flex flex-col items-start">
                     <div
                       onClick={() => {
                         triggerHaptic('light');
@@ -3121,8 +3129,8 @@ export const App: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Lower Right Opponent (Moved closer to bottom & 2-column staggered tile cluster) */}
-                  <div className="absolute right-1.5 sm:right-3 bottom-24 sm:bottom-28 z-10 flex flex-col items-end">
+                  {/* Right Side Opponent (Centered vertically on right edge & 2-column staggered tile cluster) */}
+                  <div className="absolute right-1.5 sm:right-3 top-[44%] -translate-y-1/2 z-10 flex flex-col items-end">
                     <div
                       onClick={() => {
                         triggerHaptic('light');

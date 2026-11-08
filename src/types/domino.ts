@@ -67,6 +67,7 @@ export interface DominoSkin {
   tileFace: string;
   tileBorder: string;
   pipColor: string;
+  accentPipColor?: string; // Colorful accent dot (e.g. center dot for 4 vs 5 distinction & accessibility)
   spinnerColor: string;
   glowEffect?: string;
   isFlagSkin?: boolean;

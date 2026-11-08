@@ -29,6 +29,8 @@ export const BazaarTray: React.FC<BazaarTrayProps> = ({
   useEffect(() => {
     if (canDraw) {
       setIsExpanded(true);
+    } else {
+      setIsExpanded(false);
     }
   }, [canDraw]);
 

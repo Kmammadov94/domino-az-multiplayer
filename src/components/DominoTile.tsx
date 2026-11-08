@@ -99,6 +99,7 @@ const DominoTileComponent: React.FC<DominoTileProps> = ({
     const pips = PIP_POSITIONS[value] || [];
     const isSingleDot = value === 1;
     const dotRadius = isSingleDot ? 15 : 13.5;
+    const accentColor = skin.accentPipColor || '#dc2626';
 
     return (
       <svg
@@ -107,33 +108,50 @@ const DominoTileComponent: React.FC<DominoTileProps> = ({
         className="w-full h-full p-1"
         style={{ overflow: 'visible' }}
       >
-        {pips.map(([cx, cy], i) => (
-          <g key={i}>
-            {/* Pip drop shadow / carved socket effect */}
-            <circle
-              cx={cx}
-              cy={cy + 1.8}
-              r={dotRadius + 0.8}
-              fill="rgba(0,0,0,0.35)"
-            />
-            {/* Pip main bold dot */}
-            <circle
-              cx={cx}
-              cy={cy}
-              r={dotRadius}
-              fill={skin.pipColor}
-              stroke={skin.isFlagSkin ? 'rgba(0,0,0,0.35)' : undefined}
-              strokeWidth={skin.isFlagSkin ? 0.9 : 0}
-            />
-            {/* Pip glossy gleam */}
-            <circle
-              cx={cx - (dotRadius * 0.3)}
-              cy={cy - (dotRadius * 0.3)}
-              r={dotRadius * 0.32}
-              fill="rgba(255,255,255,0.42)"
-            />
-          </g>
-        ))}
+        {pips.map(([cx, cy], i) => {
+          // Center dot is at [50, 50] (exists on 1, 3, and 5; does NOT exist on 4, 2, 6)
+          // Accenting the center dot provides immediate, high-contrast visual clarification between 4 and 5
+          const isCenterDot = cx === 50 && cy === 50;
+          const currentPipColor = isCenterDot ? accentColor : skin.pipColor;
+
+          return (
+            <g key={i}>
+              {/* Pip drop shadow / carved socket effect */}
+              <circle
+                cx={cx}
+                cy={cy + 1.8}
+                r={dotRadius + 0.8}
+                fill="rgba(0,0,0,0.35)"
+              />
+              {/* Pip outer socket frame / ring for crisp visibility & accessibility */}
+              <circle
+                cx={cx}
+                cy={cy}
+                r={dotRadius + 0.7}
+                fill="none"
+                stroke={isCenterDot ? accentColor : 'rgba(0,0,0,0.35)'}
+                strokeWidth={isCenterDot ? 1.2 : 0.8}
+                opacity={isCenterDot ? 0.75 : 0.4}
+              />
+              {/* Pip main bold dot */}
+              <circle
+                cx={cx}
+                cy={cy}
+                r={dotRadius}
+                fill={currentPipColor}
+                stroke={isCenterDot ? 'rgba(255,255,255,0.45)' : skin.isFlagSkin ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.18)'}
+                strokeWidth={isCenterDot ? 1 : (skin.isFlagSkin ? 0.9 : 0.5)}
+              />
+              {/* Pip glossy gleam */}
+              <circle
+                cx={cx - (dotRadius * 0.3)}
+                cy={cy - (dotRadius * 0.3)}
+                r={dotRadius * 0.32}
+                fill="rgba(255,255,255,0.45)"
+              />
+            </g>
+          );
+        })}
       </svg>
     );
   };
