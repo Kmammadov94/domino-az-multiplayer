@@ -80,7 +80,7 @@ export const translations = {
     },
     free: 'Pulsuz',
     avatarCategories: {
-      all: 'Hamısı (30)',
+      all: 'Hamısı',
       baku: 'Klassik & Çayxana',
       masters: 'Ustalar',
       legends: 'Əfsanələr',
@@ -168,7 +168,7 @@ export const translations = {
     },
     free: 'Бесплатно',
     avatarCategories: {
-      all: 'Все (30)',
+      all: 'Все',
       baku: 'Классика & Чайхана',
       masters: 'Мастера',
       legends: 'Легенды',
@@ -256,7 +256,7 @@ export const translations = {
     },
     free: 'Free',
     avatarCategories: {
-      all: 'All (30)',
+      all: 'All',
       baku: 'Classic & Teahouse',
       masters: 'Masters',
       legends: 'Legends',

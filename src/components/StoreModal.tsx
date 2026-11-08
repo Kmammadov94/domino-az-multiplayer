@@ -59,7 +59,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
 
   // Avatar Categories
   const avatarCategories = [
-    { id: 'all', label: t.avatarCategories?.all || 'Hamısı (30)' },
+    { id: 'all', label: t.avatarCategories?.all || 'Hamısı' },
     { id: 'baku', label: t.avatarCategories?.baku || 'Bakı & Çayxana' },
     { id: 'masters', label: t.avatarCategories?.masters || 'Ustalar' },
     { id: 'legends', label: t.avatarCategories?.legends || 'Əfsanələr' },
@@ -226,11 +226,11 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             <div>
               <h2 className="text-lg sm:text-xl font-black text-amber-300">{t.store}</h2>
               <p className="text-[10px] sm:text-xs text-slate-400">
-                {storeTab === 'skins' && '20 unikal domino daş dəsti'}
-                {storeTab === 'avatars' && '30 xüsusi profil şəkli'}
-                {storeTab === 'frames' && 'Avatar çərçivələri və parlaq effektlər'}
-                {storeTab === 'titles' && 'Masa titulları və çayxana dərəcələri'}
-                {storeTab === 'tables' && 'Masa örtüyü və çuxa dizaynı'}
+                {storeTab === 'skins' && (lang === 'az' ? 'Unikal domino daş dəstləri' : lang === 'ru' ? 'Уникальные наборы домино' : 'Unique domino tile sets')}
+                {storeTab === 'avatars' && (lang === 'az' ? 'Xüsusi profil şəkilləri' : lang === 'ru' ? 'Особые аватары профиля' : 'Custom profile avatars')}
+                {storeTab === 'frames' && (lang === 'az' ? 'Avatar çərçivələri və parlaq effektlər' : lang === 'ru' ? 'Рамки аватара и эффекты' : 'Avatar frames and effects')}
+                {storeTab === 'titles' && (lang === 'az' ? 'Masa titulları və çayxana dərəcələri' : lang === 'ru' ? 'Титулы стола и звания' : 'Table titles and ranks')}
+                {storeTab === 'tables' && (lang === 'az' ? 'Masa örtüyü və çuxa dizaynı' : lang === 'ru' ? 'Сукно стола и дизайн' : 'Table cloth and theme design')}
               </p>
             </div>
           </div>
