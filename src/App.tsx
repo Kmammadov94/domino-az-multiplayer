@@ -3274,30 +3274,6 @@ export const App: React.FC = () => {
               isBoardBlocked={isCurrentBoardBlocked}
               variant={effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant}
               minBoneyardReserve={currentMinReserve}
-              myScore={
-                (effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant) === '101'
-                  ? ((effectiveInMultiplayer ? (mpGameState?.mode || mode) : mode) === '3p_solo'
-                      ? ((effectiveInMultiplayer ? (mpGameState?.match101State || match101State) : match101State)?.playerAccounts?.[localPlayerIndex]?.mainScore ?? 0)
-                      : ((localPlayerIndex === 0 || (effectivePlayers[localPlayerIndex]?.team === 1))
-                          ? ((effectiveInMultiplayer ? (mpGameState?.match101State || match101State) : match101State)?.team1?.mainScore ?? 0)
-                          : ((effectiveInMultiplayer ? (mpGameState?.match101State || match101State) : match101State)?.team2?.mainScore ?? 0)))
-                  : (effectivePlayers[localPlayerIndex]?.score ?? 0)
-              }
-              opponentSummary={
-                effectivePlayers
-                  .filter((_, idx) => idx !== localPlayerIndex)
-                  .map((p, i) => {
-                    const activeVar = effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant;
-                    const active101State = effectiveInMultiplayer ? (mpGameState?.match101State || match101State) : match101State;
-                    const sc = activeVar === '101'
-                      ? ((effectiveInMultiplayer ? (mpGameState?.mode || mode) : mode) === '3p_solo'
-                          ? (active101State?.playerAccounts?.[p.id]?.mainScore ?? p.score ?? 0)
-                          : (active101State?.team2?.mainScore ?? p.score ?? 0))
-                      : (p.score ?? 0);
-                    return `${p.name.split(' ')[0]}: ${sc}`;
-                  })
-                  .join(' • ')
-              }
             />
             </div>
           </div>
