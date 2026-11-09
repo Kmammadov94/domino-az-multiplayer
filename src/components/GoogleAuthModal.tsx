@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Cloud, CheckCircle, ShieldAlert, LogOut, X, Smartphone, ExternalLink, Loader2 } from 'lucide-react';
+import { Cloud, CheckCircle, ShieldAlert, LogOut, X, Smartphone, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { Browser as CapBrowser } from '@capacitor/browser';
 import {
   GoogleUserProfile,
@@ -31,11 +31,70 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
   const [gisLoaded, setGisLoaded] = useState(false);
   const [gisError, setGisError] = useState<string | null>(null);
   const [waitingForMobileBrowser, setWaitingForMobileBrowser] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(() => {
+    try {
+      const sess = localStorage.getItem('az_domino_pending_auth_session');
+      const time = Number(localStorage.getItem('az_domino_pending_auth_time') || 0);
+      if (sess && Date.now() - time < 10 * 60 * 1000) return sess;
+    } catch {}
+    return null;
+  });
   const [apkBridgeCompleted, setApkBridgeCompleted] = useState(false);
   const [completedProfile, setCompletedProfile] = useState<GoogleUserProfile | null>(null);
   const [bridgeReturnUrls, setBridgeReturnUrls] = useState<{ scheme: string; intent: string } | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isNative = isNativeMobileApp();
+
+  // Helper to query backend for mobile authentication completion
+  const checkSessionAuth = async (sessionIdToPoll: string): Promise<boolean> => {
+    if (!sessionIdToPoll) return false;
+    try {
+      setIsCheckingAuth(true);
+      const baseUrl = getBackendServerUrl() || PRODUCTION_SERVER_URL;
+      const res = await fetch(`${baseUrl}/api/apk-auth/${encodeURIComponent(sessionIdToPoll)}?t=${Date.now()}`);
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
+        const data = await res.json();
+        if (data?.authenticated && data?.user) {
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+          try {
+            localStorage.removeItem('az_domino_pending_auth_session');
+            localStorage.removeItem('az_domino_pending_auth_time');
+          } catch {}
+          try {
+            await CapBrowser.close().catch(() => {});
+          } catch {}
+          setWaitingForMobileBrowser(false);
+          setIsCheckingAuth(false);
+          onSignIn(data.user);
+          onClose();
+          return true;
+        }
+      }
+    } catch (e) {
+      // Ignore transient network errors
+    } finally {
+      setIsCheckingAuth(false);
+    }
+    return false;
+  };
+
+  // Run a rapid burst of checks when app regains focus or browser closes
+  const runRapidPolling = (sessionIdToPoll: string) => {
+    checkSessionAuth(sessionIdToPoll);
+    let burstCount = 0;
+    const burstTimer = setInterval(async () => {
+      burstCount++;
+      const done = await checkSessionAuth(sessionIdToPoll);
+      if (done || burstCount >= 16) {
+        clearInterval(burstTimer);
+      }
+    }, 500);
+  };
 
   useEffect(() => {
     return () => {
@@ -51,9 +110,19 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
       }
-      setWaitingForMobileBrowser(false);
       return;
     }
+
+    // Check if there was an active pending session (< 10 mins old)
+    try {
+      const pending = localStorage.getItem('az_domino_pending_auth_session');
+      const time = Number(localStorage.getItem('az_domino_pending_auth_time') || 0);
+      if (pending && Date.now() - time < 10 * 60 * 1000) {
+        setActiveSessionId(pending);
+        setWaitingForMobileBrowser(true);
+        checkSessionAuth(pending);
+      }
+    } catch {}
 
     if (isNative) {
       // On Android APK WebView (https://localhost), Google blocks embedded WebView origin with Error 400: origin_mismatch.
@@ -179,6 +248,12 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
   // Start Mobile Browser Auth Bridge for Android APK (avoids WebView origin_mismatch 100%)
   const handleStartMobileBrowserAuth = async () => {
     const sessionId = `apk_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    setActiveSessionId(sessionId);
+    try {
+      localStorage.setItem('az_domino_pending_auth_session', sessionId);
+      localStorage.setItem('az_domino_pending_auth_time', String(Date.now()));
+    } catch {}
+
     setWaitingForMobileBrowser(true);
     setGisError(null);
 
@@ -193,10 +268,8 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
     let browserFinishedHandle: { remove: () => Promise<void> } | null = null;
     try {
       CapBrowser.addListener('browserFinished', () => {
-        // User manually closed browser window or returned to app
-        setTimeout(() => {
-          setWaitingForMobileBrowser(false);
-        }, 1500);
+        // User closed browser or pressed back — run aggressive rapid polling instead of cancelling!
+        runRapidPolling(sessionId);
       }).then((h) => {
         browserFinishedHandle = h;
       }).catch(() => {});
@@ -208,7 +281,7 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
       window.open(bridgeUrl, '_system');
     }
 
-    // Poll backend every 1.2s for completion (capped at 120 attempts / ~2.5 minutes to avoid battery drain if abandoned)
+    // Steady background polling (every 1.5s for up to 120 attempts / 3 minutes)
     let pollAttempts = 0;
     pollIntervalRef.current = setInterval(async () => {
       pollAttempts++;
@@ -222,29 +295,11 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
         setGisError('Giriş vaxtı bitdi. Yenidən cəhd edin.');
         return;
       }
-      try {
-        const res = await fetch(`${baseUrl}/api/apk-auth/${encodeURIComponent(sessionId)}`);
-        const contentType = res.headers.get('content-type') || '';
-        if (res.ok && contentType.includes('application/json')) {
-          const data = await res.json();
-          if (data?.authenticated && data?.user) {
-            if (pollIntervalRef.current) {
-              clearInterval(pollIntervalRef.current);
-              pollIntervalRef.current = null;
-            }
-            browserFinishedHandle?.remove().catch(() => {});
-            try {
-              await CapBrowser.close().catch(() => {});
-            } catch {}
-            setWaitingForMobileBrowser(false);
-            onSignIn(data.user);
-            onClose();
-          }
-        }
-      } catch {
-        // Ignore transient network errors while user is in browser
+      const done = await checkSessionAuth(sessionId);
+      if (done) {
+        browserFinishedHandle?.remove().catch(() => {});
       }
-    }, 1200);
+    }, 1500);
   };
 
   if (!isOpen) return null;
@@ -391,21 +446,69 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
               </div>
             </div>
 
-            {/* If running inside Android APK, show a single official-styled "Google ilə Daxil Olun" button that uses the Mobile Browser Auth Bridge */}
+            {/* If running inside Android APK, show the official Google login button or active sync status with verification button */}
             {isNative ? (
-              <div className="flex flex-col items-center gap-2.5 my-1">
-                <button
-                  type="button"
-                  onClick={handleStartMobileBrowserAuth}
-                  className="w-full max-w-[300px] py-3 px-5 rounded-full bg-white hover:bg-slate-100 text-slate-900 font-bold text-sm transition shadow-xl flex items-center justify-center gap-3 active:scale-95 border border-slate-200"
-                >
-                  {waitingForMobileBrowser ? (
-                    <>
-                      <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-                      <span>Brauzerdə giriş gözlənilir...</span>
-                    </>
-                  ) : (
-                    <>
+              <div className="flex flex-col items-center gap-2.5 my-1 w-full">
+                {waitingForMobileBrowser ? (
+                  <div className="w-full flex flex-col items-center gap-2.5">
+                    <div className="w-full p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/40 flex flex-col items-center text-center gap-1.5">
+                      <div className="flex items-center gap-2 text-amber-300 font-bold text-xs sm:text-sm">
+                        <Loader2 className={`w-4 h-4 text-amber-400 ${isCheckingAuth ? 'animate-spin' : ''}`} />
+                        <span>Brauzerdə Google Girişi Gözlənilir</span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 leading-tight">
+                        Brauzerdə Google hesabınızı seçdikdən sonra tətbiqə qayıdın.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const sess = activeSessionId || localStorage.getItem('az_domino_pending_auth_session');
+                        if (sess) checkSessionAuth(sess);
+                      }}
+                      disabled={isCheckingAuth}
+                      className="w-full max-w-[320px] py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 hover:brightness-110 active:scale-95 text-slate-950 font-black text-sm shadow-xl flex items-center justify-center gap-2.5 transition border border-emerald-400 cursor-pointer"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isCheckingAuth ? 'animate-spin' : ''}`} />
+                      <span>{isCheckingAuth ? 'Yoxlanılır...' : '🔄 Girişi Yoxla və Tamamla'}</span>
+                    </button>
+
+                    <div className="flex items-center justify-between w-full max-w-[320px] px-2 text-[11px]">
+                      <button
+                        type="button"
+                        onClick={handleStartMobileBrowserAuth}
+                        className="text-amber-400 hover:text-amber-300 underline font-semibold"
+                      >
+                        Brauzeri təkrar aç
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWaitingForMobileBrowser(false);
+                          setActiveSessionId(null);
+                          try {
+                            localStorage.removeItem('az_domino_pending_auth_session');
+                            localStorage.removeItem('az_domino_pending_auth_time');
+                          } catch {}
+                          if (pollIntervalRef.current) {
+                            clearInterval(pollIntervalRef.current);
+                            pollIntervalRef.current = null;
+                          }
+                        }}
+                        className="text-slate-400 hover:text-slate-200"
+                      >
+                        Ləğv et
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleStartMobileBrowserAuth}
+                      className="w-full max-w-[300px] py-3 px-5 rounded-full bg-white hover:bg-slate-100 text-slate-900 font-bold text-sm transition shadow-xl flex items-center justify-center gap-3 active:scale-95 border border-slate-200"
+                    >
                       <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0">
                         <path
                           fill="#4285F4"
@@ -425,14 +528,12 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
                         />
                       </svg>
                       <span>Google ilə Daxil Olun</span>
-                    </>
-                  )}
-                </button>
-                <span className="text-[11px] text-slate-400 text-center">
-                  {waitingForMobileBrowser
-                    ? 'Açılan pəncərədə Google hesabınızı seçin, tətbiq avtomatik daxil olacaq.'
-                    : 'Təhlükəsiz rəsmi Google girişi'}
-                </span>
+                    </button>
+                    <span className="text-[11px] text-slate-400 text-center">
+                      Təhlükəsiz rəsmi Google girişi
+                    </span>
+                  </>
+                )}
               </div>
             ) : (
               /* Official Google Button Container on Web (rendered directly by Google's native SDK) */

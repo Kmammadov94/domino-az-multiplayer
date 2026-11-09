@@ -70,8 +70,8 @@
       display: none;
       background: rgba(16, 185, 129, 0.15);
       border: 1.5px solid #10b981;
-      border-radius: 18px;
-      padding: 16px;
+      border-radius: 20px;
+      padding: 20px 16px;
       margin-top: 12px;
     }
     .status-box.active {
@@ -80,30 +80,43 @@
     }
     .status-title {
       color: #34d399;
-      font-weight: 800;
-      font-size: 1rem;
-      margin-bottom: 4px;
+      font-weight: 900;
+      font-size: 1.15rem;
+      margin-bottom: 6px;
     }
     .status-text {
-      font-size: 0.82rem;
+      font-size: 0.85rem;
       color: #e2e8f0;
-      line-height: 1.4;
+      line-height: 1.45;
     }
     .btn-return {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: 10px;
       width: 100%;
-      margin-top: 14px;
-      padding: 12px 18px;
+      margin-top: 16px;
+      padding: 14px 20px;
       background: linear-gradient(135deg, #10b981, #059669);
       color: #022c22;
       font-weight: 900;
-      font-size: 0.95rem;
-      border-radius: 16px;
+      font-size: 1.02rem;
+      border-radius: 18px;
       text-decoration: none;
-      box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+      box-shadow: 0 10px 25px rgba(16, 185, 129, 0.45);
+      animation: pulse 2s infinite;
+      cursor: pointer;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+      70% { transform: scale(1.02); box-shadow: 0 0 0 12px rgba(16, 185, 129, 0); }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+    .help-hint {
+      margin-top: 12px;
+      font-size: 0.78rem;
+      color: #94a3b8;
+      line-height: 1.35;
     }
     .loading-spinner {
       display: inline-block;
@@ -113,6 +126,8 @@
       border-radius: 50%;
       border-top-color: #34d399;
       animation: spin 0.8s ease-in-out infinite;
+      vertical-align: middle;
+      margin-right: 6px;
     }
     @keyframes spin {
       to { transform: rotate(360deg); }
@@ -145,15 +160,21 @@
       <div class="status-title" id="status-title">Giriş Uğurla Tamamlandı!</div>
       <p class="status-text" id="status-text">Məlumatlarınız Domino PRO tətbiqinə göndərilir...</p>
       <a href="dominoaz://auth" class="btn-return" id="return-btn">
-        <span>Tətbiqə Qayıt</span>
+        <span>🚀 Tətbiqə Qayıt</span>
       </a>
+      <p class="help-hint" id="help-hint">Düyməyə vurun və ya bu pəncərəni bağlayaraq Domino PRO tətbiqinə qayıdın.</p>
     </div>
   </div>
 
   <script>
     const CLIENT_ID = '345163175505-a7dv01uno2tof42k31omil6p5c9do20g.apps.googleusercontent.com';
     const params = new URLSearchParams(window.location.search);
-    const sessionId = params.get('apk_auth');
+    let sessionId = params.get('apk_auth');
+    if (sessionId) {
+      try { sessionStorage.setItem('domino_apk_auth_sess', sessionId); } catch(e){}
+    } else {
+      try { sessionId = sessionStorage.getItem('domino_apk_auth_sess'); } catch(e){}
+    }
 
     function parseJwt(token) {
       try {
@@ -169,6 +190,25 @@
       } catch (e) {
         return null;
       }
+    }
+
+    async function sendAuthToServerWithRetry(sessId, profile) {
+      for (let attempt = 1; attempt <= 4; attempt++) {
+        try {
+          const res = await fetch('/api/apk-auth/' + encodeURIComponent(sessId), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user: profile })
+          });
+          if (res.ok) {
+            return true;
+          }
+        } catch (err) {
+          console.warn('POST attempt ' + attempt + ' failed:', err);
+        }
+        await new Promise((r) => setTimeout(r, 350));
+      }
+      return false;
     }
 
     async function handleCredentialResponse(response) {
@@ -193,18 +233,11 @@
 
       if (sessionId) {
         statusText.innerHTML = '<span class="loading-spinner"></span> Tətbiqə bağlanır: <strong>' + profile.name + '</strong>';
-        try {
-          await fetch('/api/apk-auth/' + encodeURIComponent(sessionId), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user: profile })
-          });
-        } catch (e) {
-          console.error(e);
-        }
+        
+        await sendAuthToServerWithRetry(sessionId, profile);
 
-        statusTitle.textContent = 'Giriş Tamamlandı!';
-        statusText.innerHTML = '<strong>' + profile.name + '</strong> hesabınız bağlandı. Aşağıdakı düyməyə basaraq və ya avtomatik tətbiqə qayıdın.';
+        statusTitle.textContent = 'Giriş Uğurla Tamamlandı!';
+        statusText.innerHTML = '<strong>' + profile.name + '</strong> hesabınız bağlandı.<br/>Aşağıdakı düyməyə vuraraq tətbiqə qayıdın.';
 
         const qs = 'googleId=' + encodeURIComponent(profile.googleId) +
           '&name=' + encodeURIComponent(profile.name) +
@@ -218,16 +251,17 @@
 
         const returnBtn = document.getElementById('return-btn');
         returnBtn.href = returnUrl;
-        returnBtn.onclick = function() {
-          // If custom scheme doesn't work on this browser, fallback to Android intent
+        returnBtn.onclick = function(e) {
           setTimeout(function() {
             window.location.href = returnIntent;
-          }, 400);
+          }, 350);
         };
 
-        // Try direct scheme redirect
+        // Attempt direct scheme redirect if allowed by browser
         setTimeout(function() {
-          window.location.href = returnUrl;
+          try {
+            window.location.href = returnUrl;
+          } catch(e){}
         }, 300);
       } else {
         statusTitle.textContent = 'Giriş Tamamlandı!';

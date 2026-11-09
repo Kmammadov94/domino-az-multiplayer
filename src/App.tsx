@@ -48,7 +48,9 @@ import {
   saveGoogleUser,
   syncWithCloud,
   isGuestNoticeDismissed,
-  setGuestNoticeDismissed
+  setGuestNoticeDismissed,
+  PRODUCTION_SERVER_URL,
+  getBackendServerUrl
 } from './utils/storage';
 
 import { triggerHaptic } from './utils/haptics';
@@ -283,10 +285,58 @@ export const App: React.FC = () => {
           else urlListenerHandle = h;
         })
         .catch(() => {});
+    } catch {}
 
+    // Periodically or upon resume check if a mobile external browser Google Auth session was completed
+    const checkPendingMobileAuth = async () => {
+      try {
+        const pendingSession = localStorage.getItem('az_domino_pending_auth_session');
+        if (!pendingSession) return;
+        const sessionTime = Number(localStorage.getItem('az_domino_pending_auth_time') || 0);
+        if (Date.now() - sessionTime > 10 * 60 * 1000) {
+          try {
+            localStorage.removeItem('az_domino_pending_auth_session');
+            localStorage.removeItem('az_domino_pending_auth_time');
+          } catch {}
+          return;
+        }
+        const baseUrl = getBackendServerUrl() || PRODUCTION_SERVER_URL;
+        const res = await fetch(`${baseUrl}/api/apk-auth/${encodeURIComponent(pendingSession)}?t=${Date.now()}`);
+        const ct = res.headers.get('content-type') || '';
+        if (res.ok && ct.includes('application/json')) {
+          const data = await res.json();
+          if (data?.authenticated && data?.user) {
+            try {
+              localStorage.removeItem('az_domino_pending_auth_session');
+              localStorage.removeItem('az_domino_pending_auth_time');
+            } catch {}
+            try {
+              await CapBrowser.close().catch(() => {});
+            } catch {}
+            saveGoogleUser(data.user);
+            setGoogleUser(data.user);
+            setShowGuestWarning(false);
+            setShowGoogleAuthModal(false);
+            triggerHaptic('success');
+            syncWithCloud(data.user, statsRef.current, true).then((synced) => {
+              if (synced) setStats(synced);
+            });
+          }
+        }
+      } catch (e) {
+        // Transient network error
+      }
+    };
+
+    // Initial check on mount
+    checkPendingMobileAuth();
+
+    try {
       CapApp.addListener('appStateChange', ({ isActive }) => {
         if (isActive) {
           sounds.resume();
+          checkPendingMobileAuth();
+          setTimeout(checkPendingMobileAuth, 1200);
         } else {
           sounds.suspend();
         }
@@ -303,6 +353,7 @@ export const App: React.FC = () => {
         sounds.suspend();
       } else {
         sounds.resume();
+        checkPendingMobileAuth();
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
