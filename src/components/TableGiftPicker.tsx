@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { TABLE_GIFTS, TableGiftDef } from '../data/tableGifts';
+import { GiftIcon } from './GiftIcon';
 import { Language } from '../types/domino';
 import { Coins, X, Sparkles, UserPlus, Check } from 'lucide-react';
 import { triggerHaptic } from '../utils/haptics';
@@ -117,9 +118,9 @@ export const TableGiftPicker: React.FC<TableGiftPickerProps> = ({
                     : 'bg-slate-900/40 border-slate-800/40 opacity-50 cursor-not-allowed'
                 }`}
               >
-                <span className="text-3xl mb-1 group-hover:scale-125 transition-transform">
-                  {gift.icon}
-                </span>
+                <div className="h-9 flex items-center justify-center mb-1 group-hover:scale-125 transition-transform">
+                  <GiftIcon gift={gift} size={32} />
+                </div>
                 <span className="text-[11px] font-bold text-slate-200 text-center line-clamp-1">
                   {gift.name[lang] || gift.name.az}
                 </span>

@@ -32,6 +32,8 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
   const [gisError, setGisError] = useState<string | null>(null);
   const [waitingForMobileBrowser, setWaitingForMobileBrowser] = useState(false);
   const [apkBridgeCompleted, setApkBridgeCompleted] = useState(false);
+  const [completedProfile, setCompletedProfile] = useState<GoogleUserProfile | null>(null);
+  const [bridgeReturnUrls, setBridgeReturnUrls] = useState<{ scheme: string; intent: string } | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isNative = isNativeMobileApp();
 
@@ -78,24 +80,40 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
 
   const handleCompleteSignIn = async (profile: GoogleUserProfile) => {
     onSignIn(profile);
+    setCompletedProfile(profile);
 
     // If this browser tab was opened from the Android APK (?apk_auth=...), send the profile to the bridge endpoint!
     if (apkAuthSessionId) {
+      const qs = new URLSearchParams({
+        googleId: profile.googleId,
+        name: profile.name,
+        email: profile.email,
+        picture: profile.picture || '',
+        sessionId: apkAuthSessionId,
+        signedInAt: String(profile.signedInAt)
+      }).toString();
+
+      const schemeUrl = `dominoaz://auth?${qs}`;
+      const intentUrl = `intent://auth?${qs}#Intent;scheme=dominoaz;package=az.domino.telefon365;end`;
+
+      setBridgeReturnUrls({ scheme: schemeUrl, intent: intentUrl });
+      setApkBridgeCompleted(true);
+
       try {
         await fetch(`${getBackendServerUrl()}/api/apk-auth/${encodeURIComponent(apkAuthSessionId)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ user: profile })
-        });
-        setApkBridgeCompleted(true);
-        // Attempt automatic deep-link redirect back into the Android APK
-        setTimeout(() => {
-          window.location.href = 'intent://auth#Intent;scheme=dominoaz;package=az.domino.telefon365;end';
-        }, 600);
-        return;
+        }).catch(() => {});
       } catch (e) {
         console.warn('Failed to send APK bridge auth:', e);
       }
+
+      // Attempt automatic deep-link redirect back into the Android APK
+      setTimeout(() => {
+        window.location.href = schemeUrl;
+      }, 300);
+      return;
     }
 
     onClose();
@@ -172,6 +190,18 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
     // Direct dedicated authentication bridge page — no full web game load!
     const bridgeUrl = `${baseUrl}/auth-bridge.html?apk_auth=${encodeURIComponent(sessionId)}`;
 
+    let browserFinishedHandle: { remove: () => Promise<void> } | null = null;
+    try {
+      CapBrowser.addListener('browserFinished', () => {
+        // User manually closed browser window or returned to app
+        setTimeout(() => {
+          setWaitingForMobileBrowser(false);
+        }, 1500);
+      }).then((h) => {
+        browserFinishedHandle = h;
+      }).catch(() => {});
+    } catch {}
+
     try {
       await CapBrowser.open({ url: bridgeUrl, windowName: '_blank' });
     } catch {
@@ -187,19 +217,22 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
           clearInterval(pollIntervalRef.current);
           pollIntervalRef.current = null;
         }
+        browserFinishedHandle?.remove().catch(() => {});
         setWaitingForMobileBrowser(false);
         setGisError('Giriş vaxtı bitdi. Yenidən cəhd edin.');
         return;
       }
       try {
         const res = await fetch(`${baseUrl}/api/apk-auth/${encodeURIComponent(sessionId)}`);
-        if (res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
           const data = await res.json();
           if (data?.authenticated && data?.user) {
             if (pollIntervalRef.current) {
               clearInterval(pollIntervalRef.current);
               pollIntervalRef.current = null;
             }
+            browserFinishedHandle?.remove().catch(() => {});
             try {
               await CapBrowser.close().catch(() => {});
             } catch {}
@@ -259,7 +292,7 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
           </div>
         </div>
 
-        {apkBridgeCompleted && currentUser ? (
+        {apkBridgeCompleted && (completedProfile || currentUser) ? (
           <div className="flex flex-col items-center py-5 text-center gap-3">
             <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center text-emerald-400 shadow-lg">
               <CheckCircle className="w-9 h-9" />
@@ -268,11 +301,18 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
               Giriş Uğurla Tamamlandı!
             </h3>
             <p className="text-xs text-slate-300 max-w-xs">
-              <strong>{currentUser.name}</strong> hesabınız Domino PRO mobil tətbiqinə bağlandı.
+              <strong>{(completedProfile || currentUser)?.name}</strong> hesabınız Domino PRO mobil tətbiqinə bağlandı.
             </p>
             <a
-              href="intent://auth#Intent;scheme=dominoaz;package=az.domino.telefon365;end"
-              className="mt-2 w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 text-slate-950 font-black text-sm shadow-lg flex items-center justify-center gap-2"
+              href={bridgeReturnUrls?.scheme || 'dominoaz://auth'}
+              onClick={() => {
+                if (bridgeReturnUrls?.intent) {
+                  setTimeout(() => {
+                    window.location.href = bridgeReturnUrls.intent;
+                  }, 400);
+                }
+              }}
+              className="mt-2 w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 text-slate-950 font-black text-sm shadow-lg flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition"
             >
               <Smartphone className="w-4 h-4" />
               <span>Domino PRO Tətbiqinə Qayıt</span>

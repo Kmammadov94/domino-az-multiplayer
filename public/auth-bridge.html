@@ -206,22 +206,29 @@
         statusTitle.textContent = 'Giriş Tamamlandı!';
         statusText.innerHTML = '<strong>' + profile.name + '</strong> hesabınız bağlandı. Aşağıdakı düyməyə basaraq və ya avtomatik tətbiqə qayıdın.';
 
-        // Automatic redirect via deep links
-        const returnUrl = 'dominoaz://auth?googleId=' + encodeURIComponent(profile.googleId) +
+        const qs = 'googleId=' + encodeURIComponent(profile.googleId) +
           '&name=' + encodeURIComponent(profile.name) +
           '&email=' + encodeURIComponent(profile.email) +
-          (profile.picture ? '&picture=' + encodeURIComponent(profile.picture) : '');
+          (profile.picture ? '&picture=' + encodeURIComponent(profile.picture) : '') +
+          (sessionId ? '&sessionId=' + encodeURIComponent(sessionId) : '') +
+          '&signedInAt=' + Date.now();
 
-        document.getElementById('return-btn').href = returnUrl;
+        const returnUrl = 'dominoaz://auth?' + qs;
+        const returnIntent = 'intent://auth?' + qs + '#Intent;scheme=dominoaz;package=az.domino.telefon365;end';
 
-        // Try direct intent / scheme
+        const returnBtn = document.getElementById('return-btn');
+        returnBtn.href = returnUrl;
+        returnBtn.onclick = function() {
+          // If custom scheme doesn't work on this browser, fallback to Android intent
+          setTimeout(function() {
+            window.location.href = returnIntent;
+          }, 400);
+        };
+
+        // Try direct scheme redirect
         setTimeout(function() {
           window.location.href = returnUrl;
-        }, 500);
-
-        setTimeout(function() {
-          window.location.href = 'intent://auth#Intent;scheme=dominoaz;package=az.domino.telefon365;end';
-        }, 1200);
+        }, 300);
       } else {
         statusTitle.textContent = 'Giriş Tamamlandı!';
         statusText.textContent = profile.name + ' kimi daxil oldunuz.';

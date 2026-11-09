@@ -30,6 +30,11 @@ Bütün yeniləmələr, düzəlişlər, funksionallıqlar və versiya dəyişikl
   - Yuxarıdakı oyunçunun daşları ekranın sağ və soluna həddindən artıq uzanmaması üçün örtüşən (`-space-x-3.5 sm:-space-x-4`) yığcam kart/daş stili ilə mərkəzləşdirildi.
 - **Balanslı və Geniş Ana Səhifə (Lobby) Nisbətləri**:
   - Ana səhifə kartının ölçüləri və şaquli nisbətləri (`max-w-lg`, `min-h-[76vh] sm:min-h-[80vh]`, rahat daxili boşluqlar) genişləndirildi; ekranın ortasında balaca qutucuq kimi qalması və yuxarı-aşağıdakı boşluq tam aradan qaldırıldı.
+- **3 və 4 Nəfərlik Oyunlarda Rəqiblərin Geniş Masaya Uyğunlaşdırılması (Minimalist İnfobadge)**:
+  - 3P və 4P rejimlərində masada həddindən artıq yer tutan və sıxlıq yaradan rəqib və tərəfdaş daşları yığışdırıldı.
+  - Bunun əvəzinə hər oyunçunun yanında yalnız onun adı, profil şəkli, qalan daş sayı (`🀰 X`) və xalı səliqəli, yığcam fərdi lövhə kimi göstərildi; mərkəzi oyun masası maksimum dərəcədə genişləndirildi (2 nəfərlik rejimdə isə vizual daşlar olduğu kimi saxlanıldı).
+- **Hədiyyə İkonları & Şəki Paxlavasının Xüsusi SVG Qrafikası (`src/components/GiftIcon.tsx`, `src/data/tableGifts.ts`)**:
+  - Əvvəlki düşbərə/piroqi (dumpling 🥟) emojisi ləğv edildi; əvəzinə zəfəranlı riştə toru, qoz ləpəsi və bal parıltısı olan 3D romb şəkilli orijinal **Şəki Paxlavası vektor qrafikası** hazırlandı.
 - **Aşağıdakı Artıq Xal Panelinin Yığışdırılması (`src/components/PlayerControls.tsx`, `src/App.tsx`)**:
   - Yuxarıdakı əsas ScoreBoard tablosunda və oyunçu profil lövhələrində xallar onsuz da aydın göstərildiyi üçün, əlin üstündəki artıq və sıxlıq yaradan xal zolağı ləğv edildi; yalnız daş çeşidləmə və zəruri idarəetmələr saxlanıldı.
 

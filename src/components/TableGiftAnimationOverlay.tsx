@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { TableGiftDef } from '../data/tableGifts';
+import { GiftIcon } from './GiftIcon';
 import { triggerHaptic } from '../utils/haptics';
 
 export interface ActiveGiftAnimation {
@@ -93,7 +94,7 @@ export const TableGiftAnimationOverlay: React.FC<TableGiftAnimationOverlayProps>
               }
             }
           `}</style>
-          {activeAnimation.gift.icon}
+          <GiftIcon gift={activeAnimation.gift} size={48} />
         </div>
       )}
 
@@ -141,8 +142,8 @@ export const TableGiftAnimationOverlay: React.FC<TableGiftAnimationOverlayProps>
 
           {activeAnimation.gift.impactType === 'sweet' && (
             <div className="relative flex flex-col items-center justify-center">
-              <div className="text-5xl sm:text-6xl animate-pulse">
-                {activeAnimation.gift.icon}
+              <div className="flex items-center justify-center animate-pulse">
+                <GiftIcon gift={activeAnimation.gift} size={64} />
               </div>
               <div className="text-xs font-black text-amber-200 bg-black/70 px-2.5 py-0.5 rounded-full border border-amber-400/50 mt-1 shadow">
                 Nuş olsun! 😋

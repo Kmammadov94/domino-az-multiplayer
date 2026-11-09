@@ -29,11 +29,11 @@ export const TABLE_GIFTS: TableGiftDef[] = [
   {
     id: 'paxlava',
     name: { az: 'Şəki Paxlavası', ru: 'Шекинская Пахлава', en: 'Sheki Baklava' },
-    icon: '🥟',
+    icon: '🥮',
     type: 'friendly',
     cost: 10,
     impactType: 'sweet',
-    message: { az: 'sənə ləziz paxlava göndərdi! 🥟', ru: 'угостил пахлавой! 🥟', en: 'sent delicious baklava! 🥟' }
+    message: { az: 'sənə ləziz paxlava göndərdi! 🍯', ru: 'угостил пахлавой! 🍯', en: 'sent delicious baklava! 🍯' }
   },
   {
     id: 'watermelon',
