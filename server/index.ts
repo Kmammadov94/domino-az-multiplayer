@@ -72,7 +72,7 @@ let userDatabase = loadUserDatabase();
 
 // Sync user stats endpoint
 app.post('/api/user-stats', (req, res) => {
-  const { googleId, email, name, picture, stats } = req.body || {};
+  const { googleId, email, name, picture, stats, isInitialLogin } = req.body || {};
   if (!googleId) {
     return res.status(400).json({ error: 'googleId is required' });
   }
@@ -80,8 +80,19 @@ app.post('/api/user-stats', (req, res) => {
   const existing = userDatabase[googleId] || {};
   const existingStats = existing.stats || {};
 
-  // Handle coins: directly accept the client's coins without hardcoding or floor clamping
-  let finalCoins = typeof stats?.coins === 'number' ? Math.max(0, stats.coins) : (existingStats.coins ?? 20);
+  // Handle coins: on initial sign-in, preserve whichever balance is higher (cloud vs local)
+  // so a player never loses their cloud coins when switching to a new device.
+  // During normal gameplay, sync the current balance directly.
+  let finalCoins: number;
+  if (typeof stats?.coins === 'number') {
+    if (isInitialLogin || existingStats.coins !== undefined) {
+      finalCoins = Math.max(existingStats.coins || 0, stats.coins);
+    } else {
+      finalCoins = stats.coins;
+    }
+  } else {
+    finalCoins = existingStats.coins ?? 20;
+  }
 
   // Merge stats intelligently (union of unlocked cosmetics, max streak, etc.)
   const mergedStats = {
