@@ -72,6 +72,7 @@ import { PlayerControls } from './components/PlayerControls';
 import { DominoTile } from './components/DominoTile';
 import { StoreModal } from './components/StoreModal';
 import { DailyRewardModal } from './components/DailyRewardModal';
+import { DailyTeahouseChestWidget } from './components/DailyTeahouseChestWidget';
 import { RulesModal } from './components/RulesModal';
 import { GameEndModal } from './components/GameEndModal';
 import { AzerbaijanLogo } from './components/AzerbaijanLogo';
@@ -1379,23 +1380,27 @@ export const App: React.FC = () => {
     }
 
     const isDouble = tile.left === tile.right;
-    if (scored > 0 || isDouble) {
-      if (scored >= 15 || isDouble) {
-        sounds.playTileSlam();
-      } else {
-        sounds.playTileClack(true);
-      }
+
+    // Tactile Sound & Haptic Balancing:
+    // Basic moves: gentle soft clack, light haptic tick.
+    // Qoşa daş (doubles): heavy wooden slam sound, heavy haptic, 200ms quick table rumble!
+    if (isDouble) {
+      sounds.playTileSlam();
+      triggerHaptic('heavy');
+      setIsScreenShaking(true);
+      setTimeout(() => setIsScreenShaking(false), 200);
+    } else if (scored > 0) {
+      sounds.playTileClack(true);
+      triggerHaptic(scored >= 20 || scored === 35 ? 'heavy' : 'medium');
     } else {
       sounds.playTileClack(false);
+      triggerHaptic('light');
     }
 
     if (scored > 0) {
       if (scored >= 20 || scored === 35) {
-        triggerHaptic('heavy');
         setIsScreenShaking(true);
         setTimeout(() => setIsScreenShaking(false), 450);
-      } else {
-        triggerHaptic('medium');
       }
       sounds.playScorePoints(scored);
       setLastScoredPoints({
@@ -1410,7 +1415,6 @@ export const App: React.FC = () => {
         isInstant35: scored === 35
       });
     } else {
-      triggerHaptic('light');
       setLastScoredPoints(null);
     }
 
@@ -1497,24 +1501,16 @@ export const App: React.FC = () => {
     }
 
     const scored = combo.expectedScore;
-    const isDouble = true; // All combo moves are doubles!
-    if (scored > 0 || isDouble) {
-      if (scored >= 15 || isDouble) {
-        sounds.playTileSlam();
-      } else {
-        sounds.playTileClack(true);
-      }
-    } else {
-      sounds.playTileClack(false);
-    }
+    // All combo moves are doubles being slammed simultaneously
+    sounds.playTileSlam();
+    triggerHaptic('heavy');
+    setIsScreenShaking(true);
+    setTimeout(() => setIsScreenShaking(false), 220);
 
     if (scored > 0) {
       if (scored >= 20 || scored === 35) {
-        triggerHaptic('heavy');
         setIsScreenShaking(true);
         setTimeout(() => setIsScreenShaking(false), 450);
-      } else {
-        triggerHaptic('medium');
       }
       sounds.playScorePoints(scored);
       setLastScoredPoints({
@@ -1529,7 +1525,6 @@ export const App: React.FC = () => {
         isInstant35: scored === 35
       });
     } else {
-      triggerHaptic('light');
       setLastScoredPoints(null);
     }
 
@@ -2400,6 +2395,13 @@ export const App: React.FC = () => {
                 <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-300 group-hover:translate-x-0.5 transition" />
               </button>
             </div>
+
+            {/* Çayxana Günün Hədiyyəsi & Armudu Stəkan / Qızıl Sandıq Widget */}
+            <DailyTeahouseChestWidget
+              stats={stats}
+              lang={lang}
+              onOpenModal={() => setShowDailyReward(true)}
+            />
 
             {/* Guest Warning Banner (if guest) */}
             {!googleUser && showGuestWarning && (

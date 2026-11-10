@@ -44,16 +44,16 @@ export const FloatingScoreOverlay: React.FC<FloatingScoreOverlayProps> = ({ scor
         }`}
       >
         {visibleItem.isInstant35 ? (
-          <div className="flex flex-col items-center p-3 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-500 via-rose-600 to-amber-500 border-2 sm:border-4 border-yellow-200 shadow-[0_0_40px_rgba(245,158,11,0.9)] animate-pulse">
-            <div className="flex items-center gap-1.5 text-white font-black text-lg sm:text-xl">
-              <Zap className="w-5 h-5 fill-yellow-200 text-yellow-200" />
-              <span>35 VURDU!</span>
-              <Zap className="w-5 h-5 fill-yellow-200 text-yellow-200" />
+          <div className="flex flex-col items-center p-3.5 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-500 via-rose-600 to-amber-500 border-2 sm:border-4 border-yellow-200 shadow-[0_0_50px_rgba(245,158,11,0.95)] animate-bounce">
+            <div className="flex items-center gap-2 text-white font-black text-xl sm:text-2xl drop-shadow-md">
+              <Zap className="w-6 h-6 fill-yellow-200 text-yellow-200 animate-spin" />
+              <span>35! MASANIN ŞAHI!</span>
+              <Zap className="w-6 h-6 fill-yellow-200 text-yellow-200 animate-spin" />
             </div>
-            <span className="text-white text-[10px] sm:text-xs font-extrabold uppercase tracking-widest mt-0.5">
+            <span className="text-yellow-100 text-xs sm:text-sm font-black uppercase tracking-widest mt-1">
               BİRBAŞA MATÇ QƏLƏBƏSİ! 🏆
             </span>
-            <span className="text-amber-100 text-[10px] font-bold mt-0.5">
+            <span className="text-white bg-slate-950/60 px-3.5 py-0.5 rounded-full text-xs font-black mt-1.5 border border-amber-300/40 shadow-inner">
               {visibleItem.playerName}
             </span>
           </div>

@@ -254,12 +254,15 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
           const tileW = placed.isVertical ? TILE_SHORT : TILE_LONG;
           const tileH = placed.isVertical ? TILE_LONG : TILE_SHORT;
           const isLastPlaced = idx === board.tiles.length - 1 && board.tiles.length > 0;
+          const isDouble = placed.tile.left === placed.tile.right;
 
           return (
             <div
               key={`${placed.tile.id}-${idx}`}
               className={`absolute transition-all duration-300 ${
-                isLastPlaced
+                isLastPlaced && isDouble
+                  ? 'ring-4 ring-amber-400/90 shadow-[0_0_30px_rgba(251,191,36,0.95)] rounded-[7px]'
+                  : isLastPlaced
                   ? 'ring-2 ring-cyan-400/90 shadow-[0_0_20px_rgba(34,211,238,0.85)] rounded-[7px]'
                   : ''
               }`}
@@ -270,6 +273,15 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
                 zIndex: isLastPlaced ? 25 : placed.isSpinner ? 20 : 10
               }}
             >
+              {/* Authentic Çayxana Qoşa Daş Shockwave Blast Rings */}
+              {isLastPlaced && isDouble && (
+                <div className="absolute inset-0 -m-3 sm:-m-4 pointer-events-none flex items-center justify-center">
+                  <span className="absolute inset-0 rounded-2xl border-2 sm:border-3 border-amber-300 animate-ping opacity-85" />
+                  <span className="absolute -inset-1.5 rounded-2xl border border-amber-400/60 animate-pulse opacity-75" />
+                  <span className="absolute inset-0 rounded-xl bg-amber-400/20 blur-md" />
+                </div>
+              )}
+
               <DominoTile
                 tile={placed.tile}
                 skin={skin}
