@@ -191,6 +191,33 @@ app.post('/api/user-stats', (req, res) => {
   });
 });
 
+// Admin endpoint to inspect registered users
+app.get('/api/admin/users', (req, res) => {
+  const adminKey = (req.query.adminKey as string) || (req.headers['x-admin-key'] as string);
+  const secret = process.env.ADMIN_SECRET || 'domino-az-secret-admin-2026';
+  if (adminKey !== secret) {
+    return res.status(403).json({ error: 'Unauthorized. Provide valid adminKey.' });
+  }
+
+  const users = Object.entries(userDatabase).map(([id, rec]: [string, any]) => ({
+    googleId: id,
+    email: rec.profile?.email || '',
+    name: rec.profile?.name || '',
+    picture: rec.profile?.picture || '',
+    coins: rec.stats?.coins ?? 0,
+    equippedSkin: rec.stats?.equippedSkin || 'ivory_classic',
+    unlockedSkins: rec.stats?.unlockedSkins || [],
+    matchesPlayed: rec.stats?.matchesPlayed ?? 0,
+    matchesWon: rec.stats?.matchesWon ?? 0,
+    updatedAt: rec.updatedAt ? new Date(rec.updatedAt).toISOString() : null
+  }));
+
+  res.json({
+    totalUsers: users.length,
+    users
+  });
+});
+
 // Temporary store for Mobile APK Google Auth Handshake Sessions (expires after 5 minutes)
 const apkAuthSessions = new Map<string, { user: any; createdAt: number }>();
 
