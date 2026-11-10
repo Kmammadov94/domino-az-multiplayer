@@ -2460,11 +2460,11 @@ export const App: React.FC = () => {
                   triggerHaptic('medium');
                   handleQuickMatch('2p_solo', googleUser?.name || 'Siz');
                 }}
-                title="Sürətli 1v1 Onlayn Oyun"
+                title="Tezbazar 1v1 Onlayn Oyun"
                 className="py-3 px-3.5 rounded-2xl bg-gradient-to-b from-amber-400 to-amber-600 hover:brightness-110 text-slate-950 font-black flex flex-col items-center justify-center gap-0.5 shadow-md active:scale-95 transition flex-shrink-0 border border-amber-300/50"
               >
                 <Sparkles className="w-5 h-5 fill-slate-950" />
-                <span className="text-[11px] leading-none font-black">Tələsik</span>
+                <span className="text-[11px] leading-none font-black">Tezbazar</span>
               </button>
             </div>
 
