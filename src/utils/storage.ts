@@ -106,6 +106,10 @@ export const loadPlayerStats = (): PlayerStats => {
 export const savePlayerStats = (stats: PlayerStats): void => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
+    const googleUser = loadGoogleUser();
+    if (googleUser?.googleId) {
+      localStorage.setItem(`az_domino_user_stats_${googleUser.googleId}`, JSON.stringify(stats));
+    }
   } catch (err) {
     console.error('Failed to save player stats', err);
   }
@@ -158,6 +162,30 @@ export const syncWithCloud = async (
 ): Promise<PlayerStats> => {
   try {
     const baseUrl = getBackendServerUrl();
+
+    // Check account-scoped backup in localStorage to ensure past unlocks are never omitted
+    let statsToSend = { ...currentStats };
+    try {
+      const backupRaw = localStorage.getItem(`az_domino_user_stats_${profile.googleId}`);
+      if (backupRaw) {
+        const backupStats = JSON.parse(backupRaw) as Partial<PlayerStats>;
+        statsToSend = {
+          ...statsToSend,
+          coins: isInitialLogin ? Math.max(statsToSend.coins, backupStats.coins || 0) : statsToSend.coins,
+          unlockedSkins: Array.from(new Set([...(statsToSend.unlockedSkins || []), ...(backupStats.unlockedSkins || [])])),
+          unlockedAvatars: Array.from(new Set([...(statsToSend.unlockedAvatars || []), ...(backupStats.unlockedAvatars || [])])),
+          unlockedFrames: Array.from(new Set([...(statsToSend.unlockedFrames || []), ...(backupStats.unlockedFrames || [])])),
+          unlockedTitles: Array.from(new Set([...(statsToSend.unlockedTitles || []), ...(backupStats.unlockedTitles || [])])),
+          equippedSkin: (statsToSend.equippedSkin && statsToSend.equippedSkin !== 'ivory_classic')
+            ? statsToSend.equippedSkin
+            : (backupStats.equippedSkin || statsToSend.equippedSkin || 'ivory_classic'),
+          equippedAvatar: (statsToSend.equippedAvatar && statsToSend.equippedAvatar !== DEFAULT_AVATAR_ID)
+            ? statsToSend.equippedAvatar
+            : (backupStats.equippedAvatar || statsToSend.equippedAvatar || DEFAULT_AVATAR_ID)
+        };
+      }
+    } catch {}
+
     const res = await fetch(`${baseUrl}/api/user-stats`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -166,18 +194,31 @@ export const syncWithCloud = async (
         email: profile.email,
         name: profile.name,
         picture: profile.picture,
-        stats: currentStats,
+        stats: statsToSend,
         isInitialLogin
       })
     });
     if (res.ok) {
       const data = await res.json();
       if (data.stats) {
-        savePlayerStats(data.stats);
+        // Ensure default starter skins and avatars are intact
+        const resolvedStats: PlayerStats = { ...data.stats };
+        if (!resolvedStats.unlockedSkins) resolvedStats.unlockedSkins = ['ivory_classic'];
+        DOMINO_SKINS.filter((s) => s.unlockedByDefault).forEach((s) => {
+          if (!resolvedStats.unlockedSkins.includes(s.id)) {
+            resolvedStats.unlockedSkins.push(s.id);
+          }
+        });
+
+        savePlayerStats(resolvedStats);
+        try {
+          localStorage.setItem(`az_domino_user_stats_${profile.googleId}`, JSON.stringify(resolvedStats));
+        } catch {}
+
         if (data.profile) {
           saveGoogleUser(data.profile);
         }
-        return data.stats;
+        return resolvedStats;
       }
     }
   } catch (e) {

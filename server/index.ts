@@ -81,11 +81,11 @@ app.post('/api/user-stats', (req, res) => {
   const existingStats = existing.stats || {};
 
   // Handle coins: on initial sign-in, preserve whichever balance is higher (cloud vs local)
-  // so a player never loses their cloud coins when switching to a new device.
+  // so a player never loses their cloud coins when switching to a new device or re-logging in.
   // During normal gameplay, sync the current balance directly.
   let finalCoins: number;
   if (typeof stats?.coins === 'number') {
-    if (isInitialLogin || existingStats.coins !== undefined) {
+    if (isInitialLogin) {
       finalCoins = Math.max(existingStats.coins || 0, stats.coins);
     } else {
       finalCoins = stats.coins;
@@ -94,26 +94,76 @@ app.post('/api/user-stats', (req, res) => {
     finalCoins = existingStats.coins ?? 20;
   }
 
+  // Cosmetics merging with default-fallback protection:
+  // If local client has default 'ivory_classic' (e.g. fresh install or not selected), prefer existing cloud equipped skin!
+  const resolvedEquippedSkin =
+    (stats?.equippedSkin && stats.equippedSkin !== 'ivory_classic')
+      ? stats.equippedSkin
+      : (existingStats.equippedSkin || stats?.equippedSkin || 'ivory_classic');
+
+  const resolvedEquippedAvatar =
+    (stats?.equippedAvatar && stats.equippedAvatar !== 'avatar_baku_classic')
+      ? stats.equippedAvatar
+      : (existingStats.equippedAvatar || stats?.equippedAvatar || 'avatar_baku_classic');
+
+  const resolvedEquippedFrame =
+    (stats?.equippedFrame && stats.equippedFrame !== 'frame_none')
+      ? stats.equippedFrame
+      : (existingStats.equippedFrame || stats?.equippedFrame || 'frame_none');
+
+  const resolvedEquippedTitle =
+    (stats?.equippedTitle && stats.equippedTitle !== 'title_tea_elder')
+      ? stats.equippedTitle
+      : (existingStats.equippedTitle || stats?.equippedTitle || 'title_tea_elder');
+
+  const resolvedEquippedTable =
+    (stats?.equippedTableTheme && stats.equippedTableTheme !== 'table_emerald_classic')
+      ? stats.equippedTableTheme
+      : (existingStats.equippedTableTheme || stats?.equippedTableTheme || 'table_emerald_classic');
+
+  const mergedUnlockedSkins = Array.from(
+    new Set([
+      'ivory_classic',
+      ...(existingStats.unlockedSkins || []),
+      ...(stats?.unlockedSkins || [])
+    ])
+  );
+
+  const mergedUnlockedAvatars = Array.from(
+    new Set([
+      ...(existingStats.unlockedAvatars || []),
+      ...(stats?.unlockedAvatars || [])
+    ])
+  );
+
+  const mergedUnlockedFrames = Array.from(
+    new Set([
+      'frame_none',
+      ...(existingStats.unlockedFrames || []),
+      ...(stats?.unlockedFrames || [])
+    ])
+  );
+
+  const mergedUnlockedTitles = Array.from(
+    new Set([
+      'title_tea_elder',
+      ...(existingStats.unlockedTitles || []),
+      ...(stats?.unlockedTitles || [])
+    ])
+  );
+
   // Merge stats intelligently (union of unlocked cosmetics, max streak, etc.)
   const mergedStats = {
     coins: finalCoins,
-    equippedSkin: stats?.equippedSkin || existingStats.equippedSkin || 'ivory_classic',
-    unlockedSkins: Array.from(
-      new Set([...(existingStats.unlockedSkins || []), ...(stats?.unlockedSkins || ['ivory_classic'])])
-    ),
-    equippedAvatar: stats?.equippedAvatar || existingStats.equippedAvatar || 'avatar_baku_classic',
-    unlockedAvatars: Array.from(
-      new Set([...(existingStats.unlockedAvatars || []), ...(stats?.unlockedAvatars || [])])
-    ),
-    equippedFrame: stats?.equippedFrame || existingStats.equippedFrame || 'frame_none',
-    unlockedFrames: Array.from(
-      new Set([...(existingStats.unlockedFrames || ['frame_none']), ...(stats?.unlockedFrames || ['frame_none'])])
-    ),
-    equippedTitle: stats?.equippedTitle || existingStats.equippedTitle || 'title_tea_elder',
-    unlockedTitles: Array.from(
-      new Set([...(existingStats.unlockedTitles || ['title_tea_elder']), ...(stats?.unlockedTitles || ['title_tea_elder'])])
-    ),
-    equippedTableTheme: stats?.equippedTableTheme || existingStats.equippedTableTheme || 'table_emerald_classic',
+    equippedSkin: mergedUnlockedSkins.includes(resolvedEquippedSkin) ? resolvedEquippedSkin : 'ivory_classic',
+    unlockedSkins: mergedUnlockedSkins,
+    equippedAvatar: resolvedEquippedAvatar,
+    unlockedAvatars: mergedUnlockedAvatars,
+    equippedFrame: resolvedEquippedFrame,
+    unlockedFrames: mergedUnlockedFrames,
+    equippedTitle: resolvedEquippedTitle,
+    unlockedTitles: mergedUnlockedTitles,
+    equippedTableTheme: resolvedEquippedTable,
     dailyStreak: Math.max(existingStats.dailyStreak || 0, stats?.dailyStreak || 0),
     matchesPlayed: Math.max(existingStats.matchesPlayed || 0, stats?.matchesPlayed || 0),
     matchesWon: Math.max(existingStats.matchesWon || 0, stats?.matchesWon || 0),

@@ -3405,7 +3405,7 @@ export const App: React.FC = () => {
           saveGoogleUser(user);
           setGoogleUser(user);
           setShowGuestWarning(false);
-          syncWithCloud(user, stats, true).then((synced) => {
+          syncWithCloud(user, statsRef.current, true).then((synced) => {
             if (synced) setStats(synced);
           });
         }}
