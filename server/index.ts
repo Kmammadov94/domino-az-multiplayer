@@ -79,19 +79,20 @@ app.post('/api/user-stats', (req, res) => {
 
   const existing = userDatabase[googleId] || {};
   const existingStats = existing.stats || {};
+  const pendingGrant = existing.pendingCoinGrant || 0;
 
   // Handle coins: on initial sign-in, preserve whichever balance is higher (cloud vs local)
   // so a player never loses their cloud coins when switching to a new device or re-logging in.
-  // During normal gameplay, sync the current balance directly.
+  // During normal gameplay, sync the current balance directly + apply any pending admin grants.
   let finalCoins: number;
   if (typeof stats?.coins === 'number') {
     if (isInitialLogin) {
-      finalCoins = Math.max(existingStats.coins || 0, stats.coins);
+      finalCoins = Math.max(existingStats.coins || 0, stats.coins) + pendingGrant;
     } else {
-      finalCoins = stats.coins;
+      finalCoins = stats.coins + pendingGrant;
     }
   } else {
-    finalCoins = existingStats.coins ?? 20;
+    finalCoins = (existingStats.coins ?? 20) + pendingGrant;
   }
 
   // Cosmetics merging with default-fallback protection:
@@ -178,7 +179,10 @@ app.post('/api/user-stats', (req, res) => {
       picture: picture || existing.profile?.picture || ''
     },
     stats: mergedStats,
-    claimedGrants: existing.claimedGrants || [],
+    pendingCoinGrant: 0, // Cleared once applied to user's balance
+    claimedGrants: pendingGrant > 0
+      ? [...(existing.claimedGrants || []), { amount: pendingGrant, claimedAt: Date.now() }]
+      : (existing.claimedGrants || []),
     updatedAt: Date.now()
   };
 
@@ -209,6 +213,7 @@ app.get('/api/admin/users', (req, res) => {
     unlockedSkins: rec.stats?.unlockedSkins || [],
     matchesPlayed: rec.stats?.matchesPlayed ?? 0,
     matchesWon: rec.stats?.matchesWon ?? 0,
+    pendingCoinGrant: rec.pendingCoinGrant || 0,
     updatedAt: rec.updatedAt ? new Date(rec.updatedAt).toISOString() : null
   }));
 
@@ -217,6 +222,63 @@ app.get('/api/admin/users', (req, res) => {
     users
   });
 });
+
+// Admin endpoint to add or subtract coins to an account
+const handleAdminGrantCoins = (req: any, res: any) => {
+  const adminKey = (req.query.adminKey as string) || (req.headers['x-admin-key'] as string) || req.body?.adminKey;
+  const secret = process.env.ADMIN_SECRET || 'domino-az-secret-admin-2026';
+  if (adminKey !== secret) {
+    return res.status(403).json({ error: 'Unauthorized. Provide valid adminKey.' });
+  }
+
+  const googleId = (req.query.googleId as string) || req.body?.googleId;
+  const email = (req.query.email as string) || req.body?.email;
+  const rawAmount = req.query.amount ?? req.body?.amount;
+  const delta = Number(rawAmount);
+
+  if (isNaN(delta) || delta === 0) {
+    return res.status(400).json({ error: 'Valid numerical amount is required (e.g. 5000)' });
+  }
+
+  // Find user by googleId or email
+  let targetId = googleId;
+  if (!targetId && email) {
+    for (const [id, rec] of Object.entries(userDatabase)) {
+      if ((rec as any).profile?.email?.toLowerCase() === email.toLowerCase()) {
+        targetId = id;
+        break;
+      }
+    }
+  }
+
+  if (!targetId || !userDatabase[targetId]) {
+    return res.status(404).json({ error: 'User not found in cloud database' });
+  }
+
+  const user = userDatabase[targetId];
+  if (!user.stats) user.stats = {};
+  const prevCoins = user.stats.coins ?? 0;
+  user.stats.coins = Math.max(0, prevCoins + delta);
+  user.pendingCoinGrant = (user.pendingCoinGrant || 0) + delta;
+  user.updatedAt = Date.now();
+  saveUserDatabase(userDatabase);
+
+  res.json({
+    success: true,
+    user: {
+      googleId: targetId,
+      name: user.profile?.name,
+      email: user.profile?.email,
+      previousCoins: prevCoins,
+      added: delta,
+      currentServerCoins: user.stats.coins,
+      pendingCoinGrant: user.pendingCoinGrant
+    }
+  });
+};
+
+app.post('/api/admin/grant-coins', handleAdminGrantCoins);
+app.get('/api/admin/grant-coins', handleAdminGrantCoins);
 
 // Temporary store for Mobile APK Google Auth Handshake Sessions (expires after 5 minutes)
 const apkAuthSessions = new Map<string, { user: any; createdAt: number }>();
