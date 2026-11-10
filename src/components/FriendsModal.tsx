@@ -383,7 +383,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({
         {/* TAB 1: Friends List with Tag Disambiguation & Note edit  */}
         {/* ======================================================== */}
         {tab === 'list' && (
-          <div className="flex-1 flex flex-col min-h-[240px] overflow-hidden">
+          <div className="flex-1 flex flex-col min-h-0 sm:min-h-[220px] overflow-hidden">
             {/* Filter Search Input (if friends >= 3) */}
             {friends.length >= 3 && (
               <div className="relative mb-2">
@@ -540,7 +540,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({
         {/* TAB 2: Add Friend by Tag / Handle / Code & Invite Link  */}
         {/* ======================================================== */}
         {tab === 'add' && (
-          <div className="flex-1 overflow-y-auto space-y-3.5 p-1 min-h-[240px]">
+          <div className="flex-1 overflow-y-auto space-y-3.5 p-1 min-h-0 sm:min-h-[220px]">
             {/* Search by Tag or Handle */}
             <form onSubmit={handleSearchSubmit} className="flex flex-col gap-2">
               <label className="text-xs font-bold text-amber-300 flex items-center justify-between">
@@ -649,7 +649,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({
         {/* TAB 3: Recent Real Opponents                            */}
         {/* ======================================================== */}
         {tab === 'recent' && (
-          <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[240px]">
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0 sm:min-h-[220px]">
             {recentPlayers.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-48 text-center p-4 text-slate-500">
                 <Clock className="w-8 h-8 mb-2 opacity-50" />

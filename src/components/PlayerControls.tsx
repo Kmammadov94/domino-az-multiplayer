@@ -78,13 +78,19 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     return hand;
   }, [hand, sortMode]);
 
-  // Screen width observer for dynamic portrait mobile tile sizing
-  const [windowWidth, setWindowWidth] = useState(
-    typeof window !== 'undefined' ? window.innerWidth : 800
-  );
+  // Screen dimensions observer for dynamic portrait, landscape, and tablet sizing
+  const [dimensions, setDimensions] = useState(() => ({
+    width: typeof window !== 'undefined' ? window.innerWidth : 800,
+    height: typeof window !== 'undefined' ? window.innerHeight : 600
+  }));
 
   useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
+    const handleResize = () => {
+      setDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
     window.addEventListener('resize', handleResize);
     window.addEventListener('orientationchange', handleResize);
     return () => {
@@ -185,32 +191,51 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   };
 
   // Dynamic tile dimension calculation:
-  // Ensures ALL tiles in hand fit seamlessly on any phone in portrait mode!
+  // Dynamically responsive across Mobile Portrait, Landscape Mode (90° phone rotation), and Tablets!
+  const { width: windowWidth, height: windowHeight } = dimensions;
   const count = hand.length;
-  const isMobile = windowWidth < 640;
 
-  // On very small mobile screens (< 480px), if hand has > 8 tiles, wrap into two rows
-  const shouldWrapRows = isMobile && count > 8;
+  // Responsive device/orientation modes
+  const isLandscapePhone = windowHeight <= 520 && windowWidth > windowHeight;
+  const isTablet = (windowWidth >= 768 && windowHeight >= 600) || (windowHeight >= 768 && windowWidth >= 600);
+  const isMobilePortrait = windowWidth < 640 && !isLandscapePhone;
+
+  // In portrait on very small screens, wrap into two rows if count > 8
+  const shouldWrapRows = isMobilePortrait && count > 8;
   const tilesPerRow = shouldWrapRows ? Math.ceil(count / 2) : Math.max(1, count);
 
   // Available width for tiles accounting for screen padding
-  const availableWidth = Math.max(260, windowWidth - (isMobile ? 16 : 48));
-  const gapPx = isMobile ? (tilesPerRow > 6 ? 3 : 5) : 8;
+  const availableWidth = Math.max(260, windowWidth - (isMobilePortrait ? 16 : isLandscapePhone ? 80 : 48));
+  const gapPx = isLandscapePhone ? 4 : isMobilePortrait ? (tilesPerRow > 6 ? 3 : 5) : 8;
   const totalGaps = Math.max(0, tilesPerRow - 1) * gapPx;
-  const containerPadding = isMobile ? 12 : 24;
+  const containerPadding = isLandscapePhone ? 8 : isMobilePortrait ? 12 : 24;
 
   const rawTileWidth = Math.floor(
     (availableWidth - totalGaps - containerPadding) / Math.max(1, tilesPerRow)
   );
 
-  // Clamped tile width (from 32px on small phones up to 54px on desktop)
-  const dynamicTileWidth = isMobile
-    ? Math.min(52, Math.max(32, rawTileWidth))
-    : 54;
-  const dynamicTileHeight = dynamicTileWidth * 2;
+  // Dynamic Tile Dimensions:
+  // - Landscape phone: compact vertical footprint (height: 68-76px) so domino board gets maximum room!
+  // - Tablet: large, crisp 56px x 112px domino tiles
+  // - Mobile portrait: adaptive 32-52px clamped width
+  let dynamicTileWidth = 54;
+  let dynamicTileHeight = 108;
+
+  if (isLandscapePhone) {
+    dynamicTileWidth = Math.min(38, Math.max(28, rawTileWidth));
+    dynamicTileHeight = Math.min(76, dynamicTileWidth * 2);
+  } else if (isTablet) {
+    dynamicTileWidth = 56;
+    dynamicTileHeight = 112;
+  } else if (isMobilePortrait) {
+    dynamicTileWidth = Math.min(52, Math.max(32, rawTileWidth));
+    dynamicTileHeight = dynamicTileWidth * 2;
+  }
 
   return (
-    <div className="w-full flex flex-col items-center gap-1.5 sm:gap-2 select-none z-20 pb-2 px-1">
+    <div className={`w-full flex flex-col items-center select-none z-20 px-1 ${
+      isLandscapePhone ? 'gap-1 pb-1' : 'gap-1.5 sm:gap-2 pb-2'
+    }`}>
       {/* Available Double Combos Banner / Button */}
       {availableCombos.length > 0 && onExecuteCombo && (
         <div className="flex flex-wrap items-center justify-center gap-2 mb-0.5 animate-fade-in pointer-events-auto">
@@ -232,86 +257,159 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
         </div>
       )}
 
-      {/* Action Buttons Bar & Tile Sorter */}
-      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-center">
-        {/* Tile Sorting Toggle Pill */}
-        {hand.length > 1 && (
-          <button
-            onClick={cycleSortMode}
-            title="Əldəki daşları çeşidlə"
-            className="px-2.5 py-1 rounded-xl text-[10px] sm:text-xs font-bold bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-700/80 shadow flex items-center gap-1.5 active:scale-95 transition"
-          >
-            <ArrowUpDown className="w-3.5 h-3.5 text-amber-400" />
-            <span>
-              {sortMode === 'doubles_first'
-                ? 'Qoşalar öndə'
-                : sortMode === 'sum_desc'
-                ? 'Böyükdən kiçiyə'
-                : 'Çeşidləmə'}
-            </span>
-          </button>
-        )}
+      {/* Control Bar: In Landscape Phone mode, combine Turn Indicator and Actions into 1 Single Compact Row to save screen height! */}
+      {isLandscapePhone ? (
+        <div className="w-full max-w-4xl px-2 flex items-center justify-between gap-2 text-xs flex-shrink-0">
+          {/* Left: Turn prompt / Hint banner */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            {isMyTurn && hasPlayableMove ? (
+              <div className="px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-500/30 to-amber-500/20 border border-amber-400 text-amber-300 text-[10px] font-black shadow flex items-center gap-1.5 animate-pulse truncate">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+                <span>🎯 Sizin Növbənizdir</span>
+              </div>
+            ) : isMyTurn && !hasPlayableMove ? (
+              <div className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/50 text-amber-300 text-[10px] font-bold truncate">
+                {isBoardBlocked
+                  ? '🔒 Oyun Bağlandı'
+                  : canDrawFromReserve
+                  ? '💡 Bazardan çəkin'
+                  : '💡 Pas keçin'}
+              </div>
+            ) : null}
+          </div>
 
-        {/* Draw from Bazar (if bazar has tiles exceeding minimum reserve and game is not blocked) */}
-        {canDrawFromReserve && (
-          <button
-            onClick={() => onDrawTile()}
-            disabled={!isMyTurn || hasPlayableMove}
-            className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg ${
-              isMyTurn && !hasPlayableMove
-                ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 animate-bounce'
-                : 'bg-slate-800/80 text-slate-400 border border-slate-700 cursor-not-allowed'
-            }`}
-          >
-            <Layers className="w-4 h-4" />
-            <span>
-              {variant === '101'
-                ? availableToDraw >= 2
-                  ? `${t.drawTile} (+2 daş • cəmi ${boneyardCount})`
-                  : `${t.drawTile} (+1 daş • cəmi ${boneyardCount})`
-                : `${t.drawTile} (${boneyardCount})`}
-            </span>
-          </button>
-        )}
+          {/* Right: Actions (Sort, Bazar, Pass) */}
+          <div className="flex items-center gap-1.5 flex-shrink-0 ml-auto">
+            {hand.length > 1 && (
+              <button
+                onClick={cycleSortMode}
+                title="Əldəki daşları çeşidlə"
+                className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-700/80 shadow flex items-center gap-1 active:scale-95 transition"
+              >
+                <ArrowUpDown className="w-3 h-3 text-amber-400" />
+                <span>
+                  {sortMode === 'doubles_first'
+                    ? 'Qoşa'
+                    : sortMode === 'sum_desc'
+                    ? 'Xal'
+                    : 'Çeşid'}
+                </span>
+              </button>
+            )}
 
-        {/* Pass Button (when no moves and (bazar reached reserve OR board is blocked)) */}
-        {isMyTurn && !hasPlayableMove && (!canDrawFromReserve || isBoardBlocked) && (
-          <button
-            onClick={onPassTurn}
-            className="px-4 py-1.5 sm:px-5 sm:py-2 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-500 text-white shadow-lg flex items-center gap-2 animate-pulse"
-          >
-            <ArrowRightCircle className="w-4 h-4" />
-            <span>{t.pass}</span>
-          </button>
-        )}
-      </div>
+            {canDrawFromReserve && (
+              <button
+                onClick={() => onDrawTile()}
+                disabled={!isMyTurn || hasPlayableMove}
+                className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 shadow ${
+                  isMyTurn && !hasPlayableMove
+                    ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 animate-bounce'
+                    : 'bg-slate-800/80 text-slate-400 border border-slate-700 cursor-not-allowed'
+                }`}
+              >
+                <Layers className="w-3 h-3" />
+                <span>Bazar ({boneyardCount})</span>
+              </button>
+            )}
 
-      {/* Helpful Hint Banner when player has no valid move */}
-      {isMyTurn && !hasPlayableMove && (
-        <div className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/50 text-amber-300 text-[10px] sm:text-xs font-bold animate-fade-in shadow">
-          {isBoardBlocked
-            ? '🔒 Oyun Bağlandı — Bütün açıq ucların daşları masadadır! Pas keçin.'
-            : canDrawFromReserve
-            ? '💡 Gedişiniz yoxdur — Bazardan daş çəkin'
-            : '💡 Gedişiniz yoxdur və bazarda rezerv qalıb — Pas keçin'}
+            {isMyTurn && !hasPlayableMove && (!canDrawFromReserve || isBoardBlocked) && (
+              <button
+                onClick={onPassTurn}
+                className="px-3 py-0.5 rounded-lg text-[10px] font-black bg-rose-600 hover:bg-rose-500 text-white shadow flex items-center gap-1 animate-pulse"
+              >
+                <ArrowRightCircle className="w-3 h-3" />
+                <span>{t.pass}</span>
+              </button>
+            )}
+          </div>
         </div>
-      )}
+      ) : (
+        /* Portrait and Tablet layout: standard centered rows */
+        <>
+          {/* Action Buttons Bar & Tile Sorter */}
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-center">
+            {/* Tile Sorting Toggle Pill */}
+            {hand.length > 1 && (
+              <button
+                onClick={cycleSortMode}
+                title="Əldəki daşları çeşidlə"
+                className="px-2.5 py-1 rounded-xl text-[10px] sm:text-xs font-bold bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-700/80 shadow flex items-center gap-1.5 active:scale-95 transition"
+              >
+                <ArrowUpDown className="w-3.5 h-3.5 text-amber-400" />
+                <span>
+                  {sortMode === 'doubles_first'
+                    ? 'Qoşalar öndə'
+                    : sortMode === 'sum_desc'
+                    ? 'Böyükdən kiçiyə'
+                    : 'Çeşidləmə'}
+                </span>
+              </button>
+            )}
 
-      {/* Visual Turn Indicator for Human Player */}
-      {isMyTurn && hasPlayableMove && (
-        <div className="px-3 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-500/30 to-amber-500/20 border border-amber-400 text-amber-300 text-[10px] sm:text-xs font-black shadow-[0_0_15px_rgba(251,191,36,0.45)] animate-pulse flex items-center gap-1.5">
-          <span className="flex h-2 w-2 relative">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-          </span>
-          <span>🎯 Sizin Növbənizdir — Daşı masaya çəkin</span>
-        </div>
+            {/* Draw from Bazar (if bazar has tiles exceeding minimum reserve and game is not blocked) */}
+            {canDrawFromReserve && (
+              <button
+                onClick={() => onDrawTile()}
+                disabled={!isMyTurn || hasPlayableMove}
+                className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg ${
+                  isMyTurn && !hasPlayableMove
+                    ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 animate-bounce'
+                    : 'bg-slate-800/80 text-slate-400 border border-slate-700 cursor-not-allowed'
+                }`}
+              >
+                <Layers className="w-4 h-4" />
+                <span>
+                  {variant === '101'
+                    ? availableToDraw >= 2
+                    ? `${t.drawTile} (+2 daş • cəmi ${boneyardCount})`
+                    : `${t.drawTile} (+1 daş • cəmi ${boneyardCount})`
+                    : `${t.drawTile} (${boneyardCount})`}
+                </span>
+              </button>
+            )}
+
+            {/* Pass Button (when no moves and (bazar reached reserve OR board is blocked)) */}
+            {isMyTurn && !hasPlayableMove && (!canDrawFromReserve || isBoardBlocked) && (
+              <button
+                onClick={onPassTurn}
+                className="px-4 py-1.5 sm:px-5 sm:py-2 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-500 text-white shadow-lg flex items-center gap-2 animate-pulse"
+              >
+                <ArrowRightCircle className="w-4 h-4" />
+                <span>{t.pass}</span>
+              </button>
+            )}
+          </div>
+
+          {/* Helpful Hint Banner when player has no valid move */}
+          {isMyTurn && !hasPlayableMove && (
+            <div className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/50 text-amber-300 text-[10px] sm:text-xs font-bold animate-fade-in shadow">
+              {isBoardBlocked
+                ? '🔒 Oyun Bağlandı — Bütün açıq ucların daşları masadadır! Pas keçin.'
+                : canDrawFromReserve
+                ? '💡 Gedişiniz yoxdur — Bazardan daş çəkin'
+                : '💡 Gedişiniz yoxdur və bazarda rezerv qalıb — Pas keçin'}
+            </div>
+          )}
+
+          {/* Visual Turn Indicator for Human Player */}
+          {isMyTurn && hasPlayableMove && (
+            <div className="px-3 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-500/30 to-amber-500/20 border border-amber-400 text-amber-300 text-[10px] sm:text-xs font-black shadow-[0_0_15px_rgba(251,191,36,0.45)] animate-pulse flex items-center gap-1.5">
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+              </span>
+              <span>🎯 Sizin Növbənizdir — Daşı masaya çəkin</span>
+            </div>
+          )}
+        </>
       )}
 
       {/* Hand Domino Tiles Container:
-          Dynamically sized so that EVERY domino tile is 100% visible on mobile portrait! */}
+          Dynamically sized so that EVERY domino tile is 100% visible on mobile portrait, landscape, and tablets! */}
       <div
-        className={`w-full max-w-full px-2 sm:px-4 py-1.5 sm:py-2 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm rounded-2xl border transition-all duration-300 shadow-2xl ${
+        className={`w-full max-w-full px-2 sm:px-4 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm border transition-all duration-300 shadow-2xl ${
+          isLandscapePhone ? 'py-1 rounded-xl' : 'py-1.5 sm:py-2 rounded-2xl'
+        } ${
           isMyTurn
             ? 'border-amber-400/80 ring-2 ring-amber-400/30 shadow-[0_0_25px_rgba(251,191,36,0.25)]'
             : 'border-white/5'

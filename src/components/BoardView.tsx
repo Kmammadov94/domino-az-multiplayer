@@ -43,6 +43,8 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
   const [userZoom, setUserZoom] = useState(1.0);
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
+  const pinchStartDistRef = useRef<number | null>(null);
+  const pinchStartZoomRef = useRef<number>(1.0);
 
   // Measure actual container dimensions reactively
   useEffect(() => {
@@ -90,14 +92,20 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
   const spanY = Math.max(180, maxY - minY);
 
   // Safe padding so tiles never touch HUD margins or screen boundaries
-  const paddingX = Math.min(140, viewport.w * 0.15);
-  const paddingY = Math.min(110, viewport.h * 0.18);
-  const usableW = Math.max(260, viewport.w - paddingX * 2);
-  const usableH = Math.max(180, viewport.h - paddingY * 2);
+  // Dynamically adaptive for Landscape Phones, Tablets, and Mobile Portrait!
+  const isShortLandscape = viewport.h < 350;
+  const paddingX = viewport.w > 700 ? Math.min(70, viewport.w * 0.08) : Math.min(140, viewport.w * 0.15);
+  const paddingY = isShortLandscape ? Math.min(22, viewport.h * 0.08) : Math.min(110, viewport.h * 0.18);
+  const usableW = Math.max(220, viewport.w - paddingX * 2);
+  const usableH = Math.max(isShortLandscape ? 130 : 180, viewport.h - paddingY * 2);
 
   // Dynamic auto-scale factor ensuring all tiles fit inside visible bounds
+  // On tablets & large screens, allow center domino tiles to render significantly larger (up to 1.85x)
+  // so they are crisp, tactile, and prominent instead of looking tiny!
+  const isTabletOrLarge = viewport.w >= 768 || viewport.h >= 600;
+  const maxAutoScale = isTabletOrLarge ? 1.85 : 1.35;
   const rawAutoScale = Math.min(usableW / spanX, usableH / spanY);
-  const autoScale = Math.min(1.05, Math.max(0.38, rawAutoScale));
+  const autoScale = Math.min(maxAutoScale, Math.max(0.38, rawAutoScale));
 
   const finalScale = autoScale * userZoom;
   const centerX = (minX + maxX) / 2;
@@ -128,10 +136,10 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
-    setUserZoom((prev) => Math.min(1.8, Math.max(0.55, prev * zoomFactor)));
+    setUserZoom((prev) => Math.min(2.5, Math.max(0.45, prev * zoomFactor)));
   };
 
-  // Touch pan handlers
+  // Touch pan & pinch-to-zoom handlers (native multi-touch on Tablets & Mobile)
   const handleTouchStart = (e: React.TouchEvent) => {
     if (isDraggingTile) return;
     if (e.touches.length === 1) {
@@ -140,19 +148,47 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
         x: e.touches[0].clientX - panOffset.x,
         y: e.touches[0].clientY - panOffset.y
       };
+      pinchStartDistRef.current = null;
+    } else if (e.touches.length === 2) {
+      isDraggingRef.current = false;
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinchStartDistRef.current = Math.hypot(dx, dy);
+      pinchStartZoomRef.current = userZoom;
     }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (isDraggingTile || !isDraggingRef.current || e.touches.length !== 1) return;
-    setPanOffset({
-      x: e.touches[0].clientX - dragStartRef.current.x,
-      y: e.touches[0].clientY - dragStartRef.current.y
-    });
+    if (isDraggingTile) return;
+    if (e.touches.length === 1 && isDraggingRef.current) {
+      setPanOffset({
+        x: e.touches[0].clientX - dragStartRef.current.x,
+        y: e.touches[0].clientY - dragStartRef.current.y
+      });
+    } else if (e.touches.length === 2 && pinchStartDistRef.current) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const currentDist = Math.hypot(dx, dy);
+      if (pinchStartDistRef.current > 0) {
+        const factor = currentDist / pinchStartDistRef.current;
+        const newZoom = Math.min(2.5, Math.max(0.45, pinchStartZoomRef.current * factor));
+        setUserZoom(newZoom);
+      }
+    }
   };
 
-  const handleTouchEnd = () => {
-    isDraggingRef.current = false;
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length === 0) {
+      isDraggingRef.current = false;
+      pinchStartDistRef.current = null;
+    } else if (e.touches.length === 1) {
+      isDraggingRef.current = true;
+      dragStartRef.current = {
+        x: e.touches[0].clientX - panOffset.x,
+        y: e.touches[0].clientY - panOffset.y
+      };
+      pinchStartDistRef.current = null;
+    }
   };
 
   // Reset view to default auto-fit
@@ -357,16 +393,16 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
           </button>
         )}
         <button
-          onClick={() => setUserZoom((prev) => Math.min(1.8, prev * 1.15))}
+          onClick={() => setUserZoom((prev) => Math.min(2.5, prev * 1.15))}
           title="Yaxınlaşdır"
-          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition"
+          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition active:scale-95"
         >
           <ZoomIn className="w-3.5 h-3.5" />
         </button>
         <button
-          onClick={() => setUserZoom((prev) => Math.max(0.55, prev * 0.85))}
+          onClick={() => setUserZoom((prev) => Math.max(0.45, prev * 0.85))}
           title="Uzaqlaşdır"
-          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition"
+          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition active:scale-95"
         >
           <ZoomOut className="w-3.5 h-3.5" />
         </button>

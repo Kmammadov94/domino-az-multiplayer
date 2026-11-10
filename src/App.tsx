@@ -2205,7 +2205,7 @@ export const App: React.FC = () => {
           paddingLeft: 'max(0.5rem, env(safe-area-inset-left))',
           paddingRight: 'max(0.5rem, env(safe-area-inset-right))'
         }}
-        className="flex-shrink-0 min-h-11 py-1 sm:py-1.5 bg-slate-900/95 border-b border-amber-600/30 flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 z-30 shadow-md select-none"
+        className="flex-shrink-0 min-h-11 landscape:min-h-9 py-1 sm:py-1.5 landscape:py-0.5 bg-slate-900/95 border-b border-amber-600/30 flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 z-30 shadow-md select-none"
       >
         {inGame ? (
           /* Clean, non-intrusive in-game header — all elements guaranteed visible on mobile */
@@ -2629,7 +2629,7 @@ export const App: React.FC = () => {
           /* Active Playing Screen */
           <div className="flex-1 relative flex flex-col overflow-hidden">
             {/* Dedicated Non-Overlapping Top HUD Bar: ScoreBoard (Your & Opponent Scores) + Turn Indicator + Bazaar */}
-            <div className="w-full px-2 py-1.5 bg-slate-950/85 border-b border-amber-500/20 flex flex-wrap items-center justify-between gap-1.5 z-30 flex-shrink-0 pointer-events-auto">
+            <div className="w-full px-2 py-1.5 landscape:py-0.5 bg-slate-950/85 border-b border-amber-500/20 flex flex-wrap items-center justify-between gap-1.5 z-30 flex-shrink-0 pointer-events-auto">
               {/* Left: Player & Opponent Scores */}
               <div className="flex items-center">
                 <ScoreBoard
@@ -2869,61 +2869,63 @@ export const App: React.FC = () => {
                 : (rightOpponent?.score ?? 0);
               return (
                 <>
-                  {/* Left Side Opponent Badge */}
-                  <div className="absolute left-1.5 sm:left-3 top-[44%] -translate-y-1/2 z-10 flex flex-col items-start pointer-events-auto">
-                    <div
-                      onClick={() => {
-                        triggerHaptic('light');
-                        if (leftOpponent) {
-                          const targetSlot = mpGameState?.players[leftIdx];
-                          setGiftTargetPlayer({
-                            index: leftIdx,
-                            name: leftOpponent.name,
-                            isBot: leftOpponent.isAI || !effectiveInMultiplayer,
-                            playerTag: targetSlot?.playerTag,
-                            playerId: targetSlot?.playerId
-                          });
-                        }
-                      }}
-                      title={`${leftOpponent?.name} üçün hədiyyə göndər`}
-                      className={`flex items-center gap-1.5 backdrop-blur-md px-2.5 py-1 rounded-full border shadow-lg cursor-pointer active:scale-95 transition-all group ${
-                        isLeftTurn
-                          ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
-                          : 'bg-slate-900/90 hover:bg-slate-800/95 border-slate-700/80'
-                      }`}
-                    >
-                      <div className="relative">
-                        <AvatarView
-                          avatarId={leftOpponent?.avatarId || 'avatar_tea_master'}
-                          size={20}
-                          showBorder={false}
-                        />
+                  {/* Left Side Opponent Badge — Turned vertically along left edge */}
+                  <div className="absolute left-0.5 sm:left-1 top-[42%] -translate-y-1/2 z-10 flex items-center pointer-events-auto">
+                    <div className="w-8 h-36 flex items-center justify-center">
+                      <div
+                        onClick={() => {
+                          triggerHaptic('light');
+                          if (leftOpponent) {
+                            const targetSlot = mpGameState?.players[leftIdx];
+                            setGiftTargetPlayer({
+                              index: leftIdx,
+                              name: leftOpponent.name,
+                              isBot: leftOpponent.isAI || !effectiveInMultiplayer,
+                              playerTag: targetSlot?.playerTag,
+                              playerId: targetSlot?.playerId
+                            });
+                          }
+                        }}
+                        title={`${leftOpponent?.name} üçün hədiyyə göndər`}
+                        className={`rotate-90 origin-center whitespace-nowrap flex items-center gap-1.5 backdrop-blur-md px-2.5 py-1 rounded-full border shadow-lg cursor-pointer active:scale-95 transition-all group ${
+                          isLeftTurn
+                            ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
+                            : 'bg-slate-900/90 hover:bg-slate-800/95 border-slate-700/80'
+                        }`}
+                      >
+                        <div className="relative -rotate-90 flex-shrink-0">
+                          <AvatarView
+                            avatarId={leftOpponent?.avatarId || 'avatar_tea_master'}
+                            size={20}
+                            showBorder={false}
+                          />
+                          {isLeftTurn && (
+                            <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                            </span>
+                          )}
+                        </div>
+                        <span className={`text-[11px] font-bold max-w-[85px] sm:max-w-[120px] truncate ${isLeftTurn ? 'text-amber-300 font-black' : 'text-slate-200'}`}>
+                          {leftOpponent?.name}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-600 text-amber-300 text-[10px] font-black tracking-wide flex items-center gap-0.5 shadow-sm">
+                          <span className="-rotate-90">🀰</span>
+                          <span>{leftOpponent?.hand.length ?? 0}</span>
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-black">
+                          ⭐{leftScore}
+                        </span>
                         {isLeftTurn && (
-                          <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                          <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse -rotate-90">
+                            🎯
                           </span>
                         )}
+                        <span className="text-[10px] group-hover:scale-125 transition-transform -rotate-90">🎁</span>
                       </div>
-                      <span className={`text-[11px] font-bold max-w-[85px] sm:max-w-[120px] truncate ${isLeftTurn ? 'text-amber-300 font-black' : 'text-slate-200'}`}>
-                        {leftOpponent?.name}
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-600 text-amber-300 text-[10px] font-black tracking-wide flex items-center gap-0.5 shadow-sm">
-                        <span>🀰</span>
-                        <span>{leftOpponent?.hand.length ?? 0}</span>
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-black">
-                        ⭐{leftScore}
-                      </span>
-                      {isLeftTurn && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse">
-                          🎯
-                        </span>
-                      )}
-                      <span className="text-[10px] group-hover:scale-125 transition-transform">🎁</span>
                     </div>
                     {leftNotice && (
-                      <div className={`mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-black shadow border animate-bounce ${
+                      <div className={`ml-1 px-2.5 py-0.5 rounded-full text-[10px] font-black shadow border animate-bounce whitespace-nowrap ${
                         leftNotice.type === 'draw'
                           ? 'bg-cyan-950/95 border-cyan-400 text-cyan-200'
                           : 'bg-rose-950/95 border-rose-400 text-rose-200'
@@ -2933,61 +2935,63 @@ export const App: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Right Side Opponent Badge */}
-                  <div className="absolute right-1.5 sm:right-3 top-[44%] -translate-y-1/2 z-10 flex flex-col items-end pointer-events-auto">
-                    <div
-                      onClick={() => {
-                        triggerHaptic('light');
-                        if (rightOpponent) {
-                          const targetSlot = mpGameState?.players[rightIdx];
-                          setGiftTargetPlayer({
-                            index: rightIdx,
-                            name: rightOpponent.name,
-                            isBot: rightOpponent.isAI || !effectiveInMultiplayer,
-                            playerTag: targetSlot?.playerTag,
-                            playerId: targetSlot?.playerId
-                          });
-                        }
-                      }}
-                      title={`${rightOpponent?.name} üçün hədiyyə göndər`}
-                      className={`flex items-center gap-1.5 backdrop-blur-md px-2.5 py-1 rounded-full border shadow-lg cursor-pointer active:scale-95 transition-all group ${
-                        isRightTurn
-                          ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
-                          : 'bg-slate-900/90 hover:bg-slate-800/95 border-slate-700/80'
-                      }`}
-                    >
-                      <div className="relative">
-                        <AvatarView
-                          avatarId={rightOpponent?.avatarId || 'avatar_sheki_guest'}
-                          size={20}
-                          showBorder={false}
-                        />
+                  {/* Right Side Opponent Badge — Turned vertically along right edge */}
+                  <div className="absolute right-0.5 sm:right-1 top-[42%] -translate-y-1/2 z-10 flex items-center flex-row-reverse pointer-events-auto">
+                    <div className="w-8 h-36 flex items-center justify-center">
+                      <div
+                        onClick={() => {
+                          triggerHaptic('light');
+                          if (rightOpponent) {
+                            const targetSlot = mpGameState?.players[rightIdx];
+                            setGiftTargetPlayer({
+                              index: rightIdx,
+                              name: rightOpponent.name,
+                              isBot: rightOpponent.isAI || !effectiveInMultiplayer,
+                              playerTag: targetSlot?.playerTag,
+                              playerId: targetSlot?.playerId
+                            });
+                          }
+                        }}
+                        title={`${rightOpponent?.name} üçün hədiyyə göndər`}
+                        className={`-rotate-90 origin-center whitespace-nowrap flex flex-row-reverse items-center gap-1.5 backdrop-blur-md px-2.5 py-1 rounded-full border shadow-lg cursor-pointer active:scale-95 transition-all group ${
+                          isRightTurn
+                            ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
+                            : 'bg-slate-900/90 hover:bg-slate-800/95 border-slate-700/80'
+                        }`}
+                      >
+                        <div className="relative rotate-90 flex-shrink-0">
+                          <AvatarView
+                            avatarId={rightOpponent?.avatarId || 'avatar_sheki_guest'}
+                            size={20}
+                            showBorder={false}
+                          />
+                          {isRightTurn && (
+                            <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                            </span>
+                          )}
+                        </div>
+                        <span className={`text-[11px] font-bold max-w-[85px] sm:max-w-[120px] truncate ${isRightTurn ? 'text-amber-300 font-black' : 'text-slate-200'}`}>
+                          {rightOpponent?.name}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-600 text-amber-300 text-[10px] font-black tracking-wide flex items-center gap-0.5 shadow-sm">
+                          <span className="rotate-90">🀰</span>
+                          <span>{rightOpponent?.hand.length ?? 0}</span>
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-black">
+                          ⭐{rightScore}
+                        </span>
                         {isRightTurn && (
-                          <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                          <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse rotate-90">
+                            🎯
                           </span>
                         )}
+                        <span className="text-[10px] group-hover:scale-125 transition-transform rotate-90">🎁</span>
                       </div>
-                      <span className={`text-[11px] font-bold max-w-[85px] sm:max-w-[120px] truncate ${isRightTurn ? 'text-amber-300 font-black' : 'text-slate-200'}`}>
-                        {rightOpponent?.name}
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-600 text-amber-300 text-[10px] font-black tracking-wide flex items-center gap-0.5 shadow-sm">
-                        <span>🀰</span>
-                        <span>{rightOpponent?.hand.length ?? 0}</span>
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-black">
-                        ⭐{rightScore}
-                      </span>
-                      {isRightTurn && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse">
-                          🎯
-                        </span>
-                      )}
-                      <span className="text-[10px] group-hover:scale-125 transition-transform">🎁</span>
                     </div>
                     {rightNotice && (
-                      <div className={`mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-black shadow border animate-bounce ${
+                      <div className={`mr-1 px-2.5 py-0.5 rounded-full text-[10px] font-black shadow border animate-bounce whitespace-nowrap ${
                         rightNotice.type === 'draw'
                           ? 'bg-cyan-950/95 border-cyan-400 text-cyan-200'
                           : 'bg-rose-950/95 border-rose-400 text-rose-200'
@@ -3080,61 +3084,63 @@ export const App: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Left Side Opponent Badge */}
-                  <div className="absolute left-1.5 sm:left-3 top-[44%] -translate-y-1/2 z-10 flex flex-col items-start pointer-events-auto">
-                    <div
-                      onClick={() => {
-                        triggerHaptic('light');
-                        if (leftOpponent) {
-                          const targetSlot = mpGameState?.players[leftIdx];
-                          setGiftTargetPlayer({
-                            index: leftIdx,
-                            name: leftOpponent.name,
-                            isBot: leftOpponent.isAI || !effectiveInMultiplayer,
-                            playerTag: targetSlot?.playerTag,
-                            playerId: targetSlot?.playerId
-                          });
-                        }
-                      }}
-                      className={`flex items-center gap-1.5 backdrop-blur-md px-2.5 py-1 rounded-full border shadow-lg cursor-pointer active:scale-95 transition-all group ${
-                        isLeftTurn
-                          ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
-                          : 'bg-slate-900/90 hover:bg-slate-800/95 border-slate-700/80'
-                      }`}
-                      title={`${leftOpponent?.name} üçün hədiyyə göndər`}
-                    >
-                      <div className="relative">
-                        <AvatarView
-                          avatarId={leftOpponent?.avatarId || 'avatar_tea_master'}
-                          size={20}
-                          showBorder={false}
-                        />
+                  {/* Left Side Opponent Badge — Turned vertically along left edge */}
+                  <div className="absolute left-0.5 sm:left-1 top-[42%] -translate-y-1/2 z-10 flex items-center pointer-events-auto">
+                    <div className="w-8 h-36 flex items-center justify-center">
+                      <div
+                        onClick={() => {
+                          triggerHaptic('light');
+                          if (leftOpponent) {
+                            const targetSlot = mpGameState?.players[leftIdx];
+                            setGiftTargetPlayer({
+                              index: leftIdx,
+                              name: leftOpponent.name,
+                              isBot: leftOpponent.isAI || !effectiveInMultiplayer,
+                              playerTag: targetSlot?.playerTag,
+                              playerId: targetSlot?.playerId
+                            });
+                          }
+                        }}
+                        className={`rotate-90 origin-center whitespace-nowrap flex items-center gap-1.5 backdrop-blur-md px-2.5 py-1 rounded-full border shadow-lg cursor-pointer active:scale-95 transition-all group ${
+                          isLeftTurn
+                            ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
+                            : 'bg-slate-900/90 hover:bg-slate-800/95 border-slate-700/80'
+                        }`}
+                        title={`${leftOpponent?.name} üçün hədiyyə göndər`}
+                      >
+                        <div className="relative -rotate-90 flex-shrink-0">
+                          <AvatarView
+                            avatarId={leftOpponent?.avatarId || 'avatar_tea_master'}
+                            size={20}
+                            showBorder={false}
+                          />
+                          {isLeftTurn && (
+                            <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                            </span>
+                          )}
+                        </div>
+                        <span className={`text-[11px] font-bold max-w-[85px] sm:max-w-[120px] truncate ${isLeftTurn ? 'text-amber-300 font-black' : 'text-slate-200'}`}>
+                          {leftOpponent?.name}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-600 text-amber-300 text-[10px] font-black tracking-wide flex items-center gap-0.5 shadow-sm">
+                          <span className="-rotate-90">🀰</span>
+                          <span>{leftOpponent?.hand.length ?? 0}</span>
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-black">
+                          ⭐{leftOpponent?.score ?? 0}
+                        </span>
                         {isLeftTurn && (
-                          <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                          <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse -rotate-90">
+                            🎯
                           </span>
                         )}
+                        <span className="text-[10px] group-hover:scale-125 transition-transform -rotate-90">🎁</span>
                       </div>
-                      <span className={`text-[11px] font-bold max-w-[85px] sm:max-w-[120px] truncate ${isLeftTurn ? 'text-amber-300 font-black' : 'text-slate-200'}`}>
-                        {leftOpponent?.name}
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-600 text-amber-300 text-[10px] font-black tracking-wide flex items-center gap-0.5 shadow-sm">
-                        <span>🀰</span>
-                        <span>{leftOpponent?.hand.length ?? 0}</span>
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-black">
-                        ⭐{leftOpponent?.score ?? 0}
-                      </span>
-                      {isLeftTurn && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse">
-                          🎯
-                        </span>
-                      )}
-                      <span className="text-[10px] group-hover:scale-125 transition-transform">🎁</span>
                     </div>
                     {leftNotice && (
-                      <div className={`mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-black shadow border animate-bounce ${
+                      <div className={`ml-1 px-2.5 py-0.5 rounded-full text-[10px] font-black shadow border animate-bounce whitespace-nowrap ${
                         leftNotice.type === 'draw'
                           ? 'bg-cyan-950/95 border-cyan-400 text-cyan-200'
                           : 'bg-rose-950/95 border-rose-400 text-rose-200'
@@ -3144,61 +3150,63 @@ export const App: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Right Side Opponent Badge */}
-                  <div className="absolute right-1.5 sm:right-3 top-[44%] -translate-y-1/2 z-10 flex flex-col items-end pointer-events-auto">
-                    <div
-                      onClick={() => {
-                        triggerHaptic('light');
-                        if (rightOpponent) {
-                          const targetSlot = mpGameState?.players[rightIdx];
-                          setGiftTargetPlayer({
-                            index: rightIdx,
-                            name: rightOpponent.name,
-                            isBot: rightOpponent.isAI || !effectiveInMultiplayer,
-                            playerTag: targetSlot?.playerTag,
-                            playerId: targetSlot?.playerId
-                          });
-                        }
-                      }}
-                      className={`flex items-center gap-1.5 backdrop-blur-md px-2.5 py-1 rounded-full border shadow-lg cursor-pointer active:scale-95 transition-all group ${
-                        isRightTurn
-                          ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
-                          : 'bg-slate-900/90 hover:bg-slate-800/95 border-slate-700/80'
-                      }`}
-                      title={`${rightOpponent?.name} üçün hədiyyə göndər`}
-                    >
-                      <div className="relative">
-                        <AvatarView
-                          avatarId={rightOpponent?.avatarId || 'avatar_icherisheher_sage'}
-                          size={20}
-                          showBorder={false}
-                        />
+                  {/* Right Side Opponent Badge — Turned vertically along right edge */}
+                  <div className="absolute right-0.5 sm:right-1 top-[42%] -translate-y-1/2 z-10 flex items-center flex-row-reverse pointer-events-auto">
+                    <div className="w-8 h-36 flex items-center justify-center">
+                      <div
+                        onClick={() => {
+                          triggerHaptic('light');
+                          if (rightOpponent) {
+                            const targetSlot = mpGameState?.players[rightIdx];
+                            setGiftTargetPlayer({
+                              index: rightIdx,
+                              name: rightOpponent.name,
+                              isBot: rightOpponent.isAI || !effectiveInMultiplayer,
+                              playerTag: targetSlot?.playerTag,
+                              playerId: targetSlot?.playerId
+                            });
+                          }
+                        }}
+                        className={`-rotate-90 origin-center whitespace-nowrap flex flex-row-reverse items-center gap-1.5 backdrop-blur-md px-2.5 py-1 rounded-full border shadow-lg cursor-pointer active:scale-95 transition-all group ${
+                          isRightTurn
+                            ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
+                            : 'bg-slate-900/90 hover:bg-slate-800/95 border-slate-700/80'
+                        }`}
+                        title={`${rightOpponent?.name} üçün hədiyyə göndər`}
+                      >
+                        <div className="relative rotate-90 flex-shrink-0">
+                          <AvatarView
+                            avatarId={rightOpponent?.avatarId || 'avatar_icherisheher_sage'}
+                            size={20}
+                            showBorder={false}
+                          />
+                          {isRightTurn && (
+                            <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                            </span>
+                          )}
+                        </div>
+                        <span className={`text-[11px] font-bold max-w-[85px] sm:max-w-[120px] truncate ${isRightTurn ? 'text-amber-300 font-black' : 'text-slate-200'}`}>
+                          {rightOpponent?.name}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-600 text-amber-300 text-[10px] font-black tracking-wide flex items-center gap-0.5 shadow-sm">
+                          <span className="rotate-90">🀰</span>
+                          <span>{rightOpponent?.hand.length ?? 0}</span>
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-black">
+                          ⭐{rightOpponent?.score ?? 0}
+                        </span>
                         {isRightTurn && (
-                          <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                          <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse rotate-90">
+                            🎯
                           </span>
                         )}
+                        <span className="text-[10px] group-hover:scale-125 transition-transform rotate-90">🎁</span>
                       </div>
-                      <span className={`text-[11px] font-bold max-w-[85px] sm:max-w-[120px] truncate ${isRightTurn ? 'text-amber-300 font-black' : 'text-slate-200'}`}>
-                        {rightOpponent?.name}
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-600 text-amber-300 text-[10px] font-black tracking-wide flex items-center gap-0.5 shadow-sm">
-                        <span>🀰</span>
-                        <span>{rightOpponent?.hand.length ?? 0}</span>
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-black">
-                        ⭐{rightOpponent?.score ?? 0}
-                      </span>
-                      {isRightTurn && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse">
-                          🎯
-                        </span>
-                      )}
-                      <span className="text-[10px] group-hover:scale-125 transition-transform">🎁</span>
                     </div>
                     {rightNotice && (
-                      <div className={`mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-black shadow border animate-bounce ${
+                      <div className={`mr-1 px-2.5 py-0.5 rounded-full text-[10px] font-black shadow border animate-bounce whitespace-nowrap ${
                         rightNotice.type === 'draw'
                           ? 'bg-cyan-950/95 border-cyan-400 text-cyan-200'
                           : 'bg-rose-950/95 border-rose-400 text-rose-200'
