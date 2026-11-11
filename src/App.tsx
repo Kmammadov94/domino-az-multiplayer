@@ -85,6 +85,14 @@ import { GoogleAuthModal } from './components/GoogleAuthModal';
 import { ApkAuthBridgeView } from './components/ApkAuthBridgeView';
 import { multiplayerSocket } from './services/multiplayerSocket';
 import {
+  initializeAdMob,
+  maybeShowMatchEndInterstitial,
+  setLobbyBannerVisible,
+  showRewardedCoinsAd,
+  subscribeBannerHeight,
+  REWARDED_AD_COINS_AMOUNT
+} from './services/adMobService';
+import {
   MultiplayerRoomSummary,
   MultiplayerClientGameState,
   ChatMessage
@@ -215,6 +223,29 @@ export const App: React.FC = () => {
   useEffect(() => {
     statsRef.current = stats;
   }, [stats]);
+
+  const watchedRewardedOnCurrentMatchEndRef = useRef<boolean>(false);
+  const [lobbyBannerHeight, setLobbyBannerHeight] = useState<number>(0);
+
+  const shouldShowLobbyBanner =
+    !inGame &&
+    !showStore &&
+    !showDailyReward &&
+    !showRules &&
+    !showMultiplayerLobby &&
+    !showTeahousesModal &&
+    !showFriendsModal &&
+    !showGoogleAuthModal &&
+    !apkAuthSessionId;
+
+  useEffect(() => {
+    void initializeAdMob();
+    return subscribeBannerHeight(setLobbyBannerHeight);
+  }, []);
+
+  useEffect(() => {
+    void setLobbyBannerVisible(shouldShowLobbyBanner);
+  }, [shouldShowLobbyBanner]);
 
   // Listen for native deep link appUrlOpen (dominoaz://auth) from system browser after Google Sign-In
   // and suspend/resume WebAudio DSP & background resources when app goes to background to save mobile battery.
@@ -1280,6 +1311,7 @@ export const App: React.FC = () => {
   };
 
   const awardMatchCoins = (userWon: boolean) => {
+    watchedRewardedOnCurrentMatchEndRef.current = false;
     triggerHaptic('success');
     if (isMultiplayer) {
       recordRecentOpponents(players);
@@ -1291,6 +1323,19 @@ export const App: React.FC = () => {
       matchesPlayed: stats.matchesPlayed + 1,
       matchesWon: stats.matchesWon + (userWon ? 1 : 0)
     });
+  };
+
+  const handleClaimMatchEndAdBonus = async (): Promise<boolean> => {
+    const result = await showRewardedCoinsAd();
+    if (!result.rewarded) return false;
+    watchedRewardedOnCurrentMatchEndRef.current = true;
+    triggerHaptic('success');
+    sounds.playCoinChime();
+    handleUpdateStats({
+      ...statsRef.current,
+      coins: statsRef.current.coins + REWARDED_AD_COINS_AMOUNT
+    });
+    return true;
   };
 
   // Next hand click
@@ -2371,7 +2416,10 @@ export const App: React.FC = () => {
       <main className={`flex-1 relative flex flex-col min-h-0 ${!inGame ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'}`}>
         {!inGame ? (
           /* Native Mobile Game Lobby Screen — Full-height, balanced, immersive mobile gaming layout */
-          <div className="flex-1 flex flex-col justify-between w-full max-w-lg mx-auto px-3.5 sm:px-6 py-2 pb-3 overflow-y-auto overflow-x-hidden select-none">
+          <div
+            className="flex-1 flex flex-col justify-between w-full max-w-lg mx-auto px-3.5 sm:px-6 py-2 pb-3 overflow-y-auto overflow-x-hidden select-none"
+            style={lobbyBannerHeight > 0 ? { paddingBottom: `${lobbyBannerHeight + 12}px` } : undefined}
+          >
             {/* Subtle decorative glow */}
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-40 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -3360,8 +3408,19 @@ export const App: React.FC = () => {
         myPlayerIndex={localPlayerIndex}
         isHost={effectiveInMultiplayer ? mpIsHost : true}
         onNextHand={handleNextHandAction}
-        onRestartMatch={handleRestartMatchAction}
-        onLeaveMatch={handleForfeitAction}
+        onRestartMatch={async () => {
+          if (effectiveIsMatchOver && !watchedRewardedOnCurrentMatchEndRef.current) {
+            await maybeShowMatchEndInterstitial();
+          }
+          handleRestartMatchAction();
+        }}
+        onLeaveMatch={async () => {
+          if (effectiveIsMatchOver && !watchedRewardedOnCurrentMatchEndRef.current) {
+            await maybeShowMatchEndInterstitial();
+          }
+          handleForfeitAction();
+        }}
+        onClaimAdBonus={effectiveIsMatchOver ? handleClaimMatchEndAdBonus : undefined}
         variant={effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant}
         match101State={effectiveInMultiplayer ? (mpGameState?.match101State || match101State) : match101State}
         isSeka={effectiveInMultiplayer ? !!mpGameState?.handResults?.isSeka : is101Seka}

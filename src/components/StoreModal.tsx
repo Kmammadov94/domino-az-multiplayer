@@ -9,7 +9,9 @@ import { DominoTile } from './DominoTile';
 import { AvatarView } from './AvatarView';
 import { sounds } from '../utils/sound';
 import { triggerHaptic } from '../utils/haptics';
-import { X, Coins, Sparkles, Check, ShoppingBag, User, Layers, Shield, Award, Palette } from 'lucide-react';
+import { isNativeMobileApp } from '../utils/storage';
+import { showRewardedCoinsAd, REWARDED_AD_COINS_AMOUNT } from '../services/adMobService';
+import { X, Coins, Sparkles, Check, ShoppingBag, User, Layers, Shield, Award, Palette, PlayCircle } from 'lucide-react';
 
 interface StoreModalProps {
   isOpen: boolean;
@@ -32,6 +34,55 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   const [selectedSkinCategory, setSelectedSkinCategory] = useState<string>('all');
   const [selectedAvatarCategory, setSelectedAvatarCategory] = useState<string>('all');
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [feedbackType, setFeedbackType] = useState<'error' | 'success'>('error');
+  const [watchingAd, setWatchingAd] = useState<boolean>(false);
+
+  const showNotice = (message: string, type: 'error' | 'success' = 'error') => {
+    setFeedbackType(type);
+    setFeedback(message);
+    setTimeout(() => setFeedback(null), 2800);
+  };
+
+  const handleWatchRewardedAd = async () => {
+    if (watchingAd) return;
+    setWatchingAd(true);
+    try {
+      const result = await showRewardedCoinsAd();
+      if (result.rewarded) {
+        onUpdateStats({
+          ...stats,
+          coins: stats.coins + REWARDED_AD_COINS_AMOUNT
+        });
+        triggerHaptic('success');
+        sounds.playCoinChime();
+        const msg =
+          lang === 'az'
+            ? `+${REWARDED_AD_COINS_AMOUNT} Qızıl balansınıza əlavə edildi!`
+            : lang === 'ru'
+            ? `+${REWARDED_AD_COINS_AMOUNT} золота добавлено на баланс!`
+            : `+${REWARDED_AD_COINS_AMOUNT} Gold added to your balance!`;
+        showNotice(msg, 'success');
+      } else if (result.reason === 'dismissed') {
+        const msg =
+          lang === 'az'
+            ? 'Mükafat üçün reklamı sona qədər izləyin.'
+            : lang === 'ru'
+            ? 'Досмотрите рекламу до конца для награды.'
+            : 'Watch the ad until the end to earn the reward.';
+        showNotice(msg, 'error');
+      } else if (result.reason === 'unavailable') {
+        const msg =
+          lang === 'az'
+            ? 'Reklam hazırda yüklənmədi. Bir az sonra cəhd edin.'
+            : lang === 'ru'
+            ? 'Реклама сейчас недоступна. Попробуйте позже.'
+            : 'Ad is currently unavailable. Please try again later.';
+        showNotice(msg, 'error');
+      }
+    } finally {
+      setWatchingAd(false);
+    }
+  };
 
   useEffect(() => {
     if (isOpen && initialTab) {
@@ -86,8 +137,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   // Buy Skin
   const handleBuySkin = (skin: DominoSkin) => {
     if (stats.coins < skin.price) {
-      setFeedback(t.notEnoughCoins);
-      setTimeout(() => setFeedback(null), 2500);
+      showNotice(t.notEnoughCoins, 'error');
       return;
     }
 
@@ -115,8 +165,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   // Buy Avatar
   const handleBuyAvatar = (avatar: PlayerAvatar) => {
     if (stats.coins < avatar.price) {
-      setFeedback(t.notEnoughCoins);
-      setTimeout(() => setFeedback(null), 2500);
+      showNotice(t.notEnoughCoins, 'error');
       return;
     }
 
@@ -157,8 +206,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   // Buy Frame
   const handleBuyFrame = (frame: AvatarFrame) => {
     if (stats.coins < frame.price) {
-      setFeedback(t.notEnoughCoins);
-      setTimeout(() => setFeedback(null), 2500);
+      showNotice(t.notEnoughCoins, 'error');
       return;
     }
 
@@ -187,8 +235,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   // Buy Title
   const handleBuyTitle = (title: PlayerTitle) => {
     if (stats.coins < title.price) {
-      setFeedback(t.notEnoughCoins);
-      setTimeout(() => setFeedback(null), 2500);
+      showNotice(t.notEnoughCoins, 'error');
       return;
     }
 
@@ -235,7 +282,23 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {isNativeMobileApp() && (
+              <button
+                onClick={handleWatchRewardedAd}
+                disabled={watchingAd}
+                className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 disabled:opacity-60 text-slate-950 font-black text-[11px] sm:text-xs px-2.5 sm:px-3 py-1.5 rounded-full flex items-center gap-1 shadow-lg transition active:scale-95 whitespace-nowrap"
+                title={lang === 'az' ? 'Reklam izləyib qızıl qazan' : 'Watch ad for gold'}
+              >
+                <PlayCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+                <span>
+                  {watchingAd
+                    ? (lang === 'az' ? 'Yüklənir...' : lang === 'ru' ? 'Загрузка...' : 'Loading...')
+                    : `+${REWARDED_AD_COINS_AMOUNT} Qızıl`}
+                </span>
+              </button>
+            )}
+
             {/* Player Gold Balance */}
             <div className="bg-slate-800/90 border border-amber-500/50 rounded-full px-3 py-1 flex items-center gap-1.5 shadow-inner">
               <Coins className="w-4 h-4 text-amber-400 animate-spin-slow" />
@@ -316,7 +379,13 @@ export const StoreModal: React.FC<StoreModalProps> = ({
 
         {/* Feedback message banner */}
         {feedback && (
-          <div className="flex-shrink-0 bg-rose-500/20 border-b border-rose-500/40 px-4 py-2 text-center text-xs sm:text-sm font-semibold text-rose-300 animate-fade-in">
+          <div
+            className={`flex-shrink-0 px-4 py-2 text-center text-xs sm:text-sm font-semibold animate-fade-in border-b ${
+              feedbackType === 'success'
+                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                : 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+            }`}
+          >
             {feedback}
           </div>
         )}

@@ -3,9 +3,11 @@ import { Player, Language, GameMode, GameVariant } from '../types/domino';
 import { Match101State } from '../utils/domino101Logic';
 import { translations } from '../i18n/translations';
 import { sounds } from '../utils/sound';
-import { Trophy, Frown, Coins, ArrowRight, RotateCcw, Eye, EyeOff, Sparkles, LogOut } from 'lucide-react';
+import { Trophy, Frown, Coins, ArrowRight, RotateCcw, Eye, EyeOff, Sparkles, LogOut, PlayCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { AvatarView } from './AvatarView';
+import { isNativeMobileApp } from '../utils/storage';
+import { REWARDED_AD_COINS_AMOUNT } from '../services/adMobService';
 
 interface GameEndModalProps {
   isOpen: boolean;
@@ -25,6 +27,7 @@ interface GameEndModalProps {
   onNextHand: () => void;
   onRestartMatch: () => void;
   onLeaveMatch: () => void;
+  onClaimAdBonus?: () => Promise<boolean>;
   variant?: GameVariant;
   match101State?: Match101State;
   isSeka?: boolean;
@@ -49,16 +52,21 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
   onNextHand,
   onRestartMatch,
   onLeaveMatch,
+  onClaimAdBonus,
   variant = '365',
   match101State,
   isSeka = false,
   ayazCaught = false
 }) => {
   const [isViewingBoard, setIsViewingBoard] = useState<boolean>(false);
+  const [claimingAdBonus, setClaimingAdBonus] = useState<boolean>(false);
+  const [adBonusClaimed, setAdBonusClaimed] = useState<boolean>(false);
 
   useEffect(() => {
     if (isOpen) {
       setIsViewingBoard(false);
+      setClaimingAdBonus(false);
+      setAdBonusClaimed(false);
     }
   }, [isOpen]);
 
@@ -215,12 +223,46 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
             )}
 
             {/* Coin reward badge */}
-            <div className="bg-amber-500/20 border border-amber-500/40 rounded-xl px-4 py-2 flex items-center gap-2 mb-5">
+            <div className="bg-amber-500/20 border border-amber-500/40 rounded-xl px-4 py-2 flex items-center gap-2 mb-3">
               <Coins className="w-5 h-5 text-amber-400" />
               <span className="font-bold text-amber-300 text-sm">
                 {userWon ? '+5 Qızıl qazanıldı!' : '+3 Qızıl qazanıldı!'}
               </span>
             </div>
+
+            {onClaimAdBonus && isNativeMobileApp() && !adBonusClaimed && (
+              <button
+                onClick={async () => {
+                  if (claimingAdBonus) return;
+                  setClaimingAdBonus(true);
+                  try {
+                    const ok = await onClaimAdBonus();
+                    if (ok) setAdBonusClaimed(true);
+                  } finally {
+                    setClaimingAdBonus(false);
+                  }
+                }}
+                disabled={claimingAdBonus}
+                className="mb-4 w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 disabled:opacity-60 text-slate-950 font-black text-xs shadow-lg transition flex items-center justify-center gap-2 active:scale-95"
+              >
+                <PlayCircle className="w-4 h-4 flex-shrink-0" />
+                <span>
+                  {claimingAdBonus
+                    ? (lang === 'az' ? 'Reklam açılır...' : lang === 'ru' ? 'Загрузка рекламы...' : 'Loading ad...')
+                    : (lang === 'az'
+                        ? `Reklama bax → +${REWARDED_AD_COINS_AMOUNT} Qızıl Qazan`
+                        : lang === 'ru'
+                        ? `Смотреть рекламу → +${REWARDED_AD_COINS_AMOUNT} золота`
+                        : `Watch Ad → +${REWARDED_AD_COINS_AMOUNT} Gold`)}
+                </span>
+              </button>
+            )}
+
+            {adBonusClaimed && (
+              <div className="mb-4 text-xs font-black text-emerald-400">
+                ✓ +{REWARDED_AD_COINS_AMOUNT} Bonus Qızıl balansınıza əlavə edildi!
+              </div>
+            )}
 
             <div className="w-full space-y-2 mt-auto">
               {isHost ? (
