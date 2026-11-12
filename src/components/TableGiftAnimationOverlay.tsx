@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { TableGiftDef } from '../data/tableGifts';
-import { GiftIcon } from './GiftIcon';
+import { GiftIcon, ArmuduTeaSvg } from './GiftIcon';
 import { triggerHaptic } from '../utils/haptics';
 
 export interface ActiveGiftAnimation {
@@ -130,12 +130,12 @@ export const TableGiftAnimationOverlay: React.FC<TableGiftAnimationOverlayProps>
 
           {activeAnimation.gift.impactType === 'steam' && (
             <div className="relative flex flex-col items-center justify-center">
-              {/* Steaming Tea with rising steam glow */}
-              <div className="text-5xl sm:text-6xl animate-bounce">
-                ☕
+              {/* Steaming Armudu Tea with rising steam glow */}
+              <div className="animate-bounce">
+                <ArmuduTeaSvg size={60} />
               </div>
               <div className="text-xs font-black text-amber-300 bg-black/70 px-2 py-0.5 rounded-full border border-amber-500/50 mt-1 shadow">
-                +1 Pürrəngi Çay! 🫖
+                +1 Pürrəngi Çay!
               </div>
             </div>
           )}

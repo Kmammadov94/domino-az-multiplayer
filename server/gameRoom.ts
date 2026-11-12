@@ -2,8 +2,6 @@ import {
   GameMode,
   GameVariant,
   TileData,
-  GameBoard,
-  BranchId,
   Player
 } from '../src/types/domino';
 import {
@@ -28,12 +26,15 @@ import {
   Match101State
 } from '../src/utils/domino101Logic';
 import {
+  GameBoard,
+  BranchId,
   createInitialBoard,
   placeFirstTile,
   placeTileOnBranch,
   getPlayableBranches,
   isBoardGloballyBlocked,
-  canAnyTileBePlayed
+  canAnyTileBePlayed,
+  isHandBlockedAfterPlay
 } from '../src/utils/boardEngine';
 import { DoubleComboMove } from '../src/utils/comboEngine';
 import { selectBestAIMove } from '../src/utils/aiPlayer';
@@ -73,6 +74,8 @@ export class GameRoom {
   public match101State: Match101State = createInitial101State();
 
   private turnTimerInterval: NodeJS.Timeout | null = null;
+  private autoPassTimeout: NodeJS.Timeout | null = null;
+  private botTurnTimeout: NodeJS.Timeout | null = null;
   private onStateChangeCallback: () => void;
 
   constructor(
@@ -448,14 +451,10 @@ export class GameRoom {
 
     // Check if board has become globally blocked ("Bağlandı")
     const minReserve = getMinBoneyardReserve(this.variant, this.mode);
-    const drawableBoneyard = this.secretBoneyard.slice(0, Math.max(0, this.secretBoneyard.length - minReserve));
+    const drawableCount = Math.max(0, this.secretBoneyard.length - minReserve);
     const allSecretHands = Array.from(this.secretHands.values());
-    const isGloballyBlocked = isBoardGloballyBlocked(this.board);
-    const noMovePossible =
-      !allSecretHands.some((h) => canAnyTileBePlayed(this.board, h)) &&
-      !canAnyTileBePlayed(this.board, drawableBoneyard);
 
-    if (isGloballyBlocked || noMovePossible) {
+    if (isHandBlockedAfterPlay(this.board, allSecretHands, drawableCount)) {
       const playerHands = this.players.map((p) => ({
         id: p.id,
         team: p.team,
@@ -553,14 +552,10 @@ export class GameRoom {
 
     // Check if board has become globally blocked ("Bağlandı")
     const minReserve = getMinBoneyardReserve(this.variant, this.mode);
-    const drawableBoneyard = this.secretBoneyard.slice(0, Math.max(0, this.secretBoneyard.length - minReserve));
+    const drawableCount = Math.max(0, this.secretBoneyard.length - minReserve);
     const allSecretHands = Array.from(this.secretHands.values());
-    const isGloballyBlocked = isBoardGloballyBlocked(this.board);
-    const noMovePossible =
-      !allSecretHands.some((h) => canAnyTileBePlayed(this.board, h)) &&
-      !canAnyTileBePlayed(this.board, drawableBoneyard);
 
-    if (isGloballyBlocked || noMovePossible) {
+    if (isHandBlockedAfterPlay(this.board, allSecretHands, drawableCount)) {
       const playerHands = this.players.map((p) => ({
         id: p.id,
         team: p.team,
@@ -599,9 +594,8 @@ export class GameRoom {
       return { success: false, error: 'Bazarda yalnız qapalı ehtiyat daşlar qalıb!' };
     }
 
-    const drawableBoneyard = this.secretBoneyard.slice(0, available);
-    if (isBoardGloballyBlocked(this.board) || !canAnyTileBePlayed(this.board, drawableBoneyard)) {
-      return { success: false, error: 'Oyun bağlandı! Bazarda gedilə bilən daş yoxdur.' };
+    if (isBoardGloballyBlocked(this.board)) {
+      return { success: false, error: 'Oyun bağlandı! Bütün açıq ucların daşları masadadır.' };
     }
 
     const drawCount = this.variant === '101' ? Math.min(2, available) : 1;
@@ -614,6 +608,7 @@ export class GameRoom {
     player.handCount = hand.length;
 
     this.notifyState();
+    this.checkAutoPassTurn();
     return { success: true };
   }
 
@@ -625,6 +620,17 @@ export class GameRoom {
     const player = this.players[this.currentTurn];
     if (!player || player.socketId !== socketId) {
       return { success: false, error: 'Sizin növbəniz deyil!' };
+    }
+
+    const hand = this.secretHands.get(player.id) || [];
+    if (canAnyTileBePlayed(this.board, hand)) {
+      return { success: false, error: 'Əlinizdə oynaya biləcəyiniz daş var!' };
+    }
+
+    const minReserve = getMinBoneyardReserve(this.variant, this.mode);
+    const drawableAvailable = Math.max(0, this.secretBoneyard.length - minReserve);
+    if (drawableAvailable > 0 && !isBoardGloballyBlocked(this.board)) {
+      return { success: false, error: 'Bazarda götürülə bilən daş olduğu halda pas vermək olmaz!' };
     }
 
     this.consecutivePasses++;
@@ -873,6 +879,14 @@ export class GameRoom {
       clearInterval(this.turnTimerInterval);
       this.turnTimerInterval = null;
     }
+    if (this.autoPassTimeout) {
+      clearTimeout(this.autoPassTimeout);
+      this.autoPassTimeout = null;
+    }
+    if (this.botTurnTimeout) {
+      clearTimeout(this.botTurnTimeout);
+      this.botTurnTimeout = null;
+    }
   }
 
   private handleTurnTimeout(): void {
@@ -896,15 +910,12 @@ export class GameRoom {
     const minReserve = getMinBoneyardReserve(this.variant, this.mode);
     const isGloballyBlocked = isBoardGloballyBlocked(this.board);
 
-    // If player has no playable move and bazaar can actually help (respecting min reserve), draw from bazaar
+    // If player has no playable move and bazaar has drawable tiles above min reserve, draw without peeking
     while (
       !bestMove &&
       this.secretBoneyard.length > minReserve &&
       !isGloballyBlocked
     ) {
-      const drawable = this.secretBoneyard.slice(0, this.secretBoneyard.length - minReserve);
-      if (!canAnyTileBePlayed(this.board, drawable)) break;
-
       const drawCount = this.variant === '101' ? Math.min(2, this.secretBoneyard.length - minReserve) : 1;
       for (let i = 0; i < drawCount; i++) {
         const drawn = this.secretBoneyard.shift()!;
@@ -922,13 +933,53 @@ export class GameRoom {
     }
   }
 
+  private checkAutoPassTurn(): void {
+    if (this.autoPassTimeout) {
+      clearTimeout(this.autoPassTimeout);
+      this.autoPassTimeout = null;
+    }
+    if (this.status !== 'in_game' || this.handRevealed || this.board.tiles.length === 0) return;
+    const activePlayer = this.players[this.currentTurn];
+    if (!activePlayer || activePlayer.isAI) return;
+
+    const hand = this.secretHands.get(activePlayer.id) || [];
+    if (canAnyTileBePlayed(this.board, hand)) return;
+
+    const minReserve = getMinBoneyardReserve(this.variant, this.mode);
+    const drawableAvailable = Math.max(0, this.secretBoneyard.length - minReserve);
+    if (drawableAvailable > 0 && !isBoardGloballyBlocked(this.board)) return;
+
+    const targetTurn = this.currentTurn;
+    const targetSocketId = activePlayer.socketId;
+    this.autoPassTimeout = setTimeout(() => {
+      this.autoPassTimeout = null;
+      if (
+        this.status !== 'in_game' ||
+        this.handRevealed ||
+        this.currentTurn !== targetTurn
+      ) {
+        return;
+      }
+      this.passTurn(targetSocketId);
+    }, 950);
+  }
+
   private checkBotTurn(): void {
+    if (this.botTurnTimeout) {
+      clearTimeout(this.botTurnTimeout);
+      this.botTurnTimeout = null;
+    }
     if (this.status !== 'in_game' || this.handRevealed) return;
     const activePlayer = this.players[this.currentTurn];
-    if (!activePlayer || !activePlayer.isAI) return;
+    if (!activePlayer || !activePlayer.isAI) {
+      this.checkAutoPassTurn();
+      return;
+    }
 
-    setTimeout(() => {
-      if (this.status !== 'in_game' || this.handRevealed) return;
+    const targetTurn = this.currentTurn;
+    this.botTurnTimeout = setTimeout(() => {
+      this.botTurnTimeout = null;
+      if (this.status !== 'in_game' || this.handRevealed || this.currentTurn !== targetTurn) return;
       this.handleTurnTimeout();
     }, 1600);
   }

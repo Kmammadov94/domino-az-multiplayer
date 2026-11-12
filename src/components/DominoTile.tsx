@@ -200,18 +200,7 @@ const DominoTileComponent: React.FC<DominoTileProps> = ({
             isVertical ? 'flex-col' : 'flex-row'
           }`}>
             <div className={isVertical ? "h-1/3 w-full bg-[#0092bc]" : "w-1/3 h-full bg-[#0092bc]"} />
-            <div className={isVertical ? "h-1/3 w-full bg-[#e4002b] relative flex items-center justify-center" : "w-1/3 h-full bg-[#e4002b] relative flex items-center justify-center"}>
-              <svg viewBox="0 0 40 20" className="w-5 h-2.5 opacity-50">
-                <path
-                  d="M 16 3 A 7 7 0 1 0 24 17 A 8.5 8.5 0 1 1 16 3 Z"
-                  fill="#ffffff"
-                />
-                <polygon
-                  points="23,7 24,9 26,9 24.5,10.2 25,12 23.5,10.8 22,12 22.5,10.2 21,9 23,9"
-                  fill="#ffffff"
-                />
-              </svg>
-            </div>
+            <div className={isVertical ? "h-1/3 w-full bg-[#e4002b]" : "w-1/3 h-full bg-[#e4002b]"} />
             <div className={isVertical ? "h-1/3 w-full bg-[#009739]" : "w-1/3 h-full bg-[#009739]"} />
           </div>
         )

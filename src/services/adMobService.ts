@@ -27,14 +27,57 @@ const IS_DEV_TESTING = Boolean(
 export interface RewardedAdResult {
   rewarded: boolean;
   reason: 'earned' | 'dismissed' | 'unavailable' | 'not_native' | 'busy';
+  errorDetail?: string;
 }
 
 let initPromise: Promise<boolean> | null = null;
 let rewardedPrepared = false;
-let rewardedLoading = false;
+let rewardedPreparePromise: Promise<boolean> | null = null;
 let interstitialPrepared = false;
 let interstitialLoading = false;
 let isShowingAd = false;
+
+const extractAdError = (err: unknown): string => {
+  if (!err) return '';
+  if (typeof err === 'string') return err;
+  if (typeof err === 'object') {
+    const anyErr = err as { code?: string | number; message?: string };
+    const code = anyErr.code !== undefined ? `kod ${anyErr.code}` : '';
+    const msg = anyErr.message || '';
+    return [code, msg].filter(Boolean).join(': ').slice(0, 120);
+  }
+  return '';
+};
+
+export function getRewardedAdErrorNotice(
+  result: RewardedAdResult,
+  lang: 'az' | 'ru' | 'en'
+): string | null {
+  if (result.rewarded) return null;
+  if (result.reason === 'dismissed') {
+    return lang === 'az'
+      ? 'Mükafat üçün reklamı sona qədər izləyin.'
+      : lang === 'ru'
+      ? 'Досмотрите рекламу до конца для награды.'
+      : 'Watch the ad until the end to earn the reward.';
+  }
+  if (result.reason === 'busy') {
+    return lang === 'az'
+      ? 'Reklam artıq açılır, bir az gözləyin.'
+      : lang === 'ru'
+      ? 'Реклама уже загружается, подождите.'
+      : 'Ad is already loading, please wait.';
+  }
+  if (result.reason === 'unavailable') {
+    const detail = result.errorDetail ? ` (${result.errorDetail})` : '';
+    return lang === 'az'
+      ? `Reklam hazırda əlçatan deyil. Bir az sonra cəhd edin${detail}.`
+      : lang === 'ru'
+      ? `Реклама сейчас недоступна. Попробуйте позже${detail}.`
+      : `Ad is currently unavailable. Please try again later${detail}.`;
+  }
+  return null;
+}
 
 let finishedMatchesSinceInterstitial = 0;
 let lastInterstitialShownAt = 0;
@@ -70,11 +113,9 @@ export async function initializeAdMob(): Promise<boolean> {
       // Keep preload state synced via SDK lifecycle listeners
       await AdMob.addListener(RewardAdPluginEvents.Loaded, () => {
         rewardedPrepared = true;
-        rewardedLoading = false;
       });
       await AdMob.addListener(RewardAdPluginEvents.FailedToLoad, () => {
         rewardedPrepared = false;
-        rewardedLoading = false;
       });
       await AdMob.addListener(RewardAdPluginEvents.Dismissed, () => {
         rewardedPrepared = false;
@@ -125,26 +166,28 @@ export async function initializeAdMob(): Promise<boolean> {
 export async function prepareRewardedCoinsAd(): Promise<boolean> {
   if (!isNativeMobileApp()) return false;
   if (rewardedPrepared) return true;
-  if (rewardedLoading) return false;
+  if (rewardedPreparePromise) return rewardedPreparePromise;
 
-  const ready = await initializeAdMob();
-  if (!ready) return false;
+  rewardedPreparePromise = (async () => {
+    const ready = await initializeAdMob();
+    if (!ready) return false;
+    try {
+      await AdMob.prepareRewardVideoAd({
+        adId: ADMOB_REWARDED_COINS_ID,
+        isTesting: IS_DEV_TESTING,
+      });
+      rewardedPrepared = true;
+      return true;
+    } catch (err) {
+      console.warn('[AdMob] Rewarded prepare failed:', err);
+      rewardedPrepared = false;
+      return false;
+    } finally {
+      rewardedPreparePromise = null;
+    }
+  })();
 
-  rewardedLoading = true;
-  try {
-    await AdMob.prepareRewardVideoAd({
-      adId: ADMOB_REWARDED_COINS_ID,
-      isTesting: IS_DEV_TESTING,
-    });
-    rewardedPrepared = true;
-    return true;
-  } catch (err) {
-    console.warn('[AdMob] Rewarded prepare failed:', err);
-    rewardedPrepared = false;
-    return false;
-  } finally {
-    rewardedLoading = false;
-  }
+  return rewardedPreparePromise;
 }
 
 /**
@@ -176,8 +219,8 @@ export async function prepareMatchEndInterstitial(): Promise<boolean> {
 }
 
 /**
- * Displays a rewarded video ad and resolves with `rewarded: true` only when the
- * user earns the reward from AdMob.
+ * Displays a rewarded video ad and resolves cleanly whether the user completes
+ * the video, closes early, or the ad fails to load/show.
  */
 export async function showRewardedCoinsAd(): Promise<RewardedAdResult> {
   if (!isNativeMobileApp()) {
@@ -189,50 +232,110 @@ export async function showRewardedCoinsAd(): Promise<RewardedAdResult> {
 
   const ready = await initializeAdMob();
   if (!ready) {
-    return { rewarded: false, reason: 'unavailable' };
+    return { rewarded: false, reason: 'unavailable', errorDetail: 'SDK init failed' };
   }
 
   isShowingAd = true;
   let earnedReward = false;
-  let rewardListener: { remove: () => Promise<void> } | null = null;
+  const handles: Array<{ remove: () => Promise<void> }> = [];
 
   try {
     if (!rewardedPrepared) {
-      await AdMob.prepareRewardVideoAd({
-        adId: ADMOB_REWARDED_COINS_ID,
-        isTesting: IS_DEV_TESTING,
-      });
-      rewardedPrepared = true;
+      if (rewardedPreparePromise) {
+        await rewardedPreparePromise;
+      }
+      if (!rewardedPrepared) {
+        await AdMob.prepareRewardVideoAd({
+          adId: ADMOB_REWARDED_COINS_ID,
+          isTesting: IS_DEV_TESTING,
+        });
+        rewardedPrepared = true;
+      }
     }
 
-    rewardListener = await AdMob.addListener(
-      RewardAdPluginEvents.Rewarded,
-      (reward: AdMobRewardItem) => {
-        if (reward && typeof reward.amount === 'number' && reward.amount > 0) {
+    // Native @capacitor-community/admob only resolves showRewardVideoAd() when
+    // reward is earned, and leaves the call pending if dismissed early or failed to show.
+    // Racing against Dismissed / FailedToShow ensures the UI never locks up.
+    const result = await new Promise<RewardedAdResult>(async (resolve) => {
+      let settled = false;
+      const finish = (res: RewardedAdResult) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(safetyTimer);
+        resolve(res);
+      };
+
+      const safetyTimer = setTimeout(() => {
+        finish({
+          rewarded: earnedReward,
+          reason: earnedReward ? 'earned' : 'unavailable',
+          errorDetail: earnedReward ? undefined : 'timeout',
+        });
+      }, 90_000);
+
+      try {
+        handles.push(
+          await AdMob.addListener(RewardAdPluginEvents.Rewarded, (reward: AdMobRewardItem) => {
+            if (reward && typeof reward.amount === 'number' && reward.amount > 0) {
+              earnedReward = true;
+            }
+          })
+        );
+
+        handles.push(
+          await AdMob.addListener(RewardAdPluginEvents.Dismissed, () => {
+            finish({
+              rewarded: earnedReward,
+              reason: earnedReward ? 'earned' : 'dismissed',
+            });
+          })
+        );
+
+        handles.push(
+          await AdMob.addListener(RewardAdPluginEvents.FailedToShow, (err) => {
+            finish({
+              rewarded: false,
+              reason: 'unavailable',
+              errorDetail: extractAdError(err),
+            });
+          })
+        );
+
+        const item = await AdMob.showRewardVideoAd();
+        rewardedPrepared = false;
+        if (item && typeof item.amount === 'number' && item.amount > 0) {
           earnedReward = true;
         }
+        // Wait briefly for Dismissed if user hasn't tapped X yet, otherwise settle if reward earned
+        if (earnedReward) {
+          setTimeout(() => {
+            finish({ rewarded: true, reason: 'earned' });
+          }, 300);
+        }
+      } catch (showErr) {
+        rewardedPrepared = false;
+        finish({
+          rewarded: false,
+          reason: 'unavailable',
+          errorDetail: extractAdError(showErr),
+        });
       }
-    );
+    });
 
-    const item = await AdMob.showRewardVideoAd();
     rewardedPrepared = false;
-
-    if (item && typeof item.amount === 'number' && item.amount > 0) {
-      earnedReward = true;
-    }
-
-    return {
-      rewarded: earnedReward,
-      reason: earnedReward ? 'earned' : 'dismissed',
-    };
+    return result;
   } catch (err) {
     console.warn('[AdMob] Rewarded show failed:', err);
     rewardedPrepared = false;
-    return { rewarded: false, reason: 'unavailable' };
+    return {
+      rewarded: false,
+      reason: 'unavailable',
+      errorDetail: extractAdError(err),
+    };
   } finally {
     isShowingAd = false;
-    if (rewardListener) {
-      await rewardListener.remove().catch(() => {});
+    for (const h of handles) {
+      await h.remove().catch(() => {});
     }
     void prepareRewardedCoinsAd();
   }

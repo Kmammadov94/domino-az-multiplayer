@@ -6,14 +6,26 @@
   color-scheme: dark;
 }
 
+:root[data-theme='light'],
+html.theme-light {
+  color-scheme: light;
+}
+
 @layer base {
   html, body {
     width: 100%;
     height: 100%;
     margin: 0;
     padding: 0;
+    background-color: #020617;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-x pan-y;
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+  html.theme-light,
+  html.theme-light body {
+    background-color: #f1f5f9;
+    color: #0f172a;
   }
   body {
     user-select: none;
@@ -57,7 +69,94 @@
   animation: screenShake 0.4s ease-in-out;
 }
 
-/* Custom sleek dark-gold scrollbars everywhere */
+/* Light Theme Theme Overrides for Clean White/Gray Mode */
+html.theme-light .bg-slate-950 {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+html.theme-light .bg-slate-900 {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+html.theme-light .bg-slate-900\/95,
+html.theme-light .bg-slate-900\/90,
+html.theme-light .bg-slate-900\/80 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  color: #0f172a !important;
+}
+
+html.theme-light .bg-slate-950\/60,
+html.theme-light .bg-slate-950\/70,
+html.theme-light .bg-slate-950\/80,
+html.theme-light .bg-slate-950\/85,
+html.theme-light .bg-slate-950\/90,
+html.theme-light .bg-slate-950\/95 {
+  background-color: rgba(248, 250, 252, 0.92) !important;
+  color: #0f172a !important;
+}
+
+html.theme-light .bg-slate-800,
+html.theme-light .bg-slate-800\/90,
+html.theme-light .bg-slate-800\/80,
+html.theme-light .bg-slate-800\/70 {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+html.theme-light .bg-slate-800\/60,
+html.theme-light .bg-slate-800\/50,
+html.theme-light .bg-slate-800\/40 {
+  background-color: #edf2f7 !important;
+  color: #1e293b !important;
+}
+
+html.theme-light .border-slate-800,
+html.theme-light .border-slate-800\/80,
+html.theme-light .border-slate-800\/90,
+html.theme-light .border-slate-700,
+html.theme-light .border-slate-700\/80,
+html.theme-light .border-slate-700\/60 {
+  border-color: #cbd5e1 !important;
+}
+
+html.theme-light .text-slate-100 {
+  color: #0f172a !important;
+}
+
+html.theme-light .text-slate-200,
+html.theme-light .text-slate-300 {
+  color: #1e293b !important;
+}
+
+html.theme-light .text-slate-400 {
+  color: #475569 !important;
+}
+
+html.theme-light .text-slate-500 {
+  color: #64748b !important;
+}
+
+html.theme-light .text-white {
+  color: #0f172a !important;
+}
+
+/* Retain white text specifically on dark/solid badges and green/amber action buttons */
+html.theme-light .bg-amber-400 .text-slate-950,
+html.theme-light .bg-amber-500 .text-slate-950,
+html.theme-light .bg-gradient-to-r .text-slate-950,
+html.theme-light .bg-rose-600 .text-white,
+html.theme-light .bg-emerald-600 .text-white,
+html.theme-light .bg-emerald-500 .text-white,
+html.theme-light .bg-teal-600 .text-white,
+html.theme-light .bg-blue-600 .text-white,
+html.theme-light button[class*='bg-gradient'] span,
+html.theme-light .v-tile,
+html.theme-light [data-domino-tile] {
+  /* Keep buttons and domino tile pips crisp and unaffected */
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

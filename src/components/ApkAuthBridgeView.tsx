@@ -57,14 +57,14 @@ export const ApkAuthBridgeView: React.FC<ApkAuthBridgeViewProps> = ({ apkAuthSes
               setCompletedUser(profile);
               setDeepLinkUrls({ scheme: schemeUrl, intent: intentUrl });
 
-              // Post to server with retries to guarantee delivery
+              // Post Google credential to server with retries to verify & store session
               const sendAuthWithRetry = async () => {
                 for (let attempt = 1; attempt <= 4; attempt++) {
                   try {
                     const res = await fetch(`/api/apk-auth/${encodeURIComponent(apkAuthSessionId)}`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ user: profile })
+                      body: JSON.stringify({ credential: response.credential, user: profile })
                     });
                     if (res.ok) break;
                   } catch (e) {

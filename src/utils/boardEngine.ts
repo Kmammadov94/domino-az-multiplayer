@@ -304,9 +304,9 @@ export const placeTileOnBranch = (
   // Render tile with correct half facing outward
   let orientedTile = { id: tile.id, left: matchingVal, right: newOpenVal };
 
-  // Rule: NEVER turn on a double! Doubles must always lie squarely across the current line.
-  // Turning into an L-shape only happens on a NORMAL (non-double) tile.
-  const canTurnNow = shouldTurn && !isDouble;
+  // Rule: NEVER turn on a double or immediately after a double! Doubles must lie squarely across the line,
+  // and turns only happen between normal tiles after any double.
+  const canTurnNow = shouldTurn && !isDouble && !branch.isDouble && branch.tileCount >= 1;
 
   if (canTurnNow) {
     if (direction === 'left' && nextDirection === 'bottom') {
@@ -567,4 +567,406 @@ export const isBoardGloballyBlocked = (board: GameBoard): boolean => {
 export const canAnyTileBePlayed = (board: GameBoard, tiles: TileData[]): boolean => {
   if (!board || tiles.length === 0) return false;
   return tiles.some((tile) => getPlayableBranches(board, tile).length > 0);
+};
+
+/**
+ * Checks if the hand is blocked without peeking at hidden boneyard tiles:
+ * true when all 7 dominoes of every open branch end are already on the board,
+ * or when no drawable boneyard tiles remain and no player holds a playable tile.
+ */
+export const isHandBlockedAfterPlay = (
+  board: GameBoard,
+  hands: TileData[][],
+  drawableCount: number
+): boolean => {
+  if (isBoardGloballyBlocked(board)) return true;
+  return drawableCount === 0 && !hands.some((hand) => canAnyTileBePlayed(board, hand));
+};
+
+const getSpiralNextDirection = (
+  branchId: BranchId,
+  direction: BranchState['direction'],
+  tipX: number,
+  tipY: number,
+  limitX: number,
+  limitY: number
+): BranchState['direction'] | null => {
+  // Clockwise 4-quadrant spiral so branches never cross each other even on long chains
+  if (branchId === 'main_left') {
+    if (direction === 'left' && tipX < -limitX) return 'top';
+    if (direction === 'top' && tipY < -limitY) return 'right';
+    if (direction === 'right' && tipX > limitX) return 'bottom';
+  } else if (branchId === 'main_right') {
+    if (direction === 'right' && tipX > limitX) return 'bottom';
+    if (direction === 'bottom' && tipY > limitY) return 'left';
+    if (direction === 'left' && tipX < -limitX) return 'top';
+  } else if (branchId === 'spinner_top') {
+    if (direction === 'top' && tipY < -limitY) return 'right';
+    if (direction === 'right' && tipX > limitX) return 'bottom';
+    if (direction === 'bottom' && tipY > limitY) return 'left';
+  } else if (branchId === 'spinner_bottom') {
+    if (direction === 'bottom' && tipY > limitY) return 'left';
+    if (direction === 'left' && tipX < -limitX) return 'top';
+    if (direction === 'top' && tipY < -limitY) return 'right';
+  }
+  return null;
+};
+
+const layoutBoardWithTurnLimits = (
+  board: GameBoard,
+  limitX: number,
+  limitY: number
+): GameBoard => {
+  if (!board || board.tiles.length <= 1) return board;
+
+  const firstSrc = board.tiles[0];
+  const firstIsDouble = firstSrc.tile.left === firstSrc.tile.right;
+  const firstHalfW = firstIsDouble ? TILE_SHORT / 2 : TILE_LONG / 2;
+
+  const visualTiles: BoardTile[] = [
+    {
+      ...firstSrc,
+      x: 0,
+      y: 0,
+      isVertical: firstIsDouble
+    }
+  ];
+
+  const branches: Record<BranchId, BranchState> = {
+    main_left: {
+      ...board.branches.main_left,
+      tipX: -firstHalfW,
+      tipY: 0,
+      direction: 'left',
+      isDouble: firstIsDouble,
+      tileCount: 0,
+      tipTileIndex: 0
+    },
+    main_right: {
+      ...board.branches.main_right,
+      tipX: firstHalfW,
+      tipY: 0,
+      direction: 'right',
+      isDouble: firstIsDouble,
+      tileCount: 0,
+      tipTileIndex: 0
+    },
+    spinner_top: {
+      ...board.branches.spinner_top,
+      tileCount: 0
+    },
+    spinner_bottom: {
+      ...board.branches.spinner_bottom,
+      tileCount: 0
+    }
+  };
+
+  let spinnerX: number | null = null;
+  if (firstSrc.isSpinner) {
+    spinnerX = 0;
+    if (firstIsDouble) {
+      branches.spinner_top = {
+        ...branches.spinner_top,
+        tipX: 0,
+        tipY: -TILE_LONG / 2,
+        direction: 'top',
+        isDouble: false
+      };
+      branches.spinner_bottom = {
+        ...branches.spinner_bottom,
+        tipX: 0,
+        tipY: TILE_LONG / 2,
+        direction: 'bottom',
+        isDouble: false
+      };
+    } else {
+      branches.spinner_top = {
+        ...branches.spinner_top,
+        tipX: -TILE_LONG / 2,
+        tipY: 0,
+        direction: 'left',
+        isDouble: false
+      };
+      branches.spinner_bottom = {
+        ...branches.spinner_bottom,
+        tipX: TILE_LONG / 2,
+        tipY: 0,
+        direction: 'right',
+        isDouble: false
+      };
+    }
+  }
+
+  for (let i = 1; i < board.tiles.length; i++) {
+    const src = board.tiles[i];
+    const branchId = src.branch;
+    const branch = branches[branchId];
+    const isDouble = src.tile.left === src.tile.right;
+    const newOpenVal = src.endValue;
+    const matchingVal = src.tile.left === newOpenVal ? src.tile.right : src.tile.left;
+
+    const direction = branch.direction;
+    const nextDirCandidate = getSpiralNextDirection(
+      branchId,
+      direction,
+      branch.tipX,
+      branch.tipY,
+      limitX,
+      limitY
+    );
+
+    const tooCloseToSpinner =
+      spinnerX !== null &&
+      (branchId === 'main_left' || branchId === 'main_right') &&
+      Math.abs(branch.tipX - spinnerX) < 60;
+
+    // Never turn on a double or immediately after a double ("after the doubles")
+    const canTurnNow =
+      nextDirCandidate !== null &&
+      !isDouble &&
+      !branch.isDouble &&
+      branch.tileCount >= 1 &&
+      !tooCloseToSpinner;
+
+    let newX = branch.tipX;
+    let newY = branch.tipY;
+    let isVertical = false;
+    let orientedTile: TileData = { id: src.tile.id, left: matchingVal, right: newOpenVal };
+
+    if (canTurnNow && nextDirCandidate) {
+      if (direction === 'left' && nextDirCandidate === 'bottom') {
+        isVertical = true;
+        newX = branch.tipX - TILE_GAP - TILE_SHORT / 2;
+        newY = branch.tipY + TILE_LONG / 4;
+        branch.tipX = newX;
+        branch.tipY = newY + TILE_LONG / 2;
+        orientedTile = { id: src.tile.id, left: matchingVal, right: newOpenVal };
+      } else if (direction === 'left' && nextDirCandidate === 'top') {
+        isVertical = true;
+        newX = branch.tipX - TILE_GAP - TILE_SHORT / 2;
+        newY = branch.tipY - TILE_LONG / 4;
+        branch.tipX = newX;
+        branch.tipY = newY - TILE_LONG / 2;
+        orientedTile = { id: src.tile.id, left: newOpenVal, right: matchingVal };
+      } else if (direction === 'right' && nextDirCandidate === 'top') {
+        isVertical = true;
+        newX = branch.tipX + TILE_GAP + TILE_SHORT / 2;
+        newY = branch.tipY - TILE_LONG / 4;
+        branch.tipX = newX;
+        branch.tipY = newY - TILE_LONG / 2;
+        orientedTile = { id: src.tile.id, left: newOpenVal, right: matchingVal };
+      } else if (direction === 'right' && nextDirCandidate === 'bottom') {
+        isVertical = true;
+        newX = branch.tipX + TILE_GAP + TILE_SHORT / 2;
+        newY = branch.tipY + TILE_LONG / 4;
+        branch.tipX = newX;
+        branch.tipY = newY + TILE_LONG / 2;
+        orientedTile = { id: src.tile.id, left: matchingVal, right: newOpenVal };
+      } else if (direction === 'bottom' && nextDirCandidate === 'right') {
+        isVertical = false;
+        newY = branch.tipY + TILE_GAP + TILE_SHORT / 2;
+        newX = branch.tipX + TILE_LONG / 4;
+        branch.tipX = newX + TILE_LONG / 2;
+        branch.tipY = newY;
+        orientedTile = { id: src.tile.id, left: matchingVal, right: newOpenVal };
+      } else if (direction === 'bottom' && nextDirCandidate === 'left') {
+        isVertical = false;
+        newY = branch.tipY + TILE_GAP + TILE_SHORT / 2;
+        newX = branch.tipX - TILE_LONG / 4;
+        branch.tipX = newX - TILE_LONG / 2;
+        branch.tipY = newY;
+        orientedTile = { id: src.tile.id, left: newOpenVal, right: matchingVal };
+      } else if (direction === 'top' && nextDirCandidate === 'left') {
+        isVertical = false;
+        newY = branch.tipY - TILE_GAP - TILE_SHORT / 2;
+        newX = branch.tipX - TILE_LONG / 4;
+        branch.tipX = newX - TILE_LONG / 2;
+        branch.tipY = newY;
+        orientedTile = { id: src.tile.id, left: newOpenVal, right: matchingVal };
+      } else if (direction === 'top' && nextDirCandidate === 'right') {
+        isVertical = false;
+        newY = branch.tipY - TILE_GAP - TILE_SHORT / 2;
+        newX = branch.tipX + TILE_LONG / 4;
+        branch.tipX = newX + TILE_LONG / 2;
+        branch.tipY = newY;
+        orientedTile = { id: src.tile.id, left: matchingVal, right: newOpenVal };
+      }
+      branch.direction = nextDirCandidate;
+    } else {
+      switch (direction) {
+        case 'left':
+          isVertical = isDouble;
+          if (isDouble) {
+            newX = branch.tipX - TILE_SHORT / 2 - TILE_GAP;
+            newY = branch.tipY;
+            branch.tipX = newX - TILE_SHORT / 2;
+          } else {
+            newX = branch.tipX - TILE_LONG / 2 - TILE_GAP;
+            newY = branch.tipY;
+            branch.tipX = newX - TILE_LONG / 2;
+            orientedTile = { id: src.tile.id, left: newOpenVal, right: matchingVal };
+          }
+          break;
+        case 'right':
+          isVertical = isDouble;
+          if (isDouble) {
+            newX = branch.tipX + TILE_SHORT / 2 + TILE_GAP;
+            newY = branch.tipY;
+            branch.tipX = newX + TILE_SHORT / 2;
+          } else {
+            newX = branch.tipX + TILE_LONG / 2 + TILE_GAP;
+            newY = branch.tipY;
+            branch.tipX = newX + TILE_LONG / 2;
+            orientedTile = { id: src.tile.id, left: matchingVal, right: newOpenVal };
+          }
+          break;
+        case 'top':
+          isVertical = !isDouble;
+          if (isDouble) {
+            newX = branch.tipX;
+            newY = branch.tipY - TILE_SHORT / 2 - TILE_GAP;
+            branch.tipY = newY - TILE_SHORT / 2;
+          } else {
+            newX = branch.tipX;
+            newY = branch.tipY - TILE_LONG / 2 - TILE_GAP;
+            branch.tipY = newY - TILE_LONG / 2;
+            orientedTile = { id: src.tile.id, left: newOpenVal, right: matchingVal };
+          }
+          break;
+        case 'bottom':
+          isVertical = !isDouble;
+          if (isDouble) {
+            newX = branch.tipX;
+            newY = branch.tipY + TILE_SHORT / 2 + TILE_GAP;
+            branch.tipY = newY + TILE_SHORT / 2;
+          } else {
+            newX = branch.tipX;
+            newY = branch.tipY + TILE_LONG / 2 + TILE_GAP;
+            branch.tipY = newY + TILE_LONG / 2;
+            orientedTile = { id: src.tile.id, left: matchingVal, right: newOpenVal };
+          }
+          break;
+      }
+    }
+
+    visualTiles.push({
+      ...src,
+      tile: orientedTile,
+      x: newX,
+      y: newY,
+      isVertical
+    });
+
+    branch.tileCount++;
+    branch.isDouble = isDouble;
+    branch.tipTileIndex = i;
+
+    if (src.isSpinner) {
+      spinnerX = newX;
+      if (isVertical) {
+        branches.spinner_top = {
+          ...branches.spinner_top,
+          tipX: newX,
+          tipY: newY - TILE_LONG / 2,
+          direction: 'top',
+          isDouble: false
+        };
+        branches.spinner_bottom = {
+          ...branches.spinner_bottom,
+          tipX: newX,
+          tipY: newY + TILE_LONG / 2,
+          direction: 'bottom',
+          isDouble: false
+        };
+      } else {
+        branches.spinner_top = {
+          ...branches.spinner_top,
+          tipX: newX - TILE_LONG / 2,
+          tipY: newY,
+          direction: 'left',
+          isDouble: false
+        };
+        branches.spinner_bottom = {
+          ...branches.spinner_bottom,
+          tipX: newX + TILE_LONG / 2,
+          tipY: newY,
+          direction: 'right',
+          isDouble: false
+        };
+      }
+    }
+  }
+
+  return {
+    ...board,
+    tiles: visualTiles,
+    branches
+  };
+};
+
+const measureBoardFitScale = (board: GameBoard, usableW: number, usableH: number): number => {
+  let minX = -80;
+  let maxX = 80;
+  let minY = -60;
+  let maxY = 60;
+
+  board.tiles.forEach((t) => {
+    const halfW = (t.isVertical ? TILE_SHORT : TILE_LONG) / 2;
+    const halfH = (t.isVertical ? TILE_LONG : TILE_SHORT) / 2;
+    minX = Math.min(minX, t.x - halfW - 30);
+    maxX = Math.max(maxX, t.x + halfW + 30);
+    minY = Math.min(minY, t.y - halfH - 30);
+    maxY = Math.max(maxY, t.y + halfH + 30);
+  });
+
+  const branchKeys: BranchId[] = ['main_left', 'main_right', 'spinner_top', 'spinner_bottom'];
+  branchKeys.forEach((bId) => {
+    const branch = board.branches[bId];
+    if (branch && branch.active) {
+      minX = Math.min(minX, branch.tipX - 45);
+      maxX = Math.max(maxX, branch.tipX + 45);
+      minY = Math.min(minY, branch.tipY - 45);
+      maxY = Math.max(maxY, branch.tipY + 45);
+    }
+  });
+
+  const spanX = Math.max(280, maxX - minX);
+  const spanY = Math.max(180, maxY - minY);
+  return Math.min(usableW / spanX, usableH / spanY);
+};
+
+/**
+ * Dynamically re-folds domino branches visually mid-game so the layout stays large and fits the viewport.
+ * Never alters game state/rules; only adjusts visual tile coordinates & turn points.
+ */
+export const computeVisualBoardLayout = (
+  board: GameBoard,
+  usableW: number,
+  usableH: number
+): GameBoard => {
+  if (!board || board.tiles.length <= 2) return board;
+
+  const wide = layoutBoardWithTurnLimits(board, 320, 220);
+  const wideScale = measureBoardFitScale(wide, usableW, usableH);
+  if (wideScale >= 0.58) return wide;
+
+  const medium = layoutBoardWithTurnLimits(board, 180, 160);
+  const mediumScale = measureBoardFitScale(medium, usableW, usableH);
+  if (mediumScale >= 0.46) {
+    return mediumScale >= wideScale ? medium : wide;
+  }
+
+  const compact = layoutBoardWithTurnLimits(board, 125, 125);
+  const compactScale = measureBoardFitScale(compact, usableW, usableH);
+
+  let bestBoard = wide;
+  let bestScale = wideScale;
+  if (mediumScale > bestScale) {
+    bestBoard = medium;
+    bestScale = mediumScale;
+  }
+  if (compactScale > bestScale) {
+    bestBoard = compact;
+  }
+  return bestBoard;
 };

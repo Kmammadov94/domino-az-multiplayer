@@ -70,20 +70,6 @@ export const AzerbaijanLogo: React.FC<AzerbaijanLogoProps> = ({
             <rect x="0" y="18" width="108" height="18" fill="#e4002b" />
             <rect x="0" y="36" width="108" height="18" fill="#009739" />
 
-            {/* 2. White Azerbaijani Crescent & 8-Pointed Star placed cleanly in Red Stripe (Right half center: 81, 27) */}
-            <g transform="translate(73.5, 20.5) scale(0.7)" opacity="0.95">
-              {/* White Crescent */}
-              <path
-                d="M 9 2 A 7 7 0 1 0 17 16 A 8.5 8.5 0 1 1 9 2 Z"
-                fill="#ffffff"
-              />
-              {/* White 8-Pointed Star */}
-              <polygon
-                points="17,5 18,7 20,7 18.5,8.5 19,10.5 17.5,9.2 16,10.5 16.5,8.5 15,7 17,7"
-                fill="#ffffff"
-              />
-            </g>
-
             {/* 3. Authentic Domino Pips: [3:2] (Baku Opening Stone) */}
             {/* Left Half (3 Pips: 18,14 | 27,27 | 36,40) */}
             {/* Pip 1 (18, 14) */}

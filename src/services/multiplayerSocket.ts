@@ -9,12 +9,50 @@ import {
   ChatMessage
 } from '../types/multiplayer';
 
+export interface SocialProfilePayload {
+  playerId: string;
+  playerTag: string;
+  name: string;
+  handle: string;
+  avatarId?: string;
+  frameId?: string;
+  title?: string;
+  matchesWon?: number;
+  isOnline?: boolean;
+}
+
+export interface FriendRequestPayload {
+  id: string;
+  from: SocialProfilePayload;
+  createdAt: number;
+}
+
+export interface SocialSyncState {
+  friends: SocialProfilePayload[];
+  incomingRequests: FriendRequestPayload[];
+  outgoingRequestIds: string[];
+}
+
+export interface RoomInvitePayload {
+  inviteId: string;
+  roomCode: string;
+  mode: GameMode;
+  variant: GameVariant;
+  from: SocialProfilePayload;
+  createdAt: number;
+}
+
 class MultiplayerSocketService {
   private socket: Socket | null = null;
   private serverUrl: string = '';
+  private lastPresenceProfile: SocialProfilePayload | null = null;
   private roomSummaryListeners = new Set<(summary: MultiplayerRoomSummary) => void>();
   private roomStateListeners = new Set<(state: MultiplayerClientGameState) => void>();
   private chatListeners = new Set<(msg: ChatMessage) => void>();
+  private socialSyncListeners = new Set<(state: SocialSyncState) => void>();
+  private friendRequestListeners = new Set<(req: FriendRequestPayload) => void>();
+  private friendAcceptedListeners = new Set<(data: { friend: SocialProfilePayload }) => void>();
+  private roomInviteListeners = new Set<(invite: RoomInvitePayload) => void>();
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -34,6 +72,15 @@ class MultiplayerSocketService {
       this.roomSummaryListeners.forEach((cb) => this.socket?.on('room_summary', cb));
       this.roomStateListeners.forEach((cb) => this.socket?.on('room_state', cb));
       this.chatListeners.forEach((cb) => this.socket?.on('chat_message', cb));
+      this.socialSyncListeners.forEach((cb) => this.socket?.on('social_sync', cb));
+      this.friendRequestListeners.forEach((cb) => this.socket?.on('friend_request_received', cb));
+      this.friendAcceptedListeners.forEach((cb) => this.socket?.on('friend_request_accepted', cb));
+      this.roomInviteListeners.forEach((cb) => this.socket?.on('room_invite_received', cb));
+      this.socket.on('connect', () => {
+        if (this.lastPresenceProfile) {
+          this.socket?.emit('register_presence', this.lastPresenceProfile);
+        }
+      });
     } else if (this.socket.disconnected) {
       this.socket.connect();
     }
@@ -312,6 +359,96 @@ class MultiplayerSocketService {
     return () => {
       this.chatListeners.delete(callback);
       this.socket?.off('chat_message', callback);
+    };
+  }
+
+  public registerPresence(profile: SocialProfilePayload): void {
+    this.lastPresenceProfile = profile;
+    const s = this.connect();
+    if (s.connected) {
+      s.emit('register_presence', profile);
+    }
+  }
+
+  public getSocialState(playerId: string): Promise<{ success: boolean } & SocialSyncState> {
+    return this.emitWithTimeout('get_social_state', playerId);
+  }
+
+  public sendFriendRequest(data: {
+    from: SocialProfilePayload;
+    toPlayerId?: string;
+    toPlayerTag?: string;
+    toName?: string;
+  }): Promise<{
+    success: boolean;
+    autoAccepted?: boolean;
+    targetOnline?: boolean;
+    message?: string;
+    error?: string;
+  }> {
+    return this.emitWithTimeout('send_friend_request', data);
+  }
+
+  public respondFriendRequest(data: {
+    playerId: string;
+    myProfile: SocialProfilePayload;
+    requestId: string;
+    accept: boolean;
+  }): Promise<{ success: boolean; accepted?: boolean; error?: string }> {
+    return this.emitWithTimeout('respond_friend_request', data);
+  }
+
+  public removeFriendServer(
+    playerId: string,
+    friendPlayerId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    return this.emitWithTimeout('remove_friend', { playerId, friendPlayerId });
+  }
+
+  public inviteFriendToRoom(data: {
+    from: SocialProfilePayload;
+    targetPlayerId: string;
+    targetPlayerTag?: string;
+    roomCode: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    return this.emitWithTimeout('invite_friend_to_room', data);
+  }
+
+  public onSocialSync(callback: (state: SocialSyncState) => void): () => void {
+    this.socialSyncListeners.add(callback);
+    this.socket?.on('social_sync', callback);
+    return () => {
+      this.socialSyncListeners.delete(callback);
+      this.socket?.off('social_sync', callback);
+    };
+  }
+
+  public onFriendRequestReceived(callback: (req: FriendRequestPayload) => void): () => void {
+    this.friendRequestListeners.add(callback);
+    this.socket?.on('friend_request_received', callback);
+    return () => {
+      this.friendRequestListeners.delete(callback);
+      this.socket?.off('friend_request_received', callback);
+    };
+  }
+
+  public onFriendRequestAccepted(
+    callback: (data: { friend: SocialProfilePayload }) => void
+  ): () => void {
+    this.friendAcceptedListeners.add(callback);
+    this.socket?.on('friend_request_accepted', callback);
+    return () => {
+      this.friendAcceptedListeners.delete(callback);
+      this.socket?.off('friend_request_accepted', callback);
+    };
+  }
+
+  public onRoomInviteReceived(callback: (invite: RoomInvitePayload) => void): () => void {
+    this.roomInviteListeners.add(callback);
+    this.socket?.on('room_invite_received', callback);
+    return () => {
+      this.roomInviteListeners.delete(callback);
+      this.socket?.off('room_invite_received', callback);
     };
   }
 }

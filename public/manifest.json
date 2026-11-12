@@ -1,10 +1,10 @@
 {
   "name": "Domino PRO — Azərbaycan",
-  "short_name": "Domino AZ",
+  "short_name": "Domino PRO",
   "description": "Milli Azərbaycan Dominosu — Telefon 365 & Klassik 101",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "landscape",
+  "orientation": "any",
   "background_color": "#0b2916",
   "theme_color": "#154726",
   "icons": [
@@ -12,13 +12,25 @@
       "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

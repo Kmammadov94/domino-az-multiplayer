@@ -1,4 +1,4 @@
-import { TileData, PipValue, Player, GameMode, PlacedTile, OpenEnd } from '../types/domino';
+import { TileData, PipValue, Player, GameMode, GameVariant, PlacedTile, OpenEnd } from '../types/domino';
 
 // Generate standard 28 double-six domino set
 export const createDominoSet = (): TileData[] => {
@@ -234,4 +234,13 @@ export const calculateBoardScore = (openEnds: OpenEnd[]): number => {
     return totalSum;
   }
   return 0;
+};
+
+/**
+ * Returns the gold coin reward for finishing a match in the given variant.
+ * 101 is faster (+5 win / +3 loss); Telefon 365 awards 2x coins (+10 win / +6 loss).
+ */
+export const getMatchCoinReward = (variant: GameVariant, userWon: boolean): number => {
+  const baseReward = userWon ? 5 : 3;
+  return variant === '365' ? baseReward * 2 : baseReward;
 };

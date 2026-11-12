@@ -3,6 +3,7 @@ import { Sparkles, Coins, Flame, ChevronRight, Gift, Check } from 'lucide-react'
 import { Language, PlayerStats } from '../types/domino';
 import { checkDailyClaim } from '../utils/storage';
 import { triggerHaptic } from '../utils/haptics';
+import { ArmuduTeaSvg } from './GiftIcon';
 
 interface DailyTeahouseChestWidgetProps {
   stats: PlayerStats;
@@ -59,7 +60,7 @@ export const DailyTeahouseChestWidget: React.FC<DailyTeahouseChestWidgetProps> =
                     </span>
                   </>
                 ) : (
-                  <span className="text-2xl sm:text-3xl select-none filter drop-shadow">☕</span>
+                  <ArmuduTeaSvg size={32} />
                 )}
               </div>
             </div>

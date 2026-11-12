@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Send, Sparkles, X, History, Smile } from 'lucide-react';
 import { ChatMessage } from '../types/multiplayer';
 import { cleanProfanity, containsProfanity } from '../utils/profanityFilter';
+import { TABLE_GIFTS } from '../data/tableGifts';
+import { GiftIcon } from './GiftIcon';
 
 interface TeahouseChatOverlayProps {
   onSendChat: (text?: string, emoji?: string) => void;
@@ -55,6 +57,10 @@ export const TeahouseChatOverlay: React.FC<TeahouseChatOverlayProps> = ({
     if (latest.id === lastProcessedMsgIdRef.current) return;
     lastProcessedMsgIdRef.current = latest.id;
 
+    const isFromMe =
+      latest.senderIndex === myPlayerIndex || latest.senderName === myPlayerName;
+    if (isFromMe) return;
+
     if (!isOpen) {
       setUnreadCount((c) => c + 1);
     }
@@ -69,7 +75,7 @@ export const TeahouseChatOverlay: React.FC<TeahouseChatOverlayProps> = ({
 
       return () => clearTimeout(timer);
     }
-  }, [recentMessages, isOpen]);
+  }, [recentMessages, isOpen, myPlayerIndex, myPlayerName]);
 
   const handleSendPhrase = (phrase: string) => {
     onSendChat(phrase);
@@ -97,6 +103,29 @@ export const TeahouseChatOverlay: React.FC<TeahouseChatOverlayProps> = ({
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const renderMessageContent = (msg: ChatMessage, compact = false) => {
+    if (msg.emoji && msg.emoji.startsWith('gift:')) {
+      const giftId = msg.emoji.split(':')[1];
+      const gift = TABLE_GIFTS.find((g) => g.id === giftId);
+      if (gift) {
+        return (
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-200">
+            <GiftIcon gift={gift} size={compact ? 18 : 22} />
+            <span>{gift.name.az} göndərdi</span>
+          </span>
+        );
+      }
+    }
+    if (msg.emoji) {
+      return (
+        <span className={`${compact ? 'text-xl' : 'text-2xl'} leading-none inline-block`}>
+          {msg.emoji}
+        </span>
+      );
+    }
+    return msg.text;
+  };
+
   return (
     <>
       {/* 1. Brief Floating In-Game Toast Notification:
@@ -119,11 +148,7 @@ export const TeahouseChatOverlay: React.FC<TeahouseChatOverlayProps> = ({
               :
             </span>
             <span className="text-xs font-semibold truncate flex-1">
-              {activeToast.emoji ? (
-                <span className="text-xl inline-block">{activeToast.emoji}</span>
-              ) : (
-                activeToast.text
-              )}
+              {renderMessageContent(activeToast, true)}
             </span>
           </div>
         </div>
@@ -250,13 +275,7 @@ export const TeahouseChatOverlay: React.FC<TeahouseChatOverlayProps> = ({
                               : 'bg-slate-800/90 border border-slate-700 text-white rounded-bl-xs'
                           }`}
                         >
-                          {msg.emoji ? (
-                            <span className="text-2xl leading-none inline-block">
-                              {msg.emoji}
-                            </span>
-                          ) : (
-                            msg.text
-                          )}
+                          {renderMessageContent(msg)}
                         </div>
                       </div>
                     );

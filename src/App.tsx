@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import {
   GameMode,
   Language,
@@ -25,7 +25,8 @@ import {
   roundUpTo5,
   sumHandPips,
   checkHandReshuffle,
-  evaluateBaglandiWinner
+  evaluateBaglandiWinner,
+  getMatchCoinReward
 } from './utils/dominoLogic';
 import {
   GameBoard,
@@ -35,7 +36,7 @@ import {
   placeTileOnBranch,
   getPlayableBranches,
   isBoardGloballyBlocked,
-  canAnyTileBePlayed
+  isHandBlockedAfterPlay
 } from './utils/boardEngine';
 import { selectBestAIMove, pickAIPersonas } from './utils/aiPlayer';
 import { sounds } from './utils/sound';
@@ -50,7 +51,10 @@ import {
   isGuestNoticeDismissed,
   setGuestNoticeDismissed,
   PRODUCTION_SERVER_URL,
-  getBackendServerUrl
+  getBackendServerUrl,
+  AppThemeMode,
+  loadAppThemeMode,
+  saveAppThemeMode
 } from './utils/storage';
 
 import { triggerHaptic } from './utils/haptics';
@@ -59,38 +63,52 @@ import { Browser as CapBrowser } from '@capacitor/browser';
 import { TABLE_THEMES, DEFAULT_TABLE_THEME_ID } from './data/tableThemes';
 import { PLAYER_TITLES } from './data/profileCustomization';
 import { TABLE_GIFTS, TableGiftDef } from './data/tableGifts';
-import { TeahousesModal } from './components/TeahousesModal';
+const TeahousesModal = lazy(() => import('./components/TeahousesModal').then((m) => ({ default: m.TeahousesModal })));
 import { TableGiftPicker } from './components/TableGiftPicker';
 import { TableGiftAnimationOverlay, ActiveGiftAnimation } from './components/TableGiftAnimationOverlay';
 import { BoardView } from './components/BoardView';
 import { FloatingScoreOverlay, FloatingScoreItem } from './components/FloatingScoreOverlay';
-import { FriendsModal } from './components/FriendsModal';
-import { recordRecentPlayer, loadRecentPlayers, isBotName, addFriend } from './utils/friendsStorage';
+const FriendsModal = lazy(() => import('./components/FriendsModal').then((m) => ({ default: m.FriendsModal })));
+import {
+  recordRecentPlayer,
+  loadRecentPlayers,
+  isBotName,
+  addFriend,
+  FriendItem,
+  loadFriends,
+  saveFriends
+} from './utils/friendsStorage';
 import { getMyPlayerIdentity } from './utils/playerIdentity';
 import { ScoreBoard } from './components/ScoreBoard';
 import { PlayerControls } from './components/PlayerControls';
 import { DominoTile } from './components/DominoTile';
-import { StoreModal } from './components/StoreModal';
-import { DailyRewardModal } from './components/DailyRewardModal';
+const StoreModal = lazy(() => import('./components/StoreModal').then((m) => ({ default: m.StoreModal })));
+const DailyRewardModal = lazy(() => import('./components/DailyRewardModal').then((m) => ({ default: m.DailyRewardModal })));
 import { DailyTeahouseChestWidget } from './components/DailyTeahouseChestWidget';
-import { RulesModal } from './components/RulesModal';
-import { GameEndModal } from './components/GameEndModal';
+const RulesModal = lazy(() => import('./components/RulesModal').then((m) => ({ default: m.RulesModal })));
+const GameEndModal = lazy(() => import('./components/GameEndModal').then((m) => ({ default: m.GameEndModal })));
 import { AzerbaijanLogo } from './components/AzerbaijanLogo';
 import { BazaarTray } from './components/BazaarTray';
 import { AvatarView } from './components/AvatarView';
 import { PLAYER_AVATARS, DEFAULT_AVATAR_ID } from './data/avatars';
-import { MultiplayerLobbyModal } from './components/MultiplayerLobbyModal';
+const MultiplayerLobbyModal = lazy(() => import('./components/MultiplayerLobbyModal').then((m) => ({ default: m.MultiplayerLobbyModal })));
 import { TeahouseChatOverlay } from './components/TeahouseChatOverlay';
-import { GoogleAuthModal } from './components/GoogleAuthModal';
-import { ApkAuthBridgeView } from './components/ApkAuthBridgeView';
-import { multiplayerSocket } from './services/multiplayerSocket';
+const GoogleAuthModal = lazy(() => import('./components/GoogleAuthModal').then((m) => ({ default: m.GoogleAuthModal })));
+const ApkAuthBridgeView = lazy(() => import('./components/ApkAuthBridgeView').then((m) => ({ default: m.ApkAuthBridgeView })));
+import {
+  multiplayerSocket,
+  FriendRequestPayload,
+  RoomInvitePayload,
+  SocialSyncState
+} from './services/multiplayerSocket';
 import {
   initializeAdMob,
   maybeShowMatchEndInterstitial,
   setLobbyBannerVisible,
   showRewardedCoinsAd,
   subscribeBannerHeight,
-  REWARDED_AD_COINS_AMOUNT
+  REWARDED_AD_COINS_AMOUNT,
+  type RewardedAdResult
 } from './services/adMobService';
 import {
   MultiplayerRoomSummary,
@@ -144,6 +162,22 @@ export const App: React.FC = () => {
     if (typeof window === 'undefined') return false;
     return Boolean(new URLSearchParams(window.location.search).get('apk_auth'));
   });
+  const [openBugReportOnProfile, setOpenBugReportOnProfile] = useState(false);
+  const [appTheme, setAppTheme] = useState<AppThemeMode>(loadAppThemeMode);
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const root = document.documentElement;
+      if (appTheme === 'light') {
+        root.classList.add('theme-light');
+        root.setAttribute('data-theme', 'light');
+      } else {
+        root.classList.remove('theme-light');
+        root.removeAttribute('data-theme');
+      }
+    }
+    saveAppThemeMode(appTheme);
+  }, [appTheme]);
 
   // Google User & Cloud Sync State
   const [googleUser, setGoogleUser] = useState<GoogleUserProfile | null>(loadGoogleUser);
@@ -214,6 +248,11 @@ export const App: React.FC = () => {
   // Teahouse Rooms & Interactive Table Gifts State
   const [showTeahousesModal, setShowTeahousesModal] = useState<boolean>(false);
   const [showFriendsModal, setShowFriendsModal] = useState<boolean>(false);
+  const [incomingFriendRequests, setIncomingFriendRequests] = useState<FriendRequestPayload[]>([]);
+  const [outgoingFriendRequestIds, setOutgoingFriendRequestIds] = useState<string[]>([]);
+  const [incomingRoomInvite, setIncomingRoomInvite] = useState<RoomInvitePayload | null>(null);
+  const [socialBanner, setSocialBanner] = useState<string | null>(null);
+  const [isQuickMatching, setIsQuickMatching] = useState<boolean>(false);
   const [giftTargetPlayer, setGiftTargetPlayer] = useState<{ index: number; name: string; isBot?: boolean; playerTag?: string; playerId?: string } | null>(null);
   const [activeGiftAnimation, setActiveGiftAnimation] = useState<ActiveGiftAnimation | null>(null);
   const [floatingScore, setFloatingScore] = useState<FloatingScoreItem | null>(null);
@@ -226,6 +265,49 @@ export const App: React.FC = () => {
 
   const watchedRewardedOnCurrentMatchEndRef = useRef<boolean>(false);
   const [lobbyBannerHeight, setLobbyBannerHeight] = useState<number>(0);
+
+  // Track viewport orientation & portrait board stage box so portrait mode renders a 1:1 framed table
+  const [viewportSize, setViewportSize] = useState<{ w: number; h: number }>(() => ({
+    w: typeof window !== 'undefined' ? window.innerWidth : 1024,
+    h: typeof window !== 'undefined' ? window.innerHeight : 768
+  }));
+  const boardStageRef = useRef<HTMLDivElement | null>(null);
+  const [boardStageSize, setBoardStageSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+  const isPortraitMatch = inGame && viewportSize.h > viewportSize.w;
+  const portraitBoardSide =
+    isPortraitMatch && boardStageSize.w > 0 && boardStageSize.h > 0
+      ? Math.floor(Math.min(boardStageSize.w, boardStageSize.h))
+      : 0;
+
+  useEffect(() => {
+    const updateViewport = () => {
+      setViewportSize({ w: window.innerWidth, h: window.innerHeight });
+    };
+    window.addEventListener('resize', updateViewport);
+    window.addEventListener('orientationchange', updateViewport);
+    return () => {
+      window.removeEventListener('resize', updateViewport);
+      window.removeEventListener('orientationchange', updateViewport);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!inGame || !isPortraitMatch || !boardStageRef.current) {
+      setBoardStageSize({ w: 0, h: 0 });
+      return;
+    }
+    const el = boardStageRef.current;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setBoardStageSize({
+          w: entry.contentRect.width,
+          h: entry.contentRect.height
+        });
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [inGame, isPortraitMatch, players.length, mpGameState?.players?.length]);
 
   const shouldShowLobbyBanner =
     !inGame &&
@@ -246,6 +328,12 @@ export const App: React.FC = () => {
   useEffect(() => {
     void setLobbyBannerVisible(shouldShowLobbyBanner);
   }, [shouldShowLobbyBanner]);
+
+  useEffect(() => {
+    if (inGame && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  }, [inGame]);
 
   // Listen for native deep link appUrlOpen (dominoaz://auth) from system browser after Google Sign-In
   // and suspend/resume WebAudio DSP & background resources when app goes to background to save mobile battery.
@@ -439,14 +527,32 @@ export const App: React.FC = () => {
         // Check incoming friend invite link (?friend_id=DOM-XXXX&name=Murad)
         const friendId = params.get('friend_id') || params.get('add_friend');
         if (friendId) {
-          const friendName = params.get('name') || 'Dost';
+          const friendName = decodeURIComponent(params.get('name') || 'Dost');
           const friendTag = params.get('tag') || undefined;
-          addFriend({
-            name: decodeURIComponent(friendName),
-            playerId: friendId,
-            playerTag: friendTag,
-            title: 'Dəvət Edilən Dost'
-          });
+          const myId = getMyPlayerIdentity(googleUser, statsRef.current);
+          multiplayerSocket
+            .sendFriendRequest({
+              from: {
+                playerId: myId.id,
+                playerTag: myId.tag,
+                name: myId.name,
+                handle: myId.handle,
+                avatarId: myId.avatarId,
+                frameId: myId.frameId,
+                title: myId.title,
+                matchesWon: myId.matchesWon
+              },
+              toPlayerId: friendId,
+              toPlayerTag: friendTag,
+              toName: friendName
+            })
+            .then((res) => {
+              if (res?.message) {
+                setSocialBanner(res.message);
+                setTimeout(() => setSocialBanner(null), 4000);
+              }
+            })
+            .catch(() => {});
           setShowFriendsModal(true);
         }
 
@@ -642,6 +748,41 @@ export const App: React.FC = () => {
     }
   }, [isMultiplayer, mpGameState?.handRevealed, mpGameState?.roundNumber]);
 
+  const awardedMpMatchRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isMultiplayer || !mpGameState?.isMatchOver) {
+      awardedMpMatchRef.current = null;
+      return;
+    }
+    const matchKey = `${mpGameState.roomCode}:${mpGameState.roundNumber}`;
+    if (awardedMpMatchRef.current === matchKey) return;
+    awardedMpMatchRef.current = matchKey;
+
+    const myIdx = mpGameState.myPlayerIndex ?? 0;
+    const mySlot = mpGameState.players[myIdx];
+    const myTeam = mySlot?.team ?? 1;
+    let mpUserWon = false;
+
+    if (mpGameState.isInstant35) {
+      mpUserWon =
+        mpGameState.mode === '4p_duo'
+          ? (mpGameState.players[mpGameState.matchWinnerIndex]?.team ?? 1) === myTeam
+          : mpGameState.matchWinnerIndex === myIdx;
+    } else if (mpGameState.mode === '4p_duo') {
+      const myTeamScore = mpGameState.players.find((p) => p.team === myTeam)?.score ?? 0;
+      const otherTeamScore = mpGameState.players.find((p) => p.team !== myTeam)?.score ?? 0;
+      mpUserWon = myTeamScore > otherTeamScore;
+    } else {
+      const myScore = mySlot?.score ?? 0;
+      const otherScores = mpGameState.players
+        .filter((_, idx) => idx !== myIdx)
+        .map((p) => p.score ?? 0);
+      mpUserWon = otherScores.length === 0 || myScore >= Math.max(...otherScores);
+    }
+
+    awardMatchCoins(mpUserWon, mpGameState.variant || '365');
+  }, [isMultiplayer, mpGameState?.isMatchOver, mpGameState?.roomCode, mpGameState?.roundNumber]);
+
   const handleCreateRoom = async (
     roomMode: GameMode,
     playerName: string,
@@ -691,6 +832,7 @@ export const App: React.FC = () => {
       const mySlot = res.summary.players.find((p) => p.socketId === mySocketId);
       if (mySlot) setMpMyIndex(mySlot.id);
     }
+    return res.roomCode;
   };
 
   const handleJoinRoom = async (roomCode: string, playerName: string) => {
@@ -732,6 +874,7 @@ export const App: React.FC = () => {
       const mySlot = res.summary.players.find((p) => p.socketId === mySocketId);
       if (mySlot) setMpMyIndex(mySlot.id);
     }
+    return res.roomCode;
   };
 
   const handleQuickMatch = async (
@@ -779,6 +922,8 @@ export const App: React.FC = () => {
       const mySlot = res.summary.players.find((p) => p.socketId === mySocketId);
       if (mySlot) setMpMyIndex(mySlot.id);
     }
+    setShowMultiplayerLobby(true);
+    return res.roomCode;
   };
 
   const handleAddBot = async () => {
@@ -810,7 +955,6 @@ export const App: React.FC = () => {
 
   const handleLeaveRoom = () => {
     multiplayerSocket.leaveRoom();
-    multiplayerSocket.disconnectIfIdle();
     try {
       localStorage.removeItem('domino_mp_session');
       window.history.replaceState(null, '', window.location.pathname);
@@ -819,6 +963,161 @@ export const App: React.FC = () => {
     setMpGameState(null);
     setMpIsHost(false);
     setIsMultiplayer(false);
+  };
+
+  // Register live presence & sync two-way friends + room invites
+  const showTemporarySocialBanner = (msg: string) => {
+    setSocialBanner(msg);
+    setTimeout(() => setSocialBanner(null), 4000);
+  };
+
+  const applySocialSyncState = (state: SocialSyncState) => {
+    setIncomingFriendRequests(state.incomingRequests || []);
+    setOutgoingFriendRequestIds(state.outgoingRequestIds || []);
+
+    const localExisting = loadFriends();
+    const notesById = new Map<string, string>();
+    for (const lf of localExisting) {
+      if (lf.note) notesById.set(lf.playerId, lf.note);
+    }
+
+    const merged: FriendItem[] = (state.friends || []).map((sf) => ({
+      id: `fr_${sf.playerId}`,
+      playerId: sf.playerId,
+      playerTag: sf.playerTag,
+      name: sf.name,
+      handle: sf.handle || `${sf.name}#${sf.playerTag}`,
+      avatarId: sf.avatarId,
+      frameId: sf.frameId,
+      title: sf.title,
+      matchesWon: sf.matchesWon,
+      isOnline: Boolean(sf.isOnline),
+      isRealPlayer: true,
+      note: notesById.get(sf.playerId),
+      addedAt: new Date().toISOString()
+    }));
+    saveFriends(merged);
+  };
+
+  const refreshSocialState = async () => {
+    try {
+      const myId = getMyPlayerIdentity(googleUser, statsRef.current);
+      const res = await multiplayerSocket.getSocialState(myId.id);
+      if (res?.success) {
+        applySocialSyncState(res);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    const myId = getMyPlayerIdentity(googleUser, stats);
+    multiplayerSocket.registerPresence({
+      playerId: myId.id,
+      playerTag: myId.tag,
+      name: myId.name,
+      handle: myId.handle,
+      avatarId: myId.avatarId,
+      frameId: myId.frameId,
+      title: myId.title,
+      matchesWon: myId.matchesWon
+    });
+  }, [
+    googleUser?.googleId,
+    googleUser?.name,
+    stats.equippedAvatar,
+    stats.equippedFrame,
+    stats.equippedTitle,
+    stats.matchesWon
+  ]);
+
+  useEffect(() => {
+    const unsubSync = multiplayerSocket.onSocialSync((state) => {
+      applySocialSyncState(state);
+    });
+    const unsubReq = multiplayerSocket.onFriendRequestReceived((req) => {
+      triggerHaptic('medium');
+      showTemporarySocialBanner(`🤝 ${req.from.name}#${req.from.playerTag} sizə dostluq sorğusu göndərdi!`);
+    });
+    const unsubAccepted = multiplayerSocket.onFriendRequestAccepted((data) => {
+      triggerHaptic('success');
+      showTemporarySocialBanner(`🎉 ${data.friend.name} dostluq sorğunuzu qəbul etdi!`);
+    });
+    const unsubInvite = multiplayerSocket.onRoomInviteReceived((invite) => {
+      triggerHaptic('heavy');
+      setIncomingRoomInvite(invite);
+    });
+    return () => {
+      unsubSync();
+      unsubReq();
+      unsubAccepted();
+      unsubInvite();
+    };
+  }, []);
+
+  const handleRespondFriendRequest = async (requestId: string, accept: boolean) => {
+    const myId = getMyPlayerIdentity(googleUser, statsRef.current);
+    const res = await multiplayerSocket.respondFriendRequest({
+      playerId: myId.id,
+      myProfile: {
+        playerId: myId.id,
+        playerTag: myId.tag,
+        name: myId.name,
+        handle: myId.handle,
+        avatarId: myId.avatarId,
+        frameId: myId.frameId,
+        title: myId.title,
+        matchesWon: myId.matchesWon
+      },
+      requestId,
+      accept
+    });
+    if (res.success && accept) {
+      showTemporarySocialBanner('🤝 Dostluq sorğusu qəbul edildi!');
+    }
+    await refreshSocialState();
+  };
+
+  const handleInviteFriend = async (friend: FriendItem) => {
+    const myId = getMyPlayerIdentity(googleUser, statsRef.current);
+    try {
+      let targetRoomCode = mpRoom && mpRoom.status === 'waiting' ? mpRoom.code : undefined;
+      if (!targetRoomCode) {
+        targetRoomCode = await handleCreateRoom(
+          '2p_solo',
+          myId.name,
+          true,
+          undefined,
+          gameVariant
+        );
+      }
+      setShowMultiplayerLobby(true);
+
+      if (!targetRoomCode) return;
+
+      const invRes = await multiplayerSocket.inviteFriendToRoom({
+        from: {
+          playerId: myId.id,
+          playerTag: myId.tag,
+          name: myId.name,
+          handle: myId.handle,
+          avatarId: myId.avatarId,
+          frameId: myId.frameId,
+          title: myId.title,
+          matchesWon: myId.matchesWon
+        },
+        targetPlayerId: friend.playerId,
+        targetPlayerTag: friend.playerTag,
+        roomCode: targetRoomCode
+      });
+
+      if (invRes.success) {
+        showTemporarySocialBanner(`📩 ${friend.name} adlı dosta oyun dəvəti göndərildi!`);
+      } else {
+        showTemporarySocialBanner(invRes.error || `Otaq hazırdır: ${targetRoomCode}`);
+      }
+    } catch (e: any) {
+      showTemporarySocialBanner(e?.message || 'Otaq yaradılarkən xəta baş verdi.');
+    }
   };
 
   // Send interactive table gift (armudu tea, tomato splatter, baklava, etc.)
@@ -1153,7 +1452,7 @@ export const App: React.FC = () => {
                 ? res.winnerPlayerIndex === 0
                 : res.nextMatchState.team1.mainScore > res.nextMatchState.team2.mainScore;
             setWinnerTeam(userWon ? 1 : 2);
-            awardMatchCoins(userWon);
+            awardMatchCoins(userWon, '101');
           } else {
             setIsMatchOver(false);
           }
@@ -1256,7 +1555,7 @@ export const App: React.FC = () => {
                 setIsMatchOver(true);
                 const userWon = t1Score > t2Score;
                 setWinnerTeam(userWon ? 1 : 2);
-                awardMatchCoins(userWon);
+                awardMatchCoins(userWon, '365');
               }
             } else {
               const winners = playersWithBonus.filter((p) => p.score === highestScore);
@@ -1271,7 +1570,7 @@ export const App: React.FC = () => {
                 const safeWinnerIndex = matchWinnerIndex >= 0 ? matchWinnerIndex : 0;
                 setWinnerIndex(safeWinnerIndex);
                 const userWon = matchWinner.id === 0;
-                awardMatchCoins(userWon);
+                awardMatchCoins(userWon, '365');
               }
             }
           }
@@ -1310,24 +1609,24 @@ export const App: React.FC = () => {
     }
   };
 
-  const awardMatchCoins = (userWon: boolean) => {
+  const awardMatchCoins = (userWon: boolean, variant: GameVariant = gameVariant) => {
     watchedRewardedOnCurrentMatchEndRef.current = false;
     triggerHaptic('success');
     if (isMultiplayer) {
       recordRecentOpponents(players);
     }
-    const coinReward = userWon ? 5 : 3;
+    const coinReward = getMatchCoinReward(variant, userWon);
     handleUpdateStats({
-      ...stats,
-      coins: stats.coins + coinReward,
-      matchesPlayed: stats.matchesPlayed + 1,
-      matchesWon: stats.matchesWon + (userWon ? 1 : 0)
+      ...statsRef.current,
+      coins: statsRef.current.coins + coinReward,
+      matchesPlayed: statsRef.current.matchesPlayed + 1,
+      matchesWon: statsRef.current.matchesWon + (userWon ? 1 : 0)
     });
   };
 
-  const handleClaimMatchEndAdBonus = async (): Promise<boolean> => {
+  const handleClaimMatchEndAdBonus = async (): Promise<RewardedAdResult> => {
     const result = await showRewardedCoinsAd();
-    if (!result.rewarded) return false;
+    if (!result.rewarded) return result;
     watchedRewardedOnCurrentMatchEndRef.current = true;
     triggerHaptic('success');
     sounds.playCoinChime();
@@ -1335,7 +1634,7 @@ export const App: React.FC = () => {
       ...statsRef.current,
       coins: statsRef.current.coins + REWARDED_AD_COINS_AMOUNT
     });
-    return true;
+    return result;
   };
 
   // Next hand click
@@ -1498,7 +1797,7 @@ export const App: React.FC = () => {
       if (mode === '4p_duo') {
         setWinnerTeam(updatedPlayers[playerIndex].team);
       }
-      awardMatchCoins(isWinnerUser);
+      awardMatchCoins(isWinnerUser, gameVariant);
       setShowGameEnd(true);
       return;
     }
@@ -1511,15 +1810,17 @@ export const App: React.FC = () => {
 
     // Check if the board has become globally blocked ("Bağlandı")
     // (If all 7 of every open end's number have already been played on the table,
-    // or if no remaining unplayed tile anywhere can possibly be played)
+    // or if no drawable boneyard tiles remain and no player holds a playable tile)
     const minReserve = getMinBoneyardReserve(gameVariant, mode);
-    const drawableBoneyard = boneyard.slice(0, Math.max(0, boneyard.length - minReserve));
-    const isGloballyBlocked = isBoardGloballyBlocked(nextBoard);
-    const noUnplayedMoveExists =
-      !updatedPlayers.some((p) => canAnyTileBePlayed(nextBoard, p.hand)) &&
-      !canAnyTileBePlayed(nextBoard, drawableBoneyard);
+    const drawableCount = Math.max(0, boneyard.length - minReserve);
 
-    if (isGloballyBlocked || noUnplayedMoveExists) {
+    if (
+      isHandBlockedAfterPlay(
+        nextBoard,
+        updatedPlayers.map((p) => p.hand),
+        drawableCount
+      )
+    ) {
       const { winnerIndex: lowestPlayer, isTie } = evaluateBaglandiWinner(
         updatedPlayers,
         mode,
@@ -1606,7 +1907,7 @@ export const App: React.FC = () => {
       if (mode === '4p_duo') {
         setWinnerTeam(updatedPlayers[playerIndex].team);
       }
-      awardMatchCoins(isWinnerUser);
+      awardMatchCoins(isWinnerUser, gameVariant);
       setShowGameEnd(true);
       return;
     }
@@ -1622,15 +1923,17 @@ export const App: React.FC = () => {
 
     // Check if the board has become globally blocked ("Bağlandı")
     // (If all 7 of every open end's number have already been played on the table,
-    // or if no remaining unplayed tile anywhere can possibly be played)
+    // or if no drawable boneyard tiles remain and no player holds a playable tile)
     const minReserve = getMinBoneyardReserve(gameVariant, mode);
-    const drawableBoneyard = boneyard.slice(0, Math.max(0, boneyard.length - minReserve));
-    const isGloballyBlocked = isBoardGloballyBlocked(nextBoard);
-    const noUnplayedMoveExists =
-      !updatedPlayers.some((p) => canAnyTileBePlayed(nextBoard, p.hand)) &&
-      !canAnyTileBePlayed(nextBoard, drawableBoneyard);
+    const drawableCount = Math.max(0, boneyard.length - minReserve);
 
-    if (isGloballyBlocked || noUnplayedMoveExists) {
+    if (
+      isHandBlockedAfterPlay(
+        nextBoard,
+        updatedPlayers.map((p) => p.hand),
+        drawableCount
+      )
+    ) {
       const { winnerIndex: lowestPlayer, isTie } = evaluateBaglandiWinner(
         updatedPlayers,
         mode,
@@ -1704,7 +2007,11 @@ export const App: React.FC = () => {
     if (effectiveHandRevealed) return;
     if (effectiveInMultiplayer) {
       if (!effectiveIsMyTurn) return;
-      multiplayerSocket.drawBazaar();
+      void multiplayerSocket.drawBazaar().then((res) => {
+        if (!res.success && res.error) {
+          setSocialBanner(res.error);
+        }
+      });
       return;
     }
 
@@ -1738,10 +2045,16 @@ export const App: React.FC = () => {
   // Pass turn ("Pas")
   const handlePassTurn = () => {
     if (effectiveHandRevealed) return;
+    if (humanHasPlayableMove) return;
+    if (effectiveBoneyardCount > currentMinReserve && !isCurrentBoardBlocked) return;
     if (effectiveInMultiplayer) {
       if (!effectiveIsMyTurn) return;
       sounds.playPassKnock();
-      multiplayerSocket.passTurn();
+      void multiplayerSocket.passTurn().then((res) => {
+        if (!res.success && res.error) {
+          setSocialBanner(res.error);
+        }
+      });
       return;
     }
 
@@ -1813,13 +2126,17 @@ export const App: React.FC = () => {
       } else {
         // AI has no move
         const minReserve = getMinBoneyardReserve(gameVariant, mode);
-        const drawableBoneyard = boneyard.slice(0, Math.max(0, boneyard.length - minReserve));
-        const isGloballyBlocked = isBoardGloballyBlocked(board);
-        const canBazaarHelp = canAnyTileBePlayed(board, drawableBoneyard);
+        const drawableCount = Math.max(0, boneyard.length - minReserve);
 
-        // If the board is blocked, or neither players nor drawable boneyard has any playable tile,
-        // declare Bağlandı immediately without forcing useless boneyard draws!
-        if (isGloballyBlocked || (!players.some((p) => canAnyTileBePlayed(board, p.hand)) && !canBazaarHelp)) {
+        // Declare Bağlandı only when the board is visibly globally blocked,
+        // or when no drawable tiles remain and no player holds a playable tile.
+        if (
+          isHandBlockedAfterPlay(
+            board,
+            players.map((p) => p.hand),
+            drawableCount
+          )
+        ) {
           const { winnerIndex: lowestPlayer, isTie } = evaluateBaglandiWinner(
             players,
             mode,
@@ -1829,9 +2146,10 @@ export const App: React.FC = () => {
           return;
         }
 
-        if (drawableBoneyard.length > 0 && canBazaarHelp) {
+        // Bots must draw from the bazaar without peeking at hidden boneyard tiles
+        if (drawableCount > 0) {
           // AI draws from boneyard (2 tiles in 101 mode, 1 tile in other modes)
-          const countToDraw = gameVariant === '101' ? Math.min(2, drawableBoneyard.length) : 1;
+          const countToDraw = gameVariant === '101' ? Math.min(2, drawableCount) : 1;
           const drawn = boneyard.slice(0, countToDraw);
           const nextBoneyard = boneyard.slice(countToDraw);
           sounds.playTileDraw();
@@ -2006,19 +2324,43 @@ export const App: React.FC = () => {
     effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant,
     effectiveInMultiplayer ? (mpGameState?.mode || '4p_duo') : mode
   );
-  const currentDrawableBoneyard = useMemo(
-    () => boneyard.slice(0, Math.max(0, boneyard.length - currentMinReserve)),
-    [boneyard, currentMinReserve]
-  );
   const isCurrentBoardBlocked = useMemo(
-    () =>
-      isBoardGloballyBlocked(effectiveBoard) ||
-      (!effectiveInMultiplayer &&
-        currentDrawableBoneyard.length > 0 &&
-        !canAnyTileBePlayed(effectiveBoard, currentDrawableBoneyard) &&
-        !effectivePlayers.some((p) => canAnyTileBePlayed(effectiveBoard, p.hand))),
-    [effectiveBoard, effectiveInMultiplayer, currentDrawableBoneyard, effectivePlayers]
+    () => isBoardGloballyBlocked(effectiveBoard),
+    [effectiveBoard]
   );
+
+  // Auto-pass in offline mode when human player has no playable move and cannot draw from bazar
+  useEffect(() => {
+    if (
+      !inGame ||
+      effectiveInMultiplayer ||
+      showGameEnd ||
+      handRevealed ||
+      currentTurn !== 0 ||
+      board.tiles.length === 0 ||
+      humanHasPlayableMove
+    ) {
+      return;
+    }
+    const canDraw = boneyard.length > currentMinReserve && !isCurrentBoardBlocked;
+    if (canDraw) return;
+
+    const timer = setTimeout(() => {
+      handlePassTurn();
+    }, 950);
+    return () => clearTimeout(timer);
+  }, [
+    inGame,
+    effectiveInMultiplayer,
+    showGameEnd,
+    handRevealed,
+    currentTurn,
+    board.tiles.length,
+    humanHasPlayableMove,
+    boneyard.length,
+    currentMinReserve,
+    isCurrentBoardBlocked
+  ]);
   const playableBranches = useMemo(
     () => (selectedTile ? getPlayableBranches(effectiveBoard, selectedTile) : []),
     [selectedTile, effectiveBoard]
@@ -2232,11 +2574,15 @@ export const App: React.FC = () => {
   };
 
   if (apkAuthSessionId) {
-    return <ApkAuthBridgeView apkAuthSessionId={apkAuthSessionId} />;
+    return (
+      <Suspense fallback={null}>
+        <ApkAuthBridgeView apkAuthSessionId={apkAuthSessionId} />
+      </Suspense>
+    );
   }
 
   return (
-    <div className="w-full h-full min-h-[100dvh] max-h-[100dvh] flex flex-col bg-slate-950 text-slate-100 select-none overflow-hidden font-sans">
+    <div className="w-full h-full flex flex-col bg-slate-950 text-slate-100 select-none overflow-hidden font-sans">
       {/* Top Navbar */}
       {/* Top Bar Header */}
       <header
@@ -2506,15 +2852,27 @@ export const App: React.FC = () => {
               </button>
 
               <button
-                onClick={() => {
+                onClick={async () => {
+                  if (isQuickMatching) return;
                   triggerHaptic('medium');
-                  handleQuickMatch('2p_solo', googleUser?.name || 'Siz');
+                  setIsQuickMatching(true);
+                  try {
+                    const myId = getMyPlayerIdentity(googleUser, stats);
+                    await handleQuickMatch('2p_solo', googleUser?.name || myId.name);
+                  } catch (e: any) {
+                    showTemporarySocialBanner(e?.message || 'Tezbazar otağa qoşulmaq mümkün olmadı.');
+                  } finally {
+                    setIsQuickMatching(false);
+                  }
                 }}
+                disabled={isQuickMatching}
                 title="Tezbazar 1v1 Onlayn Oyun"
-                className="py-3 px-3.5 rounded-2xl bg-gradient-to-b from-amber-400 to-amber-600 hover:brightness-110 text-slate-950 font-black flex flex-col items-center justify-center gap-0.5 shadow-md active:scale-95 transition flex-shrink-0 border border-amber-300/50"
+                className="py-3 px-3.5 rounded-2xl bg-gradient-to-b from-amber-400 to-amber-600 hover:brightness-110 disabled:opacity-60 text-slate-950 font-black flex flex-col items-center justify-center gap-0.5 shadow-md active:scale-95 transition flex-shrink-0 border border-amber-300/50"
               >
-                <Sparkles className="w-5 h-5 fill-slate-950" />
-                <span className="text-[11px] leading-none font-black">Tezbazar</span>
+                <Sparkles className={`w-5 h-5 fill-slate-950 ${isQuickMatching ? 'animate-spin' : ''}`} />
+                <span className="text-[11px] leading-none font-black">
+                  {isQuickMatching ? 'Axtarılır...' : 'Tezbazar'}
+                </span>
               </button>
             </div>
 
@@ -2657,10 +3015,15 @@ export const App: React.FC = () => {
                   triggerHaptic('light');
                   setShowFriendsModal(true);
                 }}
-                className="flex flex-col items-center justify-center py-2 px-1 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-teal-300 active:scale-95 transition shadow group"
+                className="relative flex flex-col items-center justify-center py-2 px-1 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-teal-300 active:scale-95 transition shadow group"
               >
                 <Users className="w-4 h-4 sm:w-5 sm:h-5 text-teal-400 group-hover:scale-110 transition-transform" />
                 <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-200 mt-1">Dostlar</span>
+                {incomingFriendRequests.length > 0 && (
+                  <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[10px] font-black shadow animate-bounce">
+                    {incomingFriendRequests.length}
+                  </span>
+                )}
               </button>
 
               <button
@@ -2739,554 +3102,448 @@ export const App: React.FC = () => {
             </div>
 
             {/* Table Area (Completely below ScoreBoard & Turn Indicator so they NEVER overlap!) */}
-            <div className="flex-1 relative flex flex-col overflow-hidden">
-              {/* Starting tile notice banner */}
-              {effectiveForcedTile && (
-                <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 bg-amber-500/20 border border-amber-500/50 rounded-xl px-4 py-1.5 max-w-sm text-xs text-amber-300 font-semibold shadow-lg animate-pulse text-center">
-                  {t.startingTilePrompt}
-                </div>
-              )}
+            <div className="flex-1 relative flex flex-col overflow-hidden bg-slate-950">
+              {(() => {
+                const activeVariant = effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant;
+                const active101 = effectiveInMultiplayer ? (mpGameState?.match101State || match101State) : match101State;
 
-              {/* Reshuffle Notice Banner */}
-              {effectiveReshuffleNotice && (
-                <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center pointer-events-none animate-fade-in">
-                  <div className="bg-amber-950/95 border-2 border-amber-400 rounded-2xl px-5 py-2.5 shadow-[0_0_35px_rgba(251,191,36,0.6)] flex items-center gap-2.5 max-w-md text-center">
-                    <RotateCcw className="w-4 h-4 text-amber-400 animate-spin flex-shrink-0" />
-                    <span className="text-amber-200 text-xs sm:text-sm font-black tracking-wide">
-                      {effectiveReshuffleNotice}
-                    </span>
-                  </div>
-                </div>
-              )}
+                const getSideScore = (playerIdx: number, p: Player | undefined) => {
+                  if (effectivePlayers.length === 3 && activeVariant === '101') {
+                    return active101?.playerAccounts?.[p?.id ?? playerIdx]?.mainScore ?? p?.score ?? 0;
+                  }
+                  return p?.score ?? 0;
+                };
 
-              {/* Hand End Animated Tally Overlay Banner on Table */}
-            {effectiveHandRevealed && (
-              <div
-                onClick={() => setShowGameEnd(true)}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 flex flex-col items-center pointer-events-auto cursor-pointer"
-                title="Nəticələrə dərhal keçmək üçün toxunun"
-              >
-                <div className="bg-slate-950/95 border-2 border-amber-400 rounded-2xl px-6 py-4 shadow-[0_0_35px_rgba(251,191,36,0.6)] flex flex-col items-center animate-fade-in hover:scale-105 transition-transform">
-                  <span className="text-amber-400 text-xs font-black uppercase tracking-wider mb-1">
-                    {effectiveIsBaglandi ? t.baglandi : t.dominoOut}
-                  </span>
+                const renderTopSeat = () => {
+                  if (effectivePlayers.length === 2) {
+                    const oppIdx = effectivePlayers.findIndex((_, i) => i !== localPlayerIndex);
+                    const opponent = effectivePlayers[oppIdx] || effectivePlayers[1];
+                    const isOpponentTurn = effectiveTurn === oppIdx && !effectiveHandRevealed;
+                    const oppNotice = opponentActionNotice?.playerIndex === oppIdx ? opponentActionNotice : null;
+                    const oppDisplayScore =
+                      activeVariant === '101'
+                        ? (oppIdx === 0 ? active101?.team1?.mainScore : active101?.team2?.mainScore) ??
+                          opponent?.score ??
+                          0
+                        : opponent?.score ?? 0;
+                    return (
+                      <div
+                        className={`${
+                          isPortraitMatch
+                            ? 'flex flex-col items-center pointer-events-auto'
+                            : 'absolute top-1.5 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center'
+                        }`}
+                      >
+                        <div
+                          onClick={() => {
+                            triggerHaptic('light');
+                            if (opponent) {
+                              const targetSlot = mpGameState?.players[oppIdx];
+                              setGiftTargetPlayer({
+                                index: oppIdx >= 0 ? oppIdx : 1,
+                                name: opponent.name,
+                                isBot: opponent.isAI || !effectiveInMultiplayer,
+                                playerTag: targetSlot?.playerTag,
+                                playerId: targetSlot?.playerId
+                              });
+                            }
+                          }}
+                          className={`flex items-center gap-1.5 mb-1 backdrop-blur-sm px-2.5 py-0.5 rounded-full border shadow cursor-pointer active:scale-95 transition-all group ${
+                            isOpponentTurn
+                              ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_25px_rgba(251,191,36,0.9)] scale-105'
+                              : 'bg-slate-900/80 hover:bg-slate-800/90 border-slate-700/60'
+                          }`}
+                          title={`${opponent?.name} üçün hədiyyə göndər`}
+                        >
+                          <div className="relative">
+                            <AvatarView
+                              avatarId={opponent?.avatarId || 'avatar_tea_master'}
+                              size={20}
+                              showBorder={false}
+                            />
+                            {isOpponentTurn && (
+                              <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                              </span>
+                            )}
+                          </div>
+                          <span className={`text-[11px] font-bold flex items-center gap-1 ${isOpponentTurn ? 'text-amber-300 font-black' : 'text-slate-300'}`}>
+                            {opponent?.name} ({opponent?.hand.length} daş)
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-black">
+                            ⭐ {oppDisplayScore} xal
+                          </span>
+                          {isOpponentTurn && (
+                            <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse flex items-center gap-0.5 shadow">
+                              <span>🎯 Növbə</span>
+                            </span>
+                          )}
+                          <span className="text-xs group-hover:scale-125 transition-transform">🎁</span>
+                        </div>
+                        {oppNotice && (
+                          <div className={`mb-1 px-2.5 py-0.5 rounded-full text-[10px] font-black shadow-lg border animate-bounce ${
+                            oppNotice.type === 'draw'
+                              ? 'bg-cyan-950/95 border-cyan-400 text-cyan-200'
+                              : 'bg-rose-950/95 border-rose-400 text-rose-200'
+                          }`}>
+                            {oppNotice.text}
+                          </div>
+                        )}
+                        <div className={`flex items-center -space-x-3 sm:-space-x-4 transition-all px-1.5 py-0.5 rounded-xl ${isOpponentTurn ? 'ring-2 ring-amber-400/50 bg-amber-950/20 p-0.5 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
+                          {opponent?.hand.map((tile, i) => (
+                            <div key={tile.id || i} style={{ zIndex: i }}>
+                              <DominoTile
+                                tile={tile}
+                                skin={activeSkin}
+                                isFaceDown={!effectiveHandRevealed}
+                                scale={0.44}
+                                isVertical={false}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
 
-                  {didIWinHand ? (
-                    effectiveRevealPhase === 1 ? (
-                      <div className="flex flex-col items-center">
-                        <span className="text-xs text-emerald-300 font-bold">Rəqiblərin əlindən:</span>
-                        <span className="text-3xl font-black text-white mt-1 animate-pulse">
-                          {effectiveRawBonusPoints} xal
-                        </span>
+                  if (effectivePlayers.length === 4) {
+                    const topIdx = (localPlayerIndex + 2) % 4;
+                    const topPartner = effectivePlayers[topIdx];
+                    const isTopTurn = effectiveTurn === topIdx && !effectiveHandRevealed;
+                    const topNotice = opponentActionNotice?.playerIndex === topIdx ? opponentActionNotice : null;
+                    return (
+                      <div
+                        className={`${
+                          isPortraitMatch
+                            ? 'flex flex-col items-center pointer-events-auto'
+                            : 'absolute top-1.5 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center pointer-events-auto'
+                        }`}
+                      >
+                        <div
+                          onClick={() => {
+                            triggerHaptic('light');
+                            if (topPartner) {
+                              const targetSlot = mpGameState?.players[topIdx];
+                              setGiftTargetPlayer({
+                                index: topIdx,
+                                name: topPartner.name,
+                                isBot: topPartner.isAI || !effectiveInMultiplayer,
+                                playerTag: targetSlot?.playerTag,
+                                playerId: targetSlot?.playerId
+                              });
+                            }
+                          }}
+                          className={`flex items-center gap-1.5 backdrop-blur-md px-3 py-1 rounded-full border shadow-lg cursor-pointer active:scale-95 transition-all group ${
+                            isTopTurn
+                              ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_25px_rgba(251,191,36,0.9)] scale-105'
+                              : 'bg-slate-900/90 hover:bg-slate-800/90 border-slate-700/70'
+                          }`}
+                          title={`${topPartner?.name} üçün hədiyyə göndər`}
+                        >
+                          <div className="relative">
+                            <AvatarView
+                              avatarId={topPartner?.avatarId || 'avatar_sheki_guest'}
+                              size={22}
+                              showBorder={false}
+                            />
+                            {isTopTurn && (
+                              <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                              </span>
+                            )}
+                          </div>
+                          <span className={`text-[11px] font-bold ${isTopTurn ? 'text-amber-300 font-black' : 'text-slate-200'}`}>
+                            {topPartner?.name}
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-600 text-emerald-300 text-[10px] font-black tracking-wide flex items-center gap-0.5 shadow-sm">
+                            <span>🀰</span>
+                            <span>{topPartner?.hand.length ?? 0}</span>
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-black">
+                            ⭐{topPartner?.score ?? 0}
+                          </span>
+                          {isTopTurn && (
+                            <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse flex items-center gap-0.5 shadow">
+                              <span>🎯 Növbə</span>
+                            </span>
+                          )}
+                          <span className="text-xs group-hover:scale-125 transition-transform">🎁</span>
+                        </div>
+                        {topNotice && (
+                          <div className={`mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-black shadow border animate-bounce ${
+                            topNotice.type === 'draw'
+                              ? 'bg-cyan-950/95 border-cyan-400 text-cyan-200'
+                              : 'bg-rose-950/95 border-rose-400 text-rose-200'
+                          }`}>
+                            {topNotice.text}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  return null;
+                };
+
+                const renderSideOpponent = (
+                  side: 'left' | 'right',
+                  oppIdx: number,
+                  fallbackAvatar: string
+                ) => {
+                  const opponent = effectivePlayers[oppIdx];
+                  const isTurn = effectiveTurn === oppIdx && !effectiveHandRevealed;
+                  const notice = opponentActionNotice?.playerIndex === oppIdx ? opponentActionNotice : null;
+                  const score = getSideScore(oppIdx, opponent);
+                  const isLeft = side === 'left';
+
+                  return (
+                    <div
+                      className={
+                        isPortraitMatch
+                          ? 'w-8 flex-shrink-0 flex items-center justify-center relative z-20 pointer-events-auto'
+                          : `absolute ${isLeft ? 'left-0.5 sm:left-1' : 'right-0.5 sm:right-1'} top-[42%] -translate-y-1/2 z-10 flex items-center ${isLeft ? '' : 'flex-row-reverse'} pointer-events-auto`
+                      }
+                    >
+                      <div className="w-8 h-36 flex items-center justify-center">
+                        <div
+                          onClick={() => {
+                            triggerHaptic('light');
+                            if (opponent) {
+                              const targetSlot = mpGameState?.players[oppIdx];
+                              setGiftTargetPlayer({
+                                index: oppIdx,
+                                name: opponent.name,
+                                isBot: opponent.isAI || !effectiveInMultiplayer,
+                                playerTag: targetSlot?.playerTag,
+                                playerId: targetSlot?.playerId
+                              });
+                            }
+                          }}
+                          title={`${opponent?.name} üçün hədiyyə göndər`}
+                          className={`${isLeft ? 'rotate-90' : '-rotate-90 flex-row-reverse'} origin-center whitespace-nowrap flex items-center gap-1.5 backdrop-blur-md px-2.5 py-1 rounded-full border shadow-lg cursor-pointer active:scale-95 transition-all group ${
+                            isTurn
+                              ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
+                              : 'bg-slate-900/90 hover:bg-slate-800/95 border-slate-700/80'
+                          }`}
+                        >
+                          <div className={`relative ${isLeft ? '-rotate-90' : 'rotate-90'} flex-shrink-0`}>
+                            <AvatarView
+                              avatarId={opponent?.avatarId || fallbackAvatar}
+                              size={20}
+                              showBorder={false}
+                            />
+                            {isTurn && (
+                              <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                              </span>
+                            )}
+                          </div>
+                          <span className={`text-[11px] font-bold max-w-[85px] sm:max-w-[120px] truncate ${isTurn ? 'text-amber-300 font-black' : 'text-slate-200'}`}>
+                            {opponent?.name}
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-600 text-amber-300 text-[10px] font-black tracking-wide flex items-center gap-0.5 shadow-sm">
+                            <span className={isLeft ? '-rotate-90' : 'rotate-90'}>🀰</span>
+                            <span>{opponent?.hand.length ?? 0}</span>
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-black">
+                            ⭐{score}
+                          </span>
+                          {isTurn && (
+                            <span className={`px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse ${isLeft ? '-rotate-90' : 'rotate-90'}`}>
+                              🎯
+                            </span>
+                          )}
+                          <span className={`text-[10px] group-hover:scale-125 transition-transform ${isLeft ? '-rotate-90' : 'rotate-90'}`}>🎁</span>
+                        </div>
+                      </div>
+                      {notice && (
+                        <div
+                          className={`${
+                            isPortraitMatch
+                              ? `absolute ${isLeft ? 'left-9' : 'right-9'} top-1/2 -translate-y-1/2 z-30 pointer-events-none`
+                              : isLeft
+                              ? 'ml-1'
+                              : 'mr-1'
+                          } px-2.5 py-0.5 rounded-full text-[10px] font-black shadow border animate-bounce whitespace-nowrap ${
+                            notice.type === 'draw'
+                              ? 'bg-cyan-950/95 border-cyan-400 text-cyan-200'
+                              : 'bg-rose-950/95 border-rose-400 text-rose-200'
+                          }`}
+                        >
+                          {notice.text}
+                        </div>
+                      )}
+                    </div>
+                  );
+                };
+
+                const leftSideSeat =
+                  effectivePlayers.length === 3
+                    ? renderSideOpponent('left', (localPlayerIndex + 1) % 3, 'avatar_tea_master')
+                    : effectivePlayers.length === 4
+                    ? renderSideOpponent('left', (localPlayerIndex + 1) % 4, 'avatar_tea_master')
+                    : null;
+
+                const rightSideSeat =
+                  effectivePlayers.length === 3
+                    ? renderSideOpponent('right', (localPlayerIndex + 2) % 3, 'avatar_sheki_guest')
+                    : effectivePlayers.length === 4
+                    ? renderSideOpponent('right', (localPlayerIndex + 3) % 4, 'avatar_icherisheher_sage')
+                    : null;
+
+                return (
+                  <>
+                    {/* Portrait Mode: Top zone sits OUTSIDE the 1:1 framed play area so the top feels open & non-overlapping */}
+                    {isPortraitMatch ? (
+                      <div className="w-full flex-shrink-0 pt-2 pb-1 px-2 flex flex-col items-center justify-center relative z-20 pointer-events-none min-h-[18px]">
+                        {renderTopSeat()}
+                        {effectiveForcedTile && (
+                          <div className="mt-1 bg-amber-500/20 border border-amber-500/50 rounded-xl px-3 py-1 max-w-xs text-[11px] text-amber-300 font-semibold shadow-lg animate-pulse text-center pointer-events-auto">
+                            {t.startingTilePrompt}
+                          </div>
+                        )}
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center">
-                        <span className="text-xs text-emerald-300 font-bold">Rəqiblərin əlindən:</span>
-                        <div className="flex items-center gap-2 mt-1">
-                          {effectiveRawBonusPoints > 0 && effectiveRawBonusPoints !== effectiveHandBonusPoints && (
-                            <span className="text-xl text-slate-400 line-through">
-                              {effectiveRawBonusPoints}
-                            </span>
-                          )}
-                          <span className="text-3xl font-black text-emerald-400 animate-bounce">
-                            +{effectiveHandBonusPoints} xal
+                      <>
+                        {effectiveForcedTile && (
+                          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 bg-amber-500/20 border border-amber-500/50 rounded-xl px-4 py-1.5 max-w-sm text-xs text-amber-300 font-semibold shadow-lg animate-pulse text-center">
+                            {t.startingTilePrompt}
+                          </div>
+                        )}
+                        {renderTopSeat()}
+                        {leftSideSeat}
+                        {rightSideSeat}
+                      </>
+                    )}
+
+                    {/* Reshuffle Notice Banner */}
+                    {effectiveReshuffleNotice && (
+                      <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center pointer-events-none animate-fade-in">
+                        <div className="bg-amber-950/95 border-2 border-amber-400 rounded-2xl px-5 py-2.5 shadow-[0_0_35px_rgba(251,191,36,0.6)] flex items-center gap-2.5 max-w-md text-center">
+                          <RotateCcw className="w-4 h-4 text-amber-400 animate-spin flex-shrink-0" />
+                          <span className="text-amber-200 text-xs sm:text-sm font-black tracking-wide">
+                            {effectiveReshuffleNotice}
                           </span>
                         </div>
                       </div>
-                    )
-                  ) : (
-                    <div className="flex flex-col items-center">
-                      <span className="text-xs text-amber-300 font-bold">
-                        {roundWinnerPlayer?.name || 'Rəqib'} əli qazandı:
-                      </span>
-                      <span className="text-2xl font-black text-amber-400 mt-1">
-                        +{effectiveHandBonusPoints} xal
-                      </span>
-                    </div>
-                  )}
-
-                  <span className="text-[10px] text-amber-300/80 mt-2 font-medium">
-                    (Nəticəyə baxmaq üçün toxunun)
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Opponent Hands Indicators (Positioned safely away from the domino line) */}
-            {/* 1. In 2P Solo: Single Opponent at TOP CENTER facing player */}
-            {effectivePlayers.length === 2 && (() => {
-              const oppIdx = effectivePlayers.findIndex((_, i) => i !== localPlayerIndex);
-              const opponent = effectivePlayers[oppIdx] || effectivePlayers[1];
-              const isOpponentTurn = effectiveTurn === oppIdx && !effectiveHandRevealed;
-              const oppNotice = opponentActionNotice?.playerIndex === oppIdx ? opponentActionNotice : null;
-              const activeVariant = effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant;
-              const active101 = effectiveInMultiplayer ? (mpGameState?.match101State || match101State) : match101State;
-              const oppDisplayScore = activeVariant === '101'
-                ? ((oppIdx === 0 ? active101?.team1?.mainScore : active101?.team2?.mainScore) ?? opponent?.score ?? 0)
-                : (opponent?.score ?? 0);
-              return (
-                <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center">
-                  <div
-                    onClick={() => {
-                      triggerHaptic('light');
-                      if (opponent) {
-                        const targetSlot = mpGameState?.players[oppIdx];
-                        setGiftTargetPlayer({
-                          index: oppIdx >= 0 ? oppIdx : 1,
-                          name: opponent.name,
-                          isBot: opponent.isAI || !effectiveInMultiplayer,
-                          playerTag: targetSlot?.playerTag,
-                          playerId: targetSlot?.playerId
-                        });
-                      }
-                    }}
-                    className={`flex items-center gap-1.5 mb-1 backdrop-blur-sm px-2.5 py-0.5 rounded-full border shadow cursor-pointer active:scale-95 transition-all group ${
-                      isOpponentTurn
-                        ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_25px_rgba(251,191,36,0.9)] scale-105'
-                        : 'bg-slate-900/80 hover:bg-slate-800/90 border-slate-700/60'
-                    }`}
-                    title={`${opponent?.name} üçün hədiyyə göndər`}
-                  >
-                    <div className="relative">
-                      <AvatarView
-                        avatarId={opponent?.avatarId || 'avatar_tea_master'}
-                        size={20}
-                        showBorder={false}
-                      />
-                      {isOpponentTurn && (
-                        <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
-                        </span>
-                      )}
-                    </div>
-                    <span className={`text-[11px] font-bold flex items-center gap-1 ${isOpponentTurn ? 'text-amber-300 font-black' : 'text-slate-300'}`}>
-                      {opponent?.name} ({opponent?.hand.length} daş)
-                    </span>
-                    <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-black">
-                      ⭐ {oppDisplayScore} xal
-                    </span>
-                    {isOpponentTurn && (
-                      <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse flex items-center gap-0.5 shadow">
-                        <span>🎯 Növbə</span>
-                      </span>
                     )}
-                    <span className="text-xs group-hover:scale-125 transition-transform">🎁</span>
-                  </div>
-                  {oppNotice && (
-                    <div className={`mb-1 px-2.5 py-0.5 rounded-full text-[10px] font-black shadow-lg border animate-bounce ${
-                      oppNotice.type === 'draw'
-                        ? 'bg-cyan-950/95 border-cyan-400 text-cyan-200'
-                        : 'bg-rose-950/95 border-rose-400 text-rose-200'
-                    }`}>
-                      {oppNotice.text}
-                    </div>
-                  )}
-                  <div className={`flex items-center -space-x-3 sm:-space-x-4 transition-all px-1.5 py-0.5 rounded-xl ${isOpponentTurn ? 'ring-2 ring-amber-400/50 bg-amber-950/20 p-0.5 shadow-[0_0_15px_rgba(251,191,36,0.35)]' : ''}`}>
-                    {opponent?.hand.map((tile, i) => (
-                      <div key={tile.id || i} style={{ zIndex: i }}>
-                        <DominoTile
-                          tile={tile}
+
+                    {/* Hand End Animated Tally Overlay Banner on Table */}
+                    {effectiveHandRevealed && (
+                      <div
+                        onClick={() => setShowGameEnd(true)}
+                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 flex flex-col items-center pointer-events-auto cursor-pointer"
+                        title="Nəticələrə dərhal keçmək üçün toxunun"
+                      >
+                        <div className="bg-slate-950/95 border-2 border-amber-400 rounded-2xl px-6 py-4 shadow-[0_0_35px_rgba(251,191,36,0.6)] flex flex-col items-center animate-fade-in hover:scale-105 transition-transform">
+                          <span className="text-amber-400 text-xs font-black uppercase tracking-wider mb-1">
+                            {effectiveIsBaglandi ? t.baglandi : t.dominoOut}
+                          </span>
+
+                          {didIWinHand ? (
+                            effectiveRevealPhase === 1 ? (
+                              <div className="flex flex-col items-center">
+                                <span className="text-xs text-emerald-300 font-bold">Rəqiblərin əlindən:</span>
+                                <span className="text-3xl font-black text-white mt-1 animate-pulse">
+                                  {effectiveRawBonusPoints} xal
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center">
+                                <span className="text-xs text-emerald-300 font-bold">Rəqiblərin əlindən:</span>
+                                <div className="flex items-center gap-2 mt-1">
+                                  {effectiveRawBonusPoints > 0 && effectiveRawBonusPoints !== effectiveHandBonusPoints && (
+                                    <span className="text-xl text-slate-400 line-through">
+                                      {effectiveRawBonusPoints}
+                                    </span>
+                                  )}
+                                  <span className="text-3xl font-black text-emerald-400 animate-bounce">
+                                    +{effectiveHandBonusPoints} xal
+                                  </span>
+                                </div>
+                              </div>
+                            )
+                          ) : (
+                            <div className="flex flex-col items-center">
+                              <span className="text-xs text-amber-300 font-bold">
+                                {roundWinnerPlayer?.name || 'Rəqib'} əli qazandı:
+                              </span>
+                              <span className="text-2xl font-black text-amber-400 mt-1">
+                                +{effectiveHandBonusPoints} xal
+                              </span>
+                            </div>
+                          )}
+
+                          <span className="text-[10px] text-amber-300/80 mt-2 font-medium">
+                            (Nəticəyə baxmaq üçün toxunun)
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Center Domino Table Canvas: 1:1 framed square in portrait mode, full-bleed in landscape */}
+                    {isPortraitMatch ? (
+                      <div className={`flex-1 min-h-0 w-full flex items-center justify-center relative ${effectivePlayers.length >= 3 ? 'px-1' : 'px-3.5'}`}>
+                        {leftSideSeat}
+                        <div
+                          ref={boardStageRef}
+                          className="flex-1 h-full min-w-0 min-h-0 flex items-center justify-center px-1 py-1"
+                        >
+                          <div
+                            className={`relative rounded-2xl overflow-hidden border border-amber-500/35 shadow-[0_12px_40px_rgba(0,0,0,0.85)] transition-transform ${
+                              isScreenShaking ? 'animate-shake' : ''
+                            }`}
+                            style={
+                              portraitBoardSide > 0
+                                ? { width: portraitBoardSide, height: portraitBoardSide }
+                                : { width: '100%', aspectRatio: '1 / 1', maxHeight: '100%' }
+                            }
+                          >
+                            <BoardView
+                              board={effectiveBoard}
+                              skin={activeSkin}
+                              tableThemeId={stats.equippedTableTheme || DEFAULT_TABLE_THEME_ID}
+                              selectedTile={selectedTile}
+                              playableBranches={playableBranches}
+                              onSelectBranch={handleSelectBranch}
+                              branchExpectedScores={branchExpectedScores}
+                              hoveredBranch={hoveredBranch}
+                              boneyardCount={effectiveBoneyardCount}
+                              onDrawBazaar={handleDrawTile}
+                              canDrawFromBazaar={isMyTurn && !humanHasPlayableMove && effectiveBoneyardCount > currentMinReserve && !isCurrentBoardBlocked}
+                              isDraggingTile={Boolean(draggedTile)}
+                              variant={effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant}
+                              isFramedSquare={true}
+                            />
+                          </div>
+                        </div>
+                        {rightSideSeat}
+                      </div>
+                    ) : (
+                      <div className={`flex-1 w-full h-full transition-transform ${isScreenShaking ? 'animate-shake' : ''}`}>
+                        <BoardView
+                          board={effectiveBoard}
                           skin={activeSkin}
-                          isFaceDown={!effectiveHandRevealed}
-                          scale={0.48}
-                          isVertical={false}
+                          tableThemeId={stats.equippedTableTheme || DEFAULT_TABLE_THEME_ID}
+                          selectedTile={selectedTile}
+                          playableBranches={playableBranches}
+                          onSelectBranch={handleSelectBranch}
+                          branchExpectedScores={branchExpectedScores}
+                          hoveredBranch={hoveredBranch}
+                          boneyardCount={effectiveBoneyardCount}
+                          onDrawBazaar={handleDrawTile}
+                          canDrawFromBazaar={isMyTurn && !humanHasPlayableMove && effectiveBoneyardCount > currentMinReserve && !isCurrentBoardBlocked}
+                          isDraggingTile={Boolean(draggedTile)}
+                          variant={effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant}
                         />
                       </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* 2. In 3P Trio: Opponent 1 (Left Side) and Opponent 2 (Right Side) — Minimalist Badges (Name & Tile Count) */}
-            {effectivePlayers.length === 3 && (() => {
-              const leftIdx = (localPlayerIndex + 1) % 3;
-              const rightIdx = (localPlayerIndex + 2) % 3;
-              const leftOpponent = effectivePlayers[leftIdx];
-              const rightOpponent = effectivePlayers[rightIdx];
-              const isLeftTurn = effectiveTurn === leftIdx && !effectiveHandRevealed;
-              const isRightTurn = effectiveTurn === rightIdx && !effectiveHandRevealed;
-              const leftNotice = opponentActionNotice?.playerIndex === leftIdx ? opponentActionNotice : null;
-              const rightNotice = opponentActionNotice?.playerIndex === rightIdx ? opponentActionNotice : null;
-              const activeVariant = effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant;
-              const active101 = effectiveInMultiplayer ? (mpGameState?.match101State || match101State) : match101State;
-              const leftScore = activeVariant === '101'
-                ? (active101?.playerAccounts?.[leftOpponent?.id ?? leftIdx]?.mainScore ?? leftOpponent?.score ?? 0)
-                : (leftOpponent?.score ?? 0);
-              const rightScore = activeVariant === '101'
-                ? (active101?.playerAccounts?.[rightOpponent?.id ?? rightIdx]?.mainScore ?? rightOpponent?.score ?? 0)
-                : (rightOpponent?.score ?? 0);
-              return (
-                <>
-                  {/* Left Side Opponent Badge — Turned vertically along left edge */}
-                  <div className="absolute left-0.5 sm:left-1 top-[42%] -translate-y-1/2 z-10 flex items-center pointer-events-auto">
-                    <div className="w-8 h-36 flex items-center justify-center">
-                      <div
-                        onClick={() => {
-                          triggerHaptic('light');
-                          if (leftOpponent) {
-                            const targetSlot = mpGameState?.players[leftIdx];
-                            setGiftTargetPlayer({
-                              index: leftIdx,
-                              name: leftOpponent.name,
-                              isBot: leftOpponent.isAI || !effectiveInMultiplayer,
-                              playerTag: targetSlot?.playerTag,
-                              playerId: targetSlot?.playerId
-                            });
-                          }
-                        }}
-                        title={`${leftOpponent?.name} üçün hədiyyə göndər`}
-                        className={`rotate-90 origin-center whitespace-nowrap flex items-center gap-1.5 backdrop-blur-md px-2.5 py-1 rounded-full border shadow-lg cursor-pointer active:scale-95 transition-all group ${
-                          isLeftTurn
-                            ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
-                            : 'bg-slate-900/90 hover:bg-slate-800/95 border-slate-700/80'
-                        }`}
-                      >
-                        <div className="relative -rotate-90 flex-shrink-0">
-                          <AvatarView
-                            avatarId={leftOpponent?.avatarId || 'avatar_tea_master'}
-                            size={20}
-                            showBorder={false}
-                          />
-                          {isLeftTurn && (
-                            <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                            </span>
-                          )}
-                        </div>
-                        <span className={`text-[11px] font-bold max-w-[85px] sm:max-w-[120px] truncate ${isLeftTurn ? 'text-amber-300 font-black' : 'text-slate-200'}`}>
-                          {leftOpponent?.name}
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-600 text-amber-300 text-[10px] font-black tracking-wide flex items-center gap-0.5 shadow-sm">
-                          <span className="-rotate-90">🀰</span>
-                          <span>{leftOpponent?.hand.length ?? 0}</span>
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-black">
-                          ⭐{leftScore}
-                        </span>
-                        {isLeftTurn && (
-                          <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse -rotate-90">
-                            🎯
-                          </span>
-                        )}
-                        <span className="text-[10px] group-hover:scale-125 transition-transform -rotate-90">🎁</span>
-                      </div>
-                    </div>
-                    {leftNotice && (
-                      <div className={`ml-1 px-2.5 py-0.5 rounded-full text-[10px] font-black shadow border animate-bounce whitespace-nowrap ${
-                        leftNotice.type === 'draw'
-                          ? 'bg-cyan-950/95 border-cyan-400 text-cyan-200'
-                          : 'bg-rose-950/95 border-rose-400 text-rose-200'
-                      }`}>
-                        {leftNotice.text}
-                      </div>
                     )}
-                  </div>
-
-                  {/* Right Side Opponent Badge — Turned vertically along right edge */}
-                  <div className="absolute right-0.5 sm:right-1 top-[42%] -translate-y-1/2 z-10 flex items-center flex-row-reverse pointer-events-auto">
-                    <div className="w-8 h-36 flex items-center justify-center">
-                      <div
-                        onClick={() => {
-                          triggerHaptic('light');
-                          if (rightOpponent) {
-                            const targetSlot = mpGameState?.players[rightIdx];
-                            setGiftTargetPlayer({
-                              index: rightIdx,
-                              name: rightOpponent.name,
-                              isBot: rightOpponent.isAI || !effectiveInMultiplayer,
-                              playerTag: targetSlot?.playerTag,
-                              playerId: targetSlot?.playerId
-                            });
-                          }
-                        }}
-                        title={`${rightOpponent?.name} üçün hədiyyə göndər`}
-                        className={`-rotate-90 origin-center whitespace-nowrap flex flex-row-reverse items-center gap-1.5 backdrop-blur-md px-2.5 py-1 rounded-full border shadow-lg cursor-pointer active:scale-95 transition-all group ${
-                          isRightTurn
-                            ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
-                            : 'bg-slate-900/90 hover:bg-slate-800/95 border-slate-700/80'
-                        }`}
-                      >
-                        <div className="relative rotate-90 flex-shrink-0">
-                          <AvatarView
-                            avatarId={rightOpponent?.avatarId || 'avatar_sheki_guest'}
-                            size={20}
-                            showBorder={false}
-                          />
-                          {isRightTurn && (
-                            <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                            </span>
-                          )}
-                        </div>
-                        <span className={`text-[11px] font-bold max-w-[85px] sm:max-w-[120px] truncate ${isRightTurn ? 'text-amber-300 font-black' : 'text-slate-200'}`}>
-                          {rightOpponent?.name}
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-600 text-amber-300 text-[10px] font-black tracking-wide flex items-center gap-0.5 shadow-sm">
-                          <span className="rotate-90">🀰</span>
-                          <span>{rightOpponent?.hand.length ?? 0}</span>
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-black">
-                          ⭐{rightScore}
-                        </span>
-                        {isRightTurn && (
-                          <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse rotate-90">
-                            🎯
-                          </span>
-                        )}
-                        <span className="text-[10px] group-hover:scale-125 transition-transform rotate-90">🎁</span>
-                      </div>
-                    </div>
-                    {rightNotice && (
-                      <div className={`mr-1 px-2.5 py-0.5 rounded-full text-[10px] font-black shadow border animate-bounce whitespace-nowrap ${
-                        rightNotice.type === 'draw'
-                          ? 'bg-cyan-950/95 border-cyan-400 text-cyan-200'
-                          : 'bg-rose-950/95 border-rose-400 text-rose-200'
-                      }`}>
-                        {rightNotice.text}
-                      </div>
-                    )}
-                  </div>
-                </>
-              );
-            })()}
-
-            {/* 3. In 4P (Duo or Solo): Partner at Top, Opponents at Left and Right — Minimalist Badges (Name & Tile Count) */}
-            {effectivePlayers.length === 4 && (() => {
-              const topIdx = (localPlayerIndex + 2) % 4;
-              const leftIdx = (localPlayerIndex + 1) % 4;
-              const rightIdx = (localPlayerIndex + 3) % 4;
-              const topPartner = effectivePlayers[topIdx];
-              const leftOpponent = effectivePlayers[leftIdx];
-              const rightOpponent = effectivePlayers[rightIdx];
-              const isTopTurn = effectiveTurn === topIdx && !effectiveHandRevealed;
-              const isLeftTurn = effectiveTurn === leftIdx && !effectiveHandRevealed;
-              const isRightTurn = effectiveTurn === rightIdx && !effectiveHandRevealed;
-              const topNotice = opponentActionNotice?.playerIndex === topIdx ? opponentActionNotice : null;
-              const leftNotice = opponentActionNotice?.playerIndex === leftIdx ? opponentActionNotice : null;
-              const rightNotice = opponentActionNotice?.playerIndex === rightIdx ? opponentActionNotice : null;
-              return (
-                <>
-                  {/* Top Partner Badge */}
-                  <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center pointer-events-auto">
-                    <div
-                      onClick={() => {
-                        triggerHaptic('light');
-                        if (topPartner) {
-                          const targetSlot = mpGameState?.players[topIdx];
-                          setGiftTargetPlayer({
-                            index: topIdx,
-                            name: topPartner.name,
-                            isBot: topPartner.isAI || !effectiveInMultiplayer,
-                            playerTag: targetSlot?.playerTag,
-                            playerId: targetSlot?.playerId
-                          });
-                        }
-                      }}
-                      className={`flex items-center gap-1.5 backdrop-blur-md px-3 py-1 rounded-full border shadow-lg cursor-pointer active:scale-95 transition-all group ${
-                        isTopTurn
-                          ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_25px_rgba(251,191,36,0.9)] scale-105'
-                          : 'bg-slate-900/90 hover:bg-slate-800/90 border-slate-700/70'
-                      }`}
-                      title={`${topPartner?.name} üçün hədiyyə göndər`}
-                    >
-                      <div className="relative">
-                        <AvatarView
-                          avatarId={topPartner?.avatarId || 'avatar_sheki_guest'}
-                          size={22}
-                          showBorder={false}
-                        />
-                        {isTopTurn && (
-                          <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                          </span>
-                        )}
-                      </div>
-                      <span className={`text-[11px] font-bold ${isTopTurn ? 'text-amber-300 font-black' : 'text-slate-200'}`}>
-                        {topPartner?.name}
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-600 text-emerald-300 text-[10px] font-black tracking-wide flex items-center gap-0.5 shadow-sm">
-                        <span>🀰</span>
-                        <span>{topPartner?.hand.length ?? 0}</span>
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-black">
-                        ⭐{topPartner?.score ?? 0}
-                      </span>
-                      {isTopTurn && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse flex items-center gap-0.5 shadow">
-                          <span>🎯 Növbə</span>
-                        </span>
-                      )}
-                      <span className="text-xs group-hover:scale-125 transition-transform">🎁</span>
-                    </div>
-                    {topNotice && (
-                      <div className={`mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-black shadow border animate-bounce ${
-                        topNotice.type === 'draw'
-                          ? 'bg-cyan-950/95 border-cyan-400 text-cyan-200'
-                          : 'bg-rose-950/95 border-rose-400 text-rose-200'
-                      }`}>
-                        {topNotice.text}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Left Side Opponent Badge — Turned vertically along left edge */}
-                  <div className="absolute left-0.5 sm:left-1 top-[42%] -translate-y-1/2 z-10 flex items-center pointer-events-auto">
-                    <div className="w-8 h-36 flex items-center justify-center">
-                      <div
-                        onClick={() => {
-                          triggerHaptic('light');
-                          if (leftOpponent) {
-                            const targetSlot = mpGameState?.players[leftIdx];
-                            setGiftTargetPlayer({
-                              index: leftIdx,
-                              name: leftOpponent.name,
-                              isBot: leftOpponent.isAI || !effectiveInMultiplayer,
-                              playerTag: targetSlot?.playerTag,
-                              playerId: targetSlot?.playerId
-                            });
-                          }
-                        }}
-                        className={`rotate-90 origin-center whitespace-nowrap flex items-center gap-1.5 backdrop-blur-md px-2.5 py-1 rounded-full border shadow-lg cursor-pointer active:scale-95 transition-all group ${
-                          isLeftTurn
-                            ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
-                            : 'bg-slate-900/90 hover:bg-slate-800/95 border-slate-700/80'
-                        }`}
-                        title={`${leftOpponent?.name} üçün hədiyyə göndər`}
-                      >
-                        <div className="relative -rotate-90 flex-shrink-0">
-                          <AvatarView
-                            avatarId={leftOpponent?.avatarId || 'avatar_tea_master'}
-                            size={20}
-                            showBorder={false}
-                          />
-                          {isLeftTurn && (
-                            <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                            </span>
-                          )}
-                        </div>
-                        <span className={`text-[11px] font-bold max-w-[85px] sm:max-w-[120px] truncate ${isLeftTurn ? 'text-amber-300 font-black' : 'text-slate-200'}`}>
-                          {leftOpponent?.name}
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-600 text-amber-300 text-[10px] font-black tracking-wide flex items-center gap-0.5 shadow-sm">
-                          <span className="-rotate-90">🀰</span>
-                          <span>{leftOpponent?.hand.length ?? 0}</span>
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-black">
-                          ⭐{leftOpponent?.score ?? 0}
-                        </span>
-                        {isLeftTurn && (
-                          <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse -rotate-90">
-                            🎯
-                          </span>
-                        )}
-                        <span className="text-[10px] group-hover:scale-125 transition-transform -rotate-90">🎁</span>
-                      </div>
-                    </div>
-                    {leftNotice && (
-                      <div className={`ml-1 px-2.5 py-0.5 rounded-full text-[10px] font-black shadow border animate-bounce whitespace-nowrap ${
-                        leftNotice.type === 'draw'
-                          ? 'bg-cyan-950/95 border-cyan-400 text-cyan-200'
-                          : 'bg-rose-950/95 border-rose-400 text-rose-200'
-                      }`}>
-                        {leftNotice.text}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Right Side Opponent Badge — Turned vertically along right edge */}
-                  <div className="absolute right-0.5 sm:right-1 top-[42%] -translate-y-1/2 z-10 flex items-center flex-row-reverse pointer-events-auto">
-                    <div className="w-8 h-36 flex items-center justify-center">
-                      <div
-                        onClick={() => {
-                          triggerHaptic('light');
-                          if (rightOpponent) {
-                            const targetSlot = mpGameState?.players[rightIdx];
-                            setGiftTargetPlayer({
-                              index: rightIdx,
-                              name: rightOpponent.name,
-                              isBot: rightOpponent.isAI || !effectiveInMultiplayer,
-                              playerTag: targetSlot?.playerTag,
-                              playerId: targetSlot?.playerId
-                            });
-                          }
-                        }}
-                        className={`-rotate-90 origin-center whitespace-nowrap flex flex-row-reverse items-center gap-1.5 backdrop-blur-md px-2.5 py-1 rounded-full border shadow-lg cursor-pointer active:scale-95 transition-all group ${
-                          isRightTurn
-                            ? 'bg-amber-950/95 border-amber-400 ring-4 ring-amber-400/60 shadow-[0_0_20px_rgba(251,191,36,0.85)] scale-105'
-                            : 'bg-slate-900/90 hover:bg-slate-800/95 border-slate-700/80'
-                        }`}
-                        title={`${rightOpponent?.name} üçün hədiyyə göndər`}
-                      >
-                        <div className="relative rotate-90 flex-shrink-0">
-                          <AvatarView
-                            avatarId={rightOpponent?.avatarId || 'avatar_icherisheher_sage'}
-                            size={20}
-                            showBorder={false}
-                          />
-                          {isRightTurn && (
-                            <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                            </span>
-                          )}
-                        </div>
-                        <span className={`text-[11px] font-bold max-w-[85px] sm:max-w-[120px] truncate ${isRightTurn ? 'text-amber-300 font-black' : 'text-slate-200'}`}>
-                          {rightOpponent?.name}
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-600 text-amber-300 text-[10px] font-black tracking-wide flex items-center gap-0.5 shadow-sm">
-                          <span className="rotate-90">🀰</span>
-                          <span>{rightOpponent?.hand.length ?? 0}</span>
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-black">
-                          ⭐{rightOpponent?.score ?? 0}
-                        </span>
-                        {isRightTurn && (
-                          <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black animate-pulse rotate-90">
-                            🎯
-                          </span>
-                        )}
-                        <span className="text-[10px] group-hover:scale-125 transition-transform rotate-90">🎁</span>
-                      </div>
-                    </div>
-                    {rightNotice && (
-                      <div className={`mr-1 px-2.5 py-0.5 rounded-full text-[10px] font-black shadow border animate-bounce whitespace-nowrap ${
-                        rightNotice.type === 'draw'
-                          ? 'bg-cyan-950/95 border-cyan-400 text-cyan-200'
-                          : 'bg-rose-950/95 border-rose-400 text-rose-200'
-                      }`}>
-                        {rightNotice.text}
-                      </div>
-                    )}
-                  </div>
-                </>
-              );
-            })()}
-
-            {/* The Domino Table Canvas / Board View */}
-            <div className={`flex-1 w-full h-full transition-transform ${isScreenShaking ? 'animate-shake' : ''}`}>
-              <BoardView
-                board={effectiveBoard}
-                skin={activeSkin}
-                tableThemeId={stats.equippedTableTheme || DEFAULT_TABLE_THEME_ID}
-                selectedTile={selectedTile}
-                playableBranches={playableBranches}
-                onSelectBranch={handleSelectBranch}
-                branchExpectedScores={branchExpectedScores}
-                hoveredBranch={hoveredBranch}
-                boneyardCount={effectiveBoneyardCount}
-                onDrawBazaar={handleDrawTile}
-                canDrawFromBazaar={isMyTurn && !humanHasPlayableMove && effectiveBoneyardCount > getMinBoneyardReserve(gameVariant, mode) && !isCurrentBoardBlocked}
-                isDraggingTile={Boolean(draggedTile)}
-                variant={effectiveInMultiplayer ? (mpGameState?.variant || '365') : gameVariant}
-              />
-            </div>
+                  </>
+                );
+              })()}
 
             {/* Teahouse Chat Overlay during both singleplayer and multiplayer matches */}
             <TeahouseChatOverlay
@@ -3369,6 +3626,7 @@ export const App: React.FC = () => {
       )}
 
       {/* Modals */}
+      <Suspense fallback={null}>
       <StoreModal
         isOpen={showStore}
         onClose={() => setShowStore(false)}
@@ -3376,6 +3634,11 @@ export const App: React.FC = () => {
         stats={stats}
         onUpdateStats={handleUpdateStats}
         initialTab={storeInitialTab}
+        onOpenBugReport={() => {
+          setShowStore(false);
+          setOpenBugReportOnProfile(true);
+          setShowGoogleAuthModal(true);
+        }}
       />
 
       <DailyRewardModal
@@ -3459,9 +3722,18 @@ export const App: React.FC = () => {
       {/* Google Sign-In & Cloud Sync Modal */}
       <GoogleAuthModal
         isOpen={showGoogleAuthModal}
-        onClose={() => setShowGoogleAuthModal(false)}
+        onClose={() => {
+          setShowGoogleAuthModal(false);
+          setOpenBugReportOnProfile(false);
+        }}
         currentUser={googleUser}
         apkAuthSessionId={apkAuthSessionId}
+        openBugReportInitially={openBugReportOnProfile}
+        themeMode={appTheme}
+        onToggleTheme={(nextTheme) => {
+          setAppTheme(nextTheme);
+          triggerHaptic('medium');
+        }}
         onSignIn={(user) => {
           saveGoogleUser(user);
           setGoogleUser(user);
@@ -3512,6 +3784,54 @@ export const App: React.FC = () => {
         userCoins={stats.coins}
       />
 
+      {/* Incoming Game Room Invite Banner */}
+      {incomingRoomInvite && !inGame && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] w-[92%] max-w-md bg-slate-900/95 border-2 border-emerald-400 rounded-2xl p-3 shadow-[0_10px_40px_rgba(16,185,129,0.45)] backdrop-blur-md animate-fade-in">
+          <div className="flex items-center justify-between gap-2.5">
+            <div className="min-w-0">
+              <div className="text-xs font-black text-emerald-300">
+                🎮 Oyun Dəvəti ({incomingRoomInvite.variant} • {incomingRoomInvite.roomCode})
+              </div>
+              <div className="text-xs text-white font-bold truncate mt-0.5">
+                {incomingRoomInvite.from.name}#{incomingRoomInvite.from.playerTag} sizi otağa dəvət edir!
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <button
+                onClick={async () => {
+                  const inv = incomingRoomInvite;
+                  setIncomingRoomInvite(null);
+                  try {
+                    const myId = getMyPlayerIdentity(googleUser, stats);
+                    setShowFriendsModal(false);
+                    await handleJoinRoom(inv.roomCode, googleUser?.name || myId.name);
+                    setShowMultiplayerLobby(true);
+                  } catch (e: any) {
+                    showTemporarySocialBanner(e?.message || 'Otağa qoşulmaq mümkün olmadı.');
+                  }
+                }}
+                className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow active:scale-95 transition"
+              >
+                Qoşul
+              </button>
+              <button
+                onClick={() => setIncomingRoomInvite(null)}
+                className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition"
+              >
+                Rədd et
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Social / QuickMatch Toast Banner */}
+      {socialBanner && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-full bg-slate-900/95 border border-amber-400/70 text-amber-200 text-xs font-bold shadow-xl pointer-events-none animate-fade-in max-w-[90%] text-center">
+          {socialBanner}
+        </div>
+      )}
+
       {/* Friends & Social Modal */}
       <FriendsModal
         isOpen={showFriendsModal}
@@ -3519,11 +3839,13 @@ export const App: React.FC = () => {
         lang={lang}
         googleUser={googleUser}
         stats={stats}
-        onInviteFriend={() => {
-          handleCreateRoom('2p_solo', googleUser?.name || 'Siz');
-          setShowMultiplayerLobby(true);
-        }}
+        incomingRequests={incomingFriendRequests}
+        outgoingRequestIds={outgoingFriendRequestIds}
+        onRespondFriendRequest={handleRespondFriendRequest}
+        onRefreshSocial={refreshSocialState}
+        onInviteFriend={handleInviteFriend}
       />
+      </Suspense>
     </div>
   );
 };

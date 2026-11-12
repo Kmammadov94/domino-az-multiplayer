@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Cloud, CheckCircle, ShieldAlert, LogOut, X, Smartphone, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
+import { Cloud, CheckCircle, ShieldAlert, LogOut, X, Smartphone, ExternalLink, Loader2, RefreshCw, Bug, Send, Sun, Moon } from 'lucide-react';
 import { Browser as CapBrowser } from '@capacitor/browser';
 import {
   GoogleUserProfile,
   isNativeMobileApp,
   getBackendServerUrl,
-  PRODUCTION_SERVER_URL
+  PRODUCTION_SERVER_URL,
+  AppThemeMode
 } from '../utils/storage';
 
 export const GOOGLE_CLIENT_ID =
   '345163175505-a7dv01uno2tof42k31omil6p5c9do20g.apps.googleusercontent.com';
+
+export const SUPPORT_EMAIL = 'sadpocketgames@gmail.com';
+export const DEFAULT_BUG_SUBJECT = '[Bug & Feedback] Domino Pro: ';
 
 interface GoogleAuthModalProps {
   isOpen: boolean;
@@ -18,6 +22,9 @@ interface GoogleAuthModalProps {
   onSignIn: (user: GoogleUserProfile) => void;
   onSignOut: () => void;
   apkAuthSessionId?: string | null;
+  openBugReportInitially?: boolean;
+  themeMode?: AppThemeMode;
+  onToggleTheme?: (mode: AppThemeMode) => void;
 }
 
 export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
@@ -26,8 +33,37 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
   currentUser,
   onSignIn,
   onSignOut,
-  apkAuthSessionId = null
+  apkAuthSessionId = null,
+  openBugReportInitially = false,
+  themeMode = 'dark',
+  onToggleTheme
 }) => {
+  const [showBugForm, setShowBugForm] = useState(openBugReportInitially);
+  const [bugSubject, setBugSubject] = useState(DEFAULT_BUG_SUBJECT);
+  const [bugDescription, setBugDescription] = useState('');
+  const [bugNotice, setBugNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen && openBugReportInitially) {
+      setShowBugForm(true);
+    }
+  }, [isOpen, openBugReportInitially]);
+
+  const handleSendBugReport = (e: React.FormEvent) => {
+    e.preventDefault();
+    const desc = bugDescription.trim();
+    if (!desc) {
+      setBugNotice('Zəhmət olmasa problemin təsvirini yazın.');
+      return;
+    }
+    const finalSubject = (bugSubject.trim() || DEFAULT_BUG_SUBJECT.trim());
+    const platform = isNativeMobileApp() ? 'Android App' : 'Web';
+    const playerInfo = currentUser ? `${currentUser.name} (${currentUser.email})` : 'Qonaq Oyunçu';
+    const body = `${desc}\n\n---\nOyunçu: ${playerInfo}\nPlatforma: ${platform}\nVersiya: Domino PRO 1.2.2`;
+    const mailtoUrl = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(finalSubject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailtoUrl;
+    setBugNotice(`E-poçt tətbiqiniz açılır (${SUPPORT_EMAIL})...`);
+  };
   const [gisLoaded, setGisLoaded] = useState(false);
   const [gisError, setGisError] = useState<string | null>(null);
   const [waitingForMobileBrowser, setWaitingForMobileBrowser] = useState(false);
@@ -147,19 +183,39 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
     checkGis();
   }, [isOpen, apkAuthSessionId, isNative]);
 
-  const handleCompleteSignIn = async (profile: GoogleUserProfile) => {
-    onSignIn(profile);
-    setCompletedProfile(profile);
+  const handleCompleteSignIn = async (profile: GoogleUserProfile, credential?: string) => {
+    let resolvedProfile: GoogleUserProfile = profile;
 
-    // If this browser tab was opened from the Android APK (?apk_auth=...), send the profile to the bridge endpoint!
+    if (credential && !apkAuthSessionId) {
+      try {
+        const res = await fetch(`${getBackendServerUrl() || PRODUCTION_SERVER_URL}/api/auth/google`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.profile) {
+            resolvedProfile = data.profile;
+          }
+        }
+      } catch {
+        // Offline fallback: proceed with local profile
+      }
+    }
+
+    onSignIn(resolvedProfile);
+    setCompletedProfile(resolvedProfile);
+
+    // If this browser tab was opened from the Android APK (?apk_auth=...), send the credential to the bridge endpoint!
     if (apkAuthSessionId) {
       const qs = new URLSearchParams({
-        googleId: profile.googleId,
-        name: profile.name,
-        email: profile.email,
-        picture: profile.picture || '',
+        googleId: resolvedProfile.googleId,
+        name: resolvedProfile.name,
+        email: resolvedProfile.email,
+        picture: resolvedProfile.picture || '',
         sessionId: apkAuthSessionId,
-        signedInAt: String(profile.signedInAt)
+        signedInAt: String(resolvedProfile.signedInAt)
       }).toString();
 
       const schemeUrl = `dominoaz://auth?${qs}`;
@@ -172,7 +228,7 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
         await fetch(`${getBackendServerUrl()}/api/apk-auth/${encodeURIComponent(apkAuthSessionId)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user: profile })
+          body: JSON.stringify({ credential, user: resolvedProfile })
         }).catch(() => {});
       } catch (e) {
         console.warn('Failed to send APK bridge auth:', e);
@@ -205,13 +261,16 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
                   .join('')
               );
               const payload = JSON.parse(jsonPayload);
-              handleCompleteSignIn({
-                googleId: payload.sub,
-                email: payload.email,
-                name: payload.name || payload.given_name || 'Google Oyunçusu',
-                picture: payload.picture,
-                signedInAt: Date.now()
-              });
+              handleCompleteSignIn(
+                {
+                  googleId: payload.sub,
+                  email: payload.email,
+                  name: payload.name || payload.given_name || 'Google Oyunçusu',
+                  picture: payload.picture,
+                  signedInAt: Date.now()
+                },
+                response.credential
+              );
             } catch (err) {
               console.error('Failed to parse Google JWT credential:', err);
             }
@@ -339,13 +398,51 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
           </div>
           <div>
             <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-1.5">
-              Google ilə Giriş et
+              Google &amp; Profil Hesabı
             </h2>
             <span className="text-[11px] text-amber-300 font-semibold block">
-              Rəsmi Google Hesabı & Təhlükəsiz Bulud Sinxronizasiyası
+              Rəsmi Giriş &bull; Tənzimləmələr &bull; Təhlükəsizlik
             </span>
           </div>
         </div>
+
+        {/* Theme Mode Selector (Dark vs Light) */}
+        {onToggleTheme && (
+          <div className="mb-4 p-2.5 rounded-2xl bg-slate-800/80 border border-slate-700/80 flex items-center justify-between gap-3 shadow-sm">
+            <div className="flex flex-col text-left">
+              <span className="text-xs font-black text-white">Görünüş Mövzusu:</span>
+              <span className="text-[10px] text-slate-400 font-semibold">
+                {themeMode === 'light' ? '☀️ İşıqlı (Ağ) Rejim' : '🌙 Qaranlıq (Defolt) Rejim'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 bg-slate-950/70 p-1 rounded-xl border border-slate-800">
+              <button
+                type="button"
+                onClick={() => onToggleTheme('dark')}
+                className={`py-1.5 px-3 rounded-lg text-xs font-black flex items-center gap-1.5 transition ${
+                  themeMode === 'dark'
+                    ? 'bg-amber-500 text-slate-950 shadow'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Moon className="w-3.5 h-3.5" />
+                <span>Qaranlıq</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onToggleTheme('light')}
+                className={`py-1.5 px-3 rounded-lg text-xs font-black flex items-center gap-1.5 transition ${
+                  themeMode === 'light'
+                    ? 'bg-amber-500 text-slate-950 shadow'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Sun className="w-3.5 h-3.5" />
+                <span>İşıqlı</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {apkBridgeCompleted && (completedProfile || currentUser) ? (
           <div className="flex flex-col items-center py-5 text-center gap-3">
@@ -558,6 +655,74 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
                 İndi deyil, Qonaq kimi davam et
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Report a Bug / Feedback Section inside Profile */}
+        {!apkBridgeCompleted && (
+          <div className="mt-4 pt-3 border-t border-slate-800/90">
+            <button
+              type="button"
+              onClick={() => {
+                setShowBugForm((prev) => !prev);
+                setBugNotice(null);
+              }}
+              className="w-full py-2 px-3 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-slate-700/80 text-xs font-bold text-amber-300 flex items-center justify-between transition"
+            >
+              <span className="flex items-center gap-2">
+                <Bug className="w-4 h-4 text-rose-400" />
+                <span>Xəta Bildir / Rəy Göndər</span>
+              </span>
+              <span className="text-[10px] text-slate-400">
+                {showBugForm ? 'Bağla ▲' : 'Aç ▼'}
+              </span>
+            </button>
+
+            {showBugForm && (
+              <form onSubmit={handleSendBugReport} className="mt-2.5 flex flex-col gap-2 bg-slate-950/70 border border-slate-800 rounded-2xl p-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                    Mövzu:
+                  </label>
+                  <input
+                    type="text"
+                    value={bugSubject}
+                    onChange={(e) => setBugSubject(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-semibold focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                    Problemin təsviri:
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={bugDescription}
+                    onChange={(e) => {
+                      setBugDescription(e.target.value);
+                      if (bugNotice) setBugNotice(null);
+                    }}
+                    placeholder="Xətanı və ya təklifinizi ətraflı yazın..."
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400 resize-none"
+                  />
+                </div>
+
+                {bugNotice && (
+                  <p className="text-[11px] font-semibold text-amber-300">
+                    {bugNotice}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:brightness-110 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow active:scale-95 transition"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>E-poçt ilə Göndər</span>
+                </button>
+              </form>
+            )}
           </div>
         )}
       </div>

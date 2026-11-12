@@ -54,6 +54,7 @@ export interface GoogleUserProfile {
   name: string;
   picture?: string;
   signedInAt: number;
+  authToken?: string;
 }
 
 export const DEFAULT_STATS: PlayerStats = {
@@ -186,9 +187,14 @@ export const syncWithCloud = async (
       }
     } catch {}
 
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (profile.authToken) {
+      headers['Authorization'] = `Bearer ${profile.authToken}`;
+    }
+
     const res = await fetch(`${baseUrl}/api/user-stats`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         googleId: profile.googleId,
         email: profile.email,
@@ -216,7 +222,11 @@ export const syncWithCloud = async (
         } catch {}
 
         if (data.profile) {
-          saveGoogleUser(data.profile);
+          saveGoogleUser({
+            ...profile,
+            ...data.profile,
+            authToken: data.profile.authToken || profile.authToken
+          });
         }
         return resolvedStats;
       }
@@ -225,6 +235,25 @@ export const syncWithCloud = async (
     console.warn('Cloud sync offline or server unreachable, using local stats:', e);
   }
   return currentStats;
+};
+
+export type AppThemeMode = 'dark' | 'light';
+const APP_THEME_KEY = 'az_domino_app_theme_mode';
+
+export const loadAppThemeMode = (): AppThemeMode => {
+  if (typeof window === 'undefined') return 'dark';
+  try {
+    const saved = localStorage.getItem(APP_THEME_KEY);
+    if (saved === 'light' || saved === 'dark') return saved;
+  } catch {}
+  return 'dark';
+};
+
+export const saveAppThemeMode = (theme: AppThemeMode): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(APP_THEME_KEY, theme);
+  } catch {}
 };
 
 export interface DailyClaimCheck {

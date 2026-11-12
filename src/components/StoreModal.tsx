@@ -10,7 +10,7 @@ import { AvatarView } from './AvatarView';
 import { sounds } from '../utils/sound';
 import { triggerHaptic } from '../utils/haptics';
 import { isNativeMobileApp } from '../utils/storage';
-import { showRewardedCoinsAd, REWARDED_AD_COINS_AMOUNT } from '../services/adMobService';
+import { showRewardedCoinsAd, getRewardedAdErrorNotice, REWARDED_AD_COINS_AMOUNT } from '../services/adMobService';
 import { X, Coins, Sparkles, Check, ShoppingBag, User, Layers, Shield, Award, Palette, PlayCircle } from 'lucide-react';
 
 interface StoreModalProps {
@@ -20,6 +20,7 @@ interface StoreModalProps {
   stats: PlayerStats;
   onUpdateStats: (newStats: PlayerStats) => void;
   initialTab?: 'skins' | 'avatars' | 'frames' | 'titles' | 'tables';
+  onOpenBugReport?: () => void;
 }
 
 export const StoreModal: React.FC<StoreModalProps> = ({
@@ -28,7 +29,8 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   lang,
   stats,
   onUpdateStats,
-  initialTab = 'skins'
+  initialTab = 'skins',
+  onOpenBugReport
 }) => {
   const [storeTab, setStoreTab] = useState<'skins' | 'avatars' | 'frames' | 'titles' | 'tables'>(initialTab);
   const [selectedSkinCategory, setSelectedSkinCategory] = useState<string>('all');
@@ -62,22 +64,9 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             ? `+${REWARDED_AD_COINS_AMOUNT} золота добавлено на баланс!`
             : `+${REWARDED_AD_COINS_AMOUNT} Gold added to your balance!`;
         showNotice(msg, 'success');
-      } else if (result.reason === 'dismissed') {
-        const msg =
-          lang === 'az'
-            ? 'Mükafat üçün reklamı sona qədər izləyin.'
-            : lang === 'ru'
-            ? 'Досмотрите рекламу до конца для награды.'
-            : 'Watch the ad until the end to earn the reward.';
-        showNotice(msg, 'error');
-      } else if (result.reason === 'unavailable') {
-        const msg =
-          lang === 'az'
-            ? 'Reklam hazırda yüklənmədi. Bir az sonra cəhd edin.'
-            : lang === 'ru'
-            ? 'Реклама сейчас недоступна. Попробуйте позже.'
-            : 'Ad is currently unavailable. Please try again later.';
-        showNotice(msg, 'error');
+      } else {
+        const errMsg = getRewardedAdErrorNotice(result, lang);
+        if (errMsg) showNotice(errMsg, 'error');
       }
     } finally {
       setWatchingAd(false);
@@ -514,6 +503,14 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                   {c.label}
                 </button>
               ))}
+              {onOpenBugReport && (
+                <button
+                  onClick={onOpenBugReport}
+                  className="ml-auto px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap bg-rose-950/70 hover:bg-rose-900/80 text-rose-200 border border-rose-500/40"
+                >
+                  🐛 Xəta Bildir
+                </button>
+              )}
             </div>
 
             {/* Avatars Grid - Pictures Only */}

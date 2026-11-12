@@ -35,7 +35,7 @@ export const FloatingScoreOverlay: React.FC<FloatingScoreOverlayProps> = ({ scor
   const isBigScore = visibleItem.points >= 20 || visibleItem.isInstant35;
 
   return (
-    <div className="fixed inset-x-0 top-13 sm:top-14 pointer-events-none z-40 flex items-start justify-center overflow-hidden px-4">
+    <div className="fixed inset-x-0 top-[calc(env(safe-area-inset-top,0px)+6.25rem)] sm:top-24 pointer-events-none z-40 flex items-start justify-center overflow-visible px-4 pt-3">
       <div
         className={`flex flex-col items-center justify-center transition-all duration-300 transform ${
           animating

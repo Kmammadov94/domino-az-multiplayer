@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { GameBoard, BranchId, TILE_SHORT, TILE_LONG } from '../utils/boardEngine';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { GameBoard, BranchId, TILE_SHORT, TILE_LONG, computeVisualBoardLayout } from '../utils/boardEngine';
 import { DominoSkin, TileData } from '../types/domino';
 import { TABLE_THEMES, DEFAULT_TABLE_THEME_ID, TableTheme } from '../data/tableThemes';
 import { DominoTile } from './DominoTile';
@@ -19,6 +19,7 @@ interface BoardViewProps {
   canDrawFromBazaar?: boolean;
   isDraggingTile?: boolean;
   variant?: '365' | '101';
+  isFramedSquare?: boolean;
 }
 
 export const BoardView: React.FC<BoardViewProps> = React.memo(({
@@ -31,7 +32,8 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
   branchExpectedScores = {} as Record<BranchId, number>,
   hoveredBranch = null,
   isDraggingTile = false,
-  variant = '365'
+  variant = '365',
+  isFramedSquare = false
 }) => {
   const tableTheme: TableTheme =
     TABLE_THEMES.find((t) => t.id === tableThemeId) || TABLE_THEMES[0];
@@ -61,13 +63,36 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
     return () => ro.disconnect();
   }, []);
 
-  // Calculate bounding box of all placed tiles
+  // Safe padding so tiles never touch HUD margins or screen boundaries
+  // In framed 1:1 portrait mode, opponent badges live outside the board so internal padding stays compact & symmetrical
+  const isShortLandscape = !isFramedSquare && viewport.h < 350;
+  const squarePad = Math.max(14, Math.min(26, Math.min(viewport.w, viewport.h) * 0.06));
+  const paddingX = isFramedSquare
+    ? squarePad
+    : viewport.w > 700
+    ? Math.min(70, viewport.w * 0.08)
+    : Math.min(140, viewport.w * 0.15);
+  const paddingY = isFramedSquare
+    ? squarePad
+    : isShortLandscape
+    ? Math.min(22, viewport.h * 0.08)
+    : Math.min(110, viewport.h * 0.18);
+  const usableW = Math.max(isFramedSquare ? 180 : 220, viewport.w - paddingX * 2);
+  const usableH = Math.max(isShortLandscape ? 130 : 180, viewport.h - paddingY * 2);
+
+  // Dynamically re-fold domino layout visually mid-game so it stays big & fits the screen cleanly
+  const visualBoard = useMemo(
+    () => computeVisualBoardLayout(board, usableW, usableH),
+    [board, usableW, usableH]
+  );
+
+  // Calculate bounding box of all visually placed tiles
   let minX = -80;
   let maxX = 80;
   let minY = -60;
   let maxY = 60;
 
-  board.tiles.forEach((t) => {
+  visualBoard.tiles.forEach((t) => {
     const halfW = (t.isVertical ? TILE_SHORT : TILE_LONG) / 2;
     const halfH = (t.isVertical ? TILE_LONG : TILE_SHORT) / 2;
     minX = Math.min(minX, t.x - halfW - 30);
@@ -79,7 +104,7 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
   // Include target tips for playable branches in the bounding box
   const branchKeys: BranchId[] = ['main_left', 'main_right', 'spinner_top', 'spinner_bottom'];
   branchKeys.forEach((bId) => {
-    const branch = board.branches[bId];
+    const branch = visualBoard.branches[bId];
     if (branch.active) {
       minX = Math.min(minX, branch.tipX - 45);
       maxX = Math.max(maxX, branch.tipX + 45);
@@ -91,21 +116,16 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
   const spanX = Math.max(280, maxX - minX);
   const spanY = Math.max(180, maxY - minY);
 
-  // Safe padding so tiles never touch HUD margins or screen boundaries
-  // Dynamically adaptive for Landscape Phones, Tablets, and Mobile Portrait!
-  const isShortLandscape = viewport.h < 350;
-  const paddingX = viewport.w > 700 ? Math.min(70, viewport.w * 0.08) : Math.min(140, viewport.w * 0.15);
-  const paddingY = isShortLandscape ? Math.min(22, viewport.h * 0.08) : Math.min(110, viewport.h * 0.18);
-  const usableW = Math.max(220, viewport.w - paddingX * 2);
-  const usableH = Math.max(isShortLandscape ? 130 : 180, viewport.h - paddingY * 2);
-
   // Dynamic auto-scale factor ensuring all tiles fit inside visible bounds
   // On tablets & large screens, allow center domino tiles to render significantly larger (up to 1.85x)
   // so they are crisp, tactile, and prominent instead of looking tiny!
-  const isTabletOrLarge = viewport.w >= 768 || viewport.h >= 600;
+  const isTabletOrLarge = isFramedSquare
+    ? viewport.w >= 600
+    : viewport.w >= 768 || viewport.h >= 600;
   const maxAutoScale = isTabletOrLarge ? 1.85 : 1.35;
+  const minAutoScale = isFramedSquare ? 0.32 : 0.38;
   const rawAutoScale = Math.min(usableW / spanX, usableH / spanY);
-  const autoScale = Math.min(maxAutoScale, Math.max(0.38, rawAutoScale));
+  const autoScale = Math.min(maxAutoScale, Math.max(minAutoScale, rawAutoScale));
 
   const finalScale = autoScale * userZoom;
   const centerX = (minX + maxX) / 2;
@@ -217,7 +237,11 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
       {/* Dynamic Table Felt Texture */}
       <div className={`absolute inset-0 ${tableTheme.feltClass} shadow-inner pointer-events-none opacity-95 transition-colors duration-500`}>
         {/* Rail border */}
-        <div className={`absolute inset-0 border-[10px] ${tableTheme.railBorderClass} shadow-[inset_0_0_40px_rgba(0,0,0,0.85)]`} />
+        <div
+          className={`absolute inset-0 ${
+            isFramedSquare ? 'border-[6px] sm:border-[8px] rounded-2xl' : 'border-[10px]'
+          } ${tableTheme.railBorderClass} shadow-[inset_0_0_40px_rgba(0,0,0,0.85)]`}
+        />
 
         {/* Carpet Ornamental Weave Center Overlay */}
         {tableTheme.patternType === 'carpet' && (
@@ -250,10 +274,10 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
         }}
       >
         {/* Placed Domino Tiles on the Table */}
-        {board.tiles.map((placed, idx) => {
+        {visualBoard.tiles.map((placed, idx) => {
           const tileW = placed.isVertical ? TILE_SHORT : TILE_LONG;
           const tileH = placed.isVertical ? TILE_LONG : TILE_SHORT;
-          const isLastPlaced = idx === board.tiles.length - 1 && board.tiles.length > 0;
+          const isLastPlaced = idx === visualBoard.tiles.length - 1 && visualBoard.tiles.length > 0;
           const isDouble = placed.tile.left === placed.tile.right;
 
           return (
@@ -295,7 +319,7 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
         })}
 
         {/* Empty Board Starting Target if board has no tiles */}
-        {board.tiles.length === 0 && selectedTile && (
+        {visualBoard.tiles.length === 0 && selectedTile && (
           <div
             data-branch-id="main_left"
             onClick={(e) => {
@@ -324,7 +348,7 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
         {/* Highlighted Target Branches for Selected Tile */}
         {selectedTile &&
           playableBranches.map((bId) => {
-            const branch = board.branches[bId];
+            const branch = visualBoard.branches[bId];
             if (!branch.active) return null;
             const expectedScore = branchExpectedScores[bId] || 0;
             const isHovered = hoveredBranch === bId;
@@ -393,7 +417,7 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
       </div>
 
       {/* Recenter & Zoom Controls Floating Toolset (Bottom Right of Table) */}
-      <div className="absolute bottom-3 right-3 z-30 flex items-center gap-1.5 pointer-events-auto bg-slate-900/85 backdrop-blur-md border border-white/10 rounded-xl p-1 shadow-lg">
+      <div className={`absolute ${isFramedSquare ? 'bottom-2 right-2' : 'bottom-3 right-3'} z-30 flex items-center gap-1.5 pointer-events-auto bg-slate-900/85 backdrop-blur-md border border-white/10 rounded-xl p-1 shadow-lg`}>
         {isPannedOrZoomed && (
           <button
             onClick={handleRecenter}

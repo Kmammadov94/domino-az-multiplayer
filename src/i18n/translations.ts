@@ -33,7 +33,7 @@ export const translations = {
     instant35Loss: '⚡ 35 XAL! RƏQİB BİRDƏFƏLİK UDDU!',
     instant35Desc: 'Masada 35 xal vurulduğu üçün birbaşa matç qələbəsi qazanıldı!',
     noScoreTurn: '0 xal',
-    dominoOut: 'Əl bitdi! Domino!',
+    dominoOut: 'Əl bitdi! Çıxdı!',
     baglandi: 'Bağlandı!',
     baglandiNotice: 'Oyun bağlandı! Əldəki xallar hesablanır...',
     baglandiOver365Notice: '365 xal keçilsə də oyun Bağlandı ilə bitdi! Qaydaya görə əlavə raund oynanılmalıdır.',

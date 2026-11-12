@@ -145,9 +145,9 @@ export const DOMINO_SKINS: DominoSkin[] = [
       en: 'Azerbaijan Flag'
     },
     desc: {
-      az: 'Milli üçrəngli bayrağımız, ay-ulduz və qızılı zərli mərkəz.',
-      ru: 'Национальный триколор с полумесяцем, звездой и золотым центром.',
-      en: 'National tricolor with crescent, star, and polished gold pin.'
+      az: 'Milli üçrəngli rənglər və cilalanmış qızılı zərli mərkəz.',
+      ru: 'Национальный триколор с полированным золотым центром.',
+      en: 'National tricolor with polished gold pin.'
     },
     price: 0,
     unlockedByDefault: true,

@@ -407,12 +407,12 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
       {/* Hand Domino Tiles Container:
           Dynamically sized so that EVERY domino tile is 100% visible on mobile portrait, landscape, and tablets! */}
       <div
-        className={`w-full max-w-full px-2 sm:px-4 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm border transition-all duration-300 shadow-2xl ${
+        className={`w-full max-w-full px-2 sm:px-4 flex items-center justify-center backdrop-blur-sm border transition-all duration-300 shadow-2xl ${
           isLandscapePhone ? 'py-1 rounded-xl' : 'py-1.5 sm:py-2 rounded-2xl'
         } ${
           isMyTurn
-            ? 'border-amber-400/80 ring-2 ring-amber-400/30 shadow-[0_0_25px_rgba(251,191,36,0.25)]'
-            : 'border-white/5'
+            ? 'bg-slate-950/60 border-amber-400/80 ring-2 ring-amber-400/30 shadow-[0_0_25px_rgba(251,191,36,0.25)]'
+            : 'bg-slate-950/85 border-slate-800/80 opacity-60 saturate-50'
         } ${
           shouldWrapRows ? 'flex-wrap gap-1 sm:gap-2' : 'overflow-x-auto overflow-y-hidden'
         }`}
@@ -443,7 +443,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                   ? 'cursor-grab active:cursor-grabbing hover:scale-105'
                   : isMyTurn
                   ? 'opacity-65 scale-95 cursor-not-allowed'
-                  : 'cursor-default'
+                  : 'grayscale-[45%] brightness-75 cursor-not-allowed'
               } ${isBeingDragged ? 'opacity-20 scale-95' : ''} ${
                 isPartOfCombo
                   ? 'ring-2 ring-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.7)] animate-pulse'

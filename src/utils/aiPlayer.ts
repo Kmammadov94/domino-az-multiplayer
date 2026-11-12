@@ -1,5 +1,7 @@
 import { TileData, Language } from '../types/domino';
-import { GameBoard, BranchId, getPlayableBranches, placeTileOnBranch } from './boardEngine';
+import { GameBoard, BranchId, getPlayableBranches, placeTileOnBranch, isBoardGloballyBlocked } from './boardEngine';
+import { sumHandPips } from './dominoLogic';
+import { sumHandPips101 } from './domino101Logic';
 
 export interface AIPersona {
   id: string;
@@ -30,6 +32,9 @@ export interface AIMove {
   branchId: BranchId;
   expectedScore: number;
   leavesMatchingInHand?: boolean;
+  remainingPlayableCount?: number;
+  remainingHandScore?: number;
+  blocksBoard?: boolean;
 }
 
 export const selectBestAIMove = (
@@ -107,47 +112,90 @@ export const selectBestAIMove = (
       const leavesMatchingInHand =
         newOpenVal !== undefined &&
         remainingHand.some((h) => h.left === newOpenVal || h.right === newOpenVal);
+      const remainingPlayableCount = remainingHand.filter(
+        (h) => getPlayableBranches(simBoard, h).length > 0
+      ).length;
+      const remainingHandScore =
+        variant === '101' ? sumHandPips101(remainingHand) : sumHandPips(remainingHand);
+      const blocksBoard = isBoardGloballyBlocked(simBoard);
 
       possibleMoves.push({
         tile,
         branchId: bId,
         expectedScore: variant === '101' ? 0 : scoredPoints,
-        leavesMatchingInHand
+        leavesMatchingInHand,
+        remainingPlayableCount,
+        remainingHandScore,
+        blocksBoard
       });
     }
   }
 
   if (possibleMoves.length === 0) return null;
 
-  // Sort moves:
-  // 1. In 365 mode: Highest scoring move (Telefon 5-multiple)
-  // 2. Urgent [0:0] (Ayaz) disposal when hand is getting small (<= 3 tiles) so it isn't caught solo for 10 pts
-  // 3. Doubles (to dispose of risky doubles)
-  // 4. Higher pip tiles (to minimize points in hand in case of Bağlandı or loss)
-  // 5. Moves that leave a matching number still in AI's remaining hand
+  // Sort moves according to variant priorities:
+  // - 101 mode: 1) Finishing (empty hand -> smart block with low hand -> keeping playable follow-ups) 2) Lower score remaining in hand
+  // - 365 mode: 1) Scoring (Telefon 5-multiple) 2) Finishing / smart block with low hand 3) Lower score remaining in hand
   possibleMoves.sort((a, b) => {
+    // 1. In 365 mode: Highest scoring move first
     if (variant !== '101' && b.expectedScore !== a.expectedScore) {
       return b.expectedScore - a.expectedScore;
     }
 
-    if (hand.length <= 3) {
-      const aIsZeroZero = a.tile.left === 0 && a.tile.right === 0 ? 1 : 0;
-      const bIsZeroZero = b.tile.left === 0 && b.tile.right === 0 ? 1 : 0;
-      if (bIsZeroZero !== aIsZeroZero) {
-        return bIsZeroZero - aIsZeroZero;
+    // 2. Finishing priority:
+    // 2a. Instant hand finish (if hand.length === 1, remainingHandScore === 0)
+    const aFinishes = (a.remainingHandScore === 0 && hand.length === 1) ? 1 : 0;
+    const bFinishes = (b.remainingHandScore === 0 && hand.length === 1) ? 1 : 0;
+    if (bFinishes !== aFinishes) {
+      return bFinishes - aFinishes;
+    }
+
+    // 2b. Blocking strategy: if blocking the board ("Bağlandı") with a low hand (<= 12 pts),
+    // prioritize it to win the block & gain next-hand turn priority; avoid blocking with a heavy hand (> 18 pts).
+    const aBlockPref = a.blocksBoard
+      ? ((a.remainingHandScore ?? 99) <= 12 ? 1 : (a.remainingHandScore ?? 0) > 18 ? -1 : 0)
+      : 0;
+    const bBlockPref = b.blocksBoard
+      ? ((b.remainingHandScore ?? 99) <= 12 ? 1 : (b.remainingHandScore ?? 0) > 18 ? -1 : 0)
+      : 0;
+    if (bBlockPref !== aBlockPref) {
+      return bBlockPref - aBlockPref;
+    }
+
+    // 2b. Avoid dead-ending the hand (keep at least 1 playable tile on the resulting board)
+    const aHasFollowUp = (a.remainingPlayableCount ?? 0) > 0 ? 1 : 0;
+    const bHasFollowUp = (b.remainingPlayableCount ?? 0) > 0 ? 1 : 0;
+    if (bHasFollowUp !== aHasFollowUp) {
+      return bHasFollowUp - aHasFollowUp;
+    }
+
+    // 2c. In 101 mode, also favor having more playable follow-up options to finish faster
+    if (variant === '101') {
+      const aPlayable = a.remainingPlayableCount ?? 0;
+      const bPlayable = b.remainingPlayableCount ?? 0;
+      if (bPlayable !== aPlayable) {
+        return bPlayable - aPlayable;
       }
     }
 
+    // 3. Keeping lower score at hand (automatically sheds heavy tiles & avoids solo [0:0] = 10 pts)
+    const aScore = a.remainingHandScore ?? 0;
+    const bScore = b.remainingHandScore ?? 0;
+    if (aScore !== bScore) {
+      return aScore - bScore;
+    }
+
+    // 4. Tie-breakers: shed doubles first, then keep more playable options / matching end
     const aIsDouble = a.tile.left === a.tile.right ? 1 : 0;
     const bIsDouble = b.tile.left === b.tile.right ? 1 : 0;
     if (bIsDouble !== aIsDouble) {
       return bIsDouble - aIsDouble;
     }
 
-    const aPips = a.tile.left === 0 && a.tile.right === 0 ? 10 : a.tile.left + a.tile.right;
-    const bPips = b.tile.left === 0 && b.tile.right === 0 ? 10 : b.tile.left + b.tile.right;
-    if (bPips !== aPips) {
-      return bPips - aPips;
+    const aPlayable = a.remainingPlayableCount ?? 0;
+    const bPlayable = b.remainingPlayableCount ?? 0;
+    if (bPlayable !== aPlayable) {
+      return bPlayable - aPlayable;
     }
 
     const aSupport = a.leavesMatchingInHand ? 1 : 0;

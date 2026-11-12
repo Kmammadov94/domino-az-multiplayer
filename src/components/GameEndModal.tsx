@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Player, Language, GameMode, GameVariant } from '../types/domino';
 import { Match101State } from '../utils/domino101Logic';
+import { getMatchCoinReward } from '../utils/dominoLogic';
 import { translations } from '../i18n/translations';
 import { sounds } from '../utils/sound';
 import { Trophy, Frown, Coins, ArrowRight, RotateCcw, Eye, EyeOff, Sparkles, LogOut, PlayCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { AvatarView } from './AvatarView';
 import { isNativeMobileApp } from '../utils/storage';
-import { REWARDED_AD_COINS_AMOUNT } from '../services/adMobService';
+import {
+  REWARDED_AD_COINS_AMOUNT,
+  getRewardedAdErrorNotice,
+  type RewardedAdResult
+} from '../services/adMobService';
 
 interface GameEndModalProps {
   isOpen: boolean;
@@ -27,7 +32,7 @@ interface GameEndModalProps {
   onNextHand: () => void;
   onRestartMatch: () => void;
   onLeaveMatch: () => void;
-  onClaimAdBonus?: () => Promise<boolean>;
+  onClaimAdBonus?: () => Promise<RewardedAdResult>;
   variant?: GameVariant;
   match101State?: Match101State;
   isSeka?: boolean;
@@ -61,12 +66,14 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
   const [isViewingBoard, setIsViewingBoard] = useState<boolean>(false);
   const [claimingAdBonus, setClaimingAdBonus] = useState<boolean>(false);
   const [adBonusClaimed, setAdBonusClaimed] = useState<boolean>(false);
+  const [adErrorNotice, setAdErrorNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setIsViewingBoard(false);
       setClaimingAdBonus(false);
       setAdBonusClaimed(false);
+      setAdErrorNotice(null);
     }
   }, [isOpen]);
 
@@ -78,7 +85,10 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
   let userWon = false;
   if (isMatchOver) {
     if (isInstant35) {
-      userWon = winnerPlayerIndex === myIndex;
+      userWon =
+        mode === '4p_duo'
+          ? (players[winnerPlayerIndex]?.team ?? 1) === myTeam
+          : winnerPlayerIndex === myIndex;
     } else if (mode === '4p_duo') {
       const myTeamScore = players.find((p) => p.team === myTeam)?.score ?? 0;
       const otherTeamScore = players.find((p) => p.team !== myTeam)?.score ?? 0;
@@ -226,36 +236,49 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
             <div className="bg-amber-500/20 border border-amber-500/40 rounded-xl px-4 py-2 flex items-center gap-2 mb-3">
               <Coins className="w-5 h-5 text-amber-400" />
               <span className="font-bold text-amber-300 text-sm">
-                {userWon ? '+5 Qızıl qazanıldı!' : '+3 Qızıl qazanıldı!'}
+                {`+${getMatchCoinReward(variant, userWon)} Qızıl qazanıldı!`}
               </span>
             </div>
 
             {onClaimAdBonus && isNativeMobileApp() && !adBonusClaimed && (
-              <button
-                onClick={async () => {
-                  if (claimingAdBonus) return;
-                  setClaimingAdBonus(true);
-                  try {
-                    const ok = await onClaimAdBonus();
-                    if (ok) setAdBonusClaimed(true);
-                  } finally {
-                    setClaimingAdBonus(false);
-                  }
-                }}
-                disabled={claimingAdBonus}
-                className="mb-4 w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 disabled:opacity-60 text-slate-950 font-black text-xs shadow-lg transition flex items-center justify-center gap-2 active:scale-95"
-              >
-                <PlayCircle className="w-4 h-4 flex-shrink-0" />
-                <span>
-                  {claimingAdBonus
-                    ? (lang === 'az' ? 'Reklam açılır...' : lang === 'ru' ? 'Загрузка рекламы...' : 'Loading ad...')
-                    : (lang === 'az'
-                        ? `Reklama bax → +${REWARDED_AD_COINS_AMOUNT} Qızıl Qazan`
-                        : lang === 'ru'
-                        ? `Смотреть рекламу → +${REWARDED_AD_COINS_AMOUNT} золота`
-                        : `Watch Ad → +${REWARDED_AD_COINS_AMOUNT} Gold`)}
-                </span>
-              </button>
+              <div className="mb-4 w-full">
+                <button
+                  onClick={async () => {
+                    if (claimingAdBonus) return;
+                    setClaimingAdBonus(true);
+                    setAdErrorNotice(null);
+                    try {
+                      const res = await onClaimAdBonus();
+                      if (res.rewarded) {
+                        setAdBonusClaimed(true);
+                      } else {
+                        const msg = getRewardedAdErrorNotice(res, lang);
+                        if (msg) setAdErrorNotice(msg);
+                      }
+                    } finally {
+                      setClaimingAdBonus(false);
+                    }
+                  }}
+                  disabled={claimingAdBonus}
+                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 disabled:opacity-60 text-slate-950 font-black text-xs shadow-lg transition flex items-center justify-center gap-2 active:scale-95"
+                >
+                  <PlayCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>
+                    {claimingAdBonus
+                      ? (lang === 'az' ? 'Reklam açılır...' : lang === 'ru' ? 'Загрузка рекламы...' : 'Loading ad...')
+                      : (lang === 'az'
+                          ? `Reklama bax → +${REWARDED_AD_COINS_AMOUNT} Qızıl Qazan`
+                          : lang === 'ru'
+                          ? `Смотреть рекламу → +${REWARDED_AD_COINS_AMOUNT} золота`
+                          : `Watch Ad → +${REWARDED_AD_COINS_AMOUNT} Gold`)}
+                  </span>
+                </button>
+                {adErrorNotice && (
+                  <p className="mt-1.5 text-[11px] font-semibold text-rose-300 text-center">
+                    {adErrorNotice}
+                  </p>
+                )}
+              </div>
             )}
 
             {adBonusClaimed && (
@@ -331,13 +354,13 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
                 <span className="text-emerald-400">
                   {isBaglandi
                     ? (mode === '4p_duo' ? 'Bağlandı! Komandanız Qazandı!' : 'Bağlandı! Siz Qazandınız!')
-                    : (mode === '4p_duo' ? 'Domino! Komandanız Qazandı!' : 'Domino! Siz Qazandınız!')}
+                    : (mode === '4p_duo' ? 'Çıxdınız! Komandanız Qazandı!' : 'Çıxdınız! Siz Qazandınız!')}
                 </span>
               ) : (
                 <span className="text-amber-300">
                   {isBaglandi
                     ? `${winnerPlayer?.name || 'Rəqib'} Bağlandı ilə qazandı`
-                    : `${winnerPlayer?.name || 'Rəqib'} Domino etdi`}
+                    : `${winnerPlayer?.name || 'Rəqib'} çıxdı`}
                 </span>
               )}
             </h2>

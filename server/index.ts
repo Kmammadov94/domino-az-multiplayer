@@ -10,13 +10,52 @@ import { DoubleComboMove } from '../src/utils/comboEngine';
 import { GameRoom } from './gameRoom';
 import { ChatMessage, MultiplayerRoomSummary } from '../src/types/multiplayer';
 import { validatePlayerName, cleanProfanity } from '../src/utils/profanityFilter';
+import {
+  extractBearerToken,
+  isValidSafeId,
+  safeTimingEqual,
+  signSessionToken,
+  verifyGoogleIdToken,
+  verifySessionToken
+} from './auth';
+import {
+  initStorage,
+  isPostgresEnabled,
+  persistSocialDatabase,
+  persistUserRecord
+} from './db';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const DEFAULT_ALLOWED_ORIGINS = [
+  'https://domino-az-multiplayer.onrender.com',
+  'https://localhost',
+  'http://localhost',
+  'capacitor://localhost',
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:4173',
+  'http://localhost:5173'
+];
+
+const allowedOrigins = new Set(
+  (process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
+    : DEFAULT_ALLOWED_ORIGINS)
+);
+
+const corsOriginCheck = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+  if (!origin || allowedOrigins.has(origin) || /^http:\/\/127\.0\.0\.1:\d+$/.test(origin)) {
+    callback(null, true);
+  } else {
+    callback(new Error(`Origin ${origin} not allowed by CORS`));
+  }
+};
+
 const app = express();
-app.use(cors());
-app.use(express.json());
+app.use(cors({ origin: corsOriginCheck }));
+app.use(express.json({ limit: '256kb' }));
 
 // Serve production static assets from Vite build if available
 const distPath = fs.existsSync(path.resolve(__dirname, '../dist'))
@@ -38,46 +77,222 @@ app.get('/health', (_req, res) => {
   res.json({
     status: 'ok',
     game: 'Domino PRO (Telefon 365)',
+    storage: isPostgresEnabled() ? 'postgresql' : 'local_json',
     activeRooms: rooms.size,
     timestamp: Date.now()
   });
 });
 
-// User Cloud Storage File Persistence
-const USERS_FILE = path.resolve(process.cwd(), 'data/users.json');
+// User Cloud Storage (backed by Neon PostgreSQL when DATABASE_URL is set, or local JSON fallback)
+let userDatabase: Record<string, any> = {};
 
-const loadUserDatabase = (): Record<string, any> => {
-  try {
-    if (fs.existsSync(USERS_FILE)) {
-      const raw = fs.readFileSync(USERS_FILE, 'utf-8');
-      return JSON.parse(raw);
+// Persistent Two-Way Social Store (Friends & Pending Requests)
+interface SocialProfile {
+  playerId: string;
+  playerTag: string;
+  name: string;
+  handle: string;
+  avatarId?: string;
+  frameId?: string;
+  title?: string;
+  matchesWon?: number;
+}
+
+interface FriendRequestRecord {
+  id: string;
+  from: SocialProfile;
+  createdAt: number;
+}
+
+interface SocialDatabase {
+  friendsByPlayerId: Record<string, SocialProfile[]>;
+  requestsByTargetId: Record<string, FriendRequestRecord[]>;
+}
+
+let socialDb: SocialDatabase = { friendsByPlayerId: {}, requestsByTargetId: {} };
+
+const saveSocialDatabase = (db: SocialDatabase): void => {
+  persistSocialDatabase(db);
+};
+
+// Live Presence Tracking
+const socketToPlayerId = new Map<string, string>();
+const playerIdToSockets = new Map<string, Set<string>>();
+const onlineProfiles = new Map<string, SocialProfile>();
+
+const isPlayerOnline = (playerId?: string): boolean => {
+  if (!playerId) return false;
+  const set = playerIdToSockets.get(playerId);
+  return !!set && set.size > 0;
+};
+
+const buildSocialStateForPlayer = (playerId: string) => {
+  const friends = (socialDb.friendsByPlayerId[playerId] || []).map((f) => {
+    const live = onlineProfiles.get(f.playerId);
+    return {
+      ...(live || f),
+      isOnline: isPlayerOnline(f.playerId)
+    };
+  });
+  const incomingRequests = socialDb.requestsByTargetId[playerId] || [];
+  const outgoingRequestIds: string[] = [];
+  for (const [targetId, reqs] of Object.entries(socialDb.requestsByTargetId)) {
+    if (reqs.some((r) => r.from.playerId === playerId)) {
+      outgoingRequestIds.push(targetId);
     }
-  } catch (e) {
-    console.error('Failed to load user database:', e);
   }
-  return {};
+  return { friends, incomingRequests, outgoingRequestIds };
 };
 
-const saveUserDatabase = (db: Record<string, any>): void => {
-  try {
-    const dir = path.dirname(USERS_FILE);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(USERS_FILE, JSON.stringify(db, null, 2), 'utf-8');
-  } catch (e) {
-    console.error('Failed to save user database:', e);
+const emitToPlayer = (playerId: string, event: string, payload: any) => {
+  const sockets = playerIdToSockets.get(playerId);
+  if (!sockets) return;
+  for (const sid of sockets) {
+    io.to(sid).emit(event, payload);
   }
 };
 
-let userDatabase = loadUserDatabase();
+const emitSocialSync = (playerId: string) => {
+  if (!isPlayerOnline(playerId)) return;
+  emitToPlayer(playerId, 'social_sync', buildSocialStateForPlayer(playerId));
+};
 
-// Sync user stats endpoint
+const upsertFriendRecord = (ownerId: string, friend: SocialProfile) => {
+  if (!socialDb.friendsByPlayerId[ownerId]) {
+    socialDb.friendsByPlayerId[ownerId] = [];
+  }
+  const list = socialDb.friendsByPlayerId[ownerId];
+  const idx = list.findIndex(
+    (f) => f.playerId === friend.playerId || (f.playerTag && friend.playerTag && f.playerTag === friend.playerTag)
+  );
+  if (idx >= 0) {
+    list[idx] = { ...list[idx], ...friend };
+  } else {
+    list.push(friend);
+  }
+};
+
+const addMutualFriendship = (p1: SocialProfile, p2: SocialProfile) => {
+  upsertFriendRecord(p1.playerId, p2);
+  upsertFriendRecord(p2.playerId, p1);
+  saveSocialDatabase(socialDb);
+  emitSocialSync(p1.playerId);
+  emitSocialSync(p2.playerId);
+};
+
+const findPlayerProfileByQuery = (qRaw: string): (SocialProfile & { isOnline: boolean }) | null => {
+  const q = (qRaw || '').trim();
+  if (!q) return null;
+
+  // 1. Live online profiles (Home screen + Lobby + In-Game)
+  for (const prof of onlineProfiles.values()) {
+    const matchTag =
+      prof.playerTag &&
+      (q === prof.playerTag || q === `#${prof.playerTag}` || q.toUpperCase() === `DOM-${prof.playerTag}`);
+    const matchId = prof.playerId && q.toLowerCase() === prof.playerId.toLowerCase();
+    const matchHandle = prof.handle && prof.handle.toLowerCase() === q.toLowerCase();
+    if (matchTag || matchId || matchHandle) {
+      return { ...prof, isOnline: isPlayerOnline(prof.playerId) };
+    }
+  }
+
+  // 2. Active rooms
+  for (const room of rooms.values()) {
+    for (const p of room.players) {
+      if (p.isAI) continue;
+      const matchTag =
+        p.playerTag &&
+        (q === p.playerTag || q === `#${p.playerTag}` || q.toUpperCase() === `DOM-${p.playerTag}`);
+      const matchId = p.playerId && q.toLowerCase() === p.playerId.toLowerCase();
+      const matchHandle = p.name && p.playerTag && `${p.name}#${p.playerTag}`.toLowerCase() === q.toLowerCase();
+      if (matchTag || matchId || matchHandle) {
+        const pid = p.playerId || `DOM-${p.playerTag || '0000'}`;
+        return {
+          name: p.name,
+          playerId: pid,
+          playerTag: p.playerTag || '0000',
+          handle: `${p.name}#${p.playerTag || '0000'}`,
+          avatarId: p.avatarId || 'avatar_baku_classic',
+          frameId: p.frameId,
+          title: p.title || 'Çayxana Dominocusu',
+          isOnline: true
+        };
+      }
+    }
+  }
+
+  // 3. Persistent Google user database
+  for (const [googleId, userRecord] of Object.entries(userDatabase)) {
+    const uProfile = (userRecord as any).profile || {};
+    const uStats = (userRecord as any).stats || {};
+    let hash = 0;
+    for (let i = 0; i < googleId.length; i++) {
+      hash = (hash << 5) - hash + googleId.charCodeAt(i);
+      hash |= 0;
+    }
+    const tag = ((Math.abs(hash) % 9000) + 1000).toString();
+    const pid = `DOM-${googleId.slice(-6).toUpperCase()}`;
+    const name = uProfile.name || 'Dominocu';
+    const handle = `${name}#${tag}`;
+
+    const matchTag = q === tag || q === `#${tag}` || q.toUpperCase() === `DOM-${tag}`;
+    const matchId = q.toLowerCase() === pid.toLowerCase();
+    const matchHandle = q.toLowerCase() === handle.toLowerCase();
+    if (matchTag || matchId || matchHandle) {
+      return {
+        name,
+        playerId: pid,
+        playerTag: tag,
+        handle,
+        avatarId: uStats.equippedAvatar || 'avatar_baku_classic',
+        frameId: uStats.equippedFrame,
+        title: uStats.equippedTitle || 'Çayxana Qonağı',
+        matchesWon: uStats.matchesWon || 0,
+        isOnline: isPlayerOnline(pid)
+      };
+    }
+  }
+
+  return null;
+};
+
+// Verify Google ID Token and issue a signed server session token
+app.post('/api/auth/google', async (req, res) => {
+  const { credential } = req.body || {};
+  if (typeof credential !== 'string' || !credential) {
+    return res.status(400).json({ error: 'Google ID token (credential) is required' });
+  }
+  const verified = await verifyGoogleIdToken(credential);
+  if (!verified) {
+    return res.status(401).json({ error: 'Invalid or expired Google token' });
+  }
+  const authToken = signSessionToken(verified.googleId);
+  res.json({
+    success: true,
+    profile: {
+      ...verified,
+      signedInAt: Date.now(),
+      authToken
+    }
+  });
+});
+
+// Sync user stats endpoint (authenticated)
 app.post('/api/user-stats', (req, res) => {
   const { googleId, email, name, picture, stats, isInitialLogin } = req.body || {};
-  if (!googleId) {
-    return res.status(400).json({ error: 'googleId is required' });
+  if (!isValidSafeId(googleId)) {
+    return res.status(400).json({ error: 'Valid googleId is required' });
   }
 
-  const existing = userDatabase[googleId] || {};
+  const token = extractBearerToken(req.headers.authorization);
+  const verifiedToken = verifySessionToken(token);
+  if (!verifiedToken || verifiedToken.googleId !== googleId) {
+    return res.status(401).json({ error: 'Authentication required. Please sign in again.' });
+  }
+
+  const existing = Object.prototype.hasOwnProperty.call(userDatabase, googleId)
+    ? userDatabase[googleId]
+    : {};
   const existingStats = existing.stats || {};
   const pendingGrant = existing.pendingCoinGrant || 0;
 
@@ -186,7 +401,7 @@ app.post('/api/user-stats', (req, res) => {
     updatedAt: Date.now()
   };
 
-  saveUserDatabase(userDatabase);
+  persistUserRecord(googleId, userDatabase[googleId], userDatabase);
 
   res.json({
     success: true,
@@ -195,11 +410,20 @@ app.post('/api/user-stats', (req, res) => {
   });
 });
 
+// Admin helper to validate configured ADMIN_SECRET (no hardcoded fallback)
+const isAuthorizedAdmin = (providedKey: unknown): boolean => {
+  const secret = process.env.ADMIN_SECRET;
+  if (!secret || typeof providedKey !== 'string' || !providedKey) return false;
+  return safeTimingEqual(providedKey, secret);
+};
+
 // Admin endpoint to inspect registered users
 app.get('/api/admin/users', (req, res) => {
-  const adminKey = (req.query.adminKey as string) || (req.headers['x-admin-key'] as string);
-  const secret = process.env.ADMIN_SECRET || 'domino-az-secret-admin-2026';
-  if (adminKey !== secret) {
+  if (!process.env.ADMIN_SECRET) {
+    return res.status(503).json({ error: 'Admin endpoints are disabled (ADMIN_SECRET not configured).' });
+  }
+  const adminKey = (req.headers['x-admin-key'] as string) || (req.query.adminKey as string);
+  if (!isAuthorizedAdmin(adminKey)) {
     return res.status(403).json({ error: 'Unauthorized. Provide valid adminKey.' });
   }
 
@@ -223,17 +447,19 @@ app.get('/api/admin/users', (req, res) => {
   });
 });
 
-// Admin endpoint to add or subtract coins to an account
+// Admin endpoint to add or subtract coins to an account (POST only)
 const handleAdminGrantCoins = (req: any, res: any) => {
-  const adminKey = (req.query.adminKey as string) || (req.headers['x-admin-key'] as string) || req.body?.adminKey;
-  const secret = process.env.ADMIN_SECRET || 'domino-az-secret-admin-2026';
-  if (adminKey !== secret) {
+  if (!process.env.ADMIN_SECRET) {
+    return res.status(503).json({ error: 'Admin endpoints are disabled (ADMIN_SECRET not configured).' });
+  }
+  const adminKey = (req.headers['x-admin-key'] as string) || req.body?.adminKey;
+  if (!isAuthorizedAdmin(adminKey)) {
     return res.status(403).json({ error: 'Unauthorized. Provide valid adminKey.' });
   }
 
-  const googleId = (req.query.googleId as string) || req.body?.googleId;
-  const email = (req.query.email as string) || req.body?.email;
-  const rawAmount = req.query.amount ?? req.body?.amount;
+  const googleId = req.body?.googleId;
+  const email = req.body?.email;
+  const rawAmount = req.body?.amount;
   const delta = Number(rawAmount);
 
   if (isNaN(delta) || delta === 0) {
@@ -261,7 +487,7 @@ const handleAdminGrantCoins = (req: any, res: any) => {
   user.stats.coins = Math.max(0, prevCoins + delta);
   user.pendingCoinGrant = (user.pendingCoinGrant || 0) + delta;
   user.updatedAt = Date.now();
-  saveUserDatabase(userDatabase);
+  persistUserRecord(targetId, userDatabase[targetId], userDatabase);
 
   res.json({
     success: true,
@@ -278,42 +504,68 @@ const handleAdminGrantCoins = (req: any, res: any) => {
 };
 
 app.post('/api/admin/grant-coins', handleAdminGrantCoins);
-app.get('/api/admin/grant-coins', handleAdminGrantCoins);
 
 // Temporary store for Mobile APK Google Auth Handshake Sessions (expires after 5 minutes)
-const apkAuthSessions = new Map<string, { user: any; createdAt: number }>();
+const apkAuthSessions = new Map<string, { user: any; createdAt: number; consumedAt?: number }>();
 
-app.post('/api/apk-auth/:sessionId', (req, res) => {
+app.post('/api/apk-auth/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
-  const { user } = req.body || {};
-  if (!sessionId || !user || !user.googleId) {
-    return res.status(400).json({ error: 'Invalid session or user payload' });
+  const { credential } = req.body || {};
+  if (!isValidSafeId(sessionId) || typeof credential !== 'string' || !credential) {
+    return res.status(400).json({ error: 'Valid sessionId and Google credential are required' });
   }
-  apkAuthSessions.set(sessionId, { user, createdAt: Date.now() });
-  // Cleanup expired sessions older than 5 minutes
+
+  const verified = await verifyGoogleIdToken(credential);
+  if (!verified) {
+    return res.status(401).json({ error: 'Invalid or expired Google credential' });
+  }
+
+  const authToken = signSessionToken(verified.googleId);
+  const authenticatedUser = {
+    ...verified,
+    signedInAt: Date.now(),
+    authToken
+  };
+
+  apkAuthSessions.set(sessionId, { user: authenticatedUser, createdAt: Date.now() });
+  // Cleanup expired or consumed sessions
   const now = Date.now();
   for (const [k, v] of apkAuthSessions.entries()) {
-    if (now - v.createdAt > 5 * 60 * 1000) {
+    if (now - v.createdAt > 5 * 60 * 1000 || (v.consumedAt && now - v.consumedAt > 15_000)) {
       apkAuthSessions.delete(k);
     }
   }
-  res.json({ success: true });
+  res.json({ success: true, user: authenticatedUser });
 });
 
 app.get('/api/apk-auth/:sessionId', (req, res) => {
   const { sessionId } = req.params;
   const record = apkAuthSessions.get(sessionId);
-  if (!record) {
+  if (!record || Date.now() - record.createdAt > 5 * 60 * 1000) {
+    apkAuthSessions.delete(sessionId);
     return res.json({ authenticated: false });
   }
-  // Keep record available for polling (do not delete on first read so repeated polls or retry deep-links succeed)
+  // Allow a brief 15-second window for concurrent poll + deep-link retries, then expire
+  if (!record.consumedAt) {
+    record.consumedAt = Date.now();
+  }
   res.json({ authenticated: true, user: record.user });
 });
 
-// Fetch user stats endpoint
+// Fetch user stats endpoint (authenticated)
 app.get('/api/user-stats/:googleId', (req, res) => {
   const { googleId } = req.params;
-  const user = userDatabase[googleId];
+  if (!isValidSafeId(googleId)) {
+    return res.status(400).json({ error: 'Invalid googleId' });
+  }
+  const token = extractBearerToken(req.headers.authorization);
+  const verifiedToken = verifySessionToken(token);
+  if (!verifiedToken || verifiedToken.googleId !== googleId) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  const user = Object.prototype.hasOwnProperty.call(userDatabase, googleId)
+    ? userDatabase[googleId]
+    : null;
   if (!user) {
     return res.status(404).json({ error: 'User not found in cloud' });
   }
@@ -327,7 +579,7 @@ app.get('/api/user-stats/:googleId', (req, res) => {
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: corsOriginCheck,
     methods: ['GET', 'POST']
   },
   pingInterval: 10000,
@@ -601,67 +853,10 @@ io.on('connection', (socket: Socket) => {
         return;
       }
 
-      // Check online players in active rooms
-      for (const room of rooms.values()) {
-        for (const p of room.players) {
-          if (p.isAI) continue;
-          const matchTag = p.playerTag && (q === p.playerTag || q === `#${p.playerTag}` || q.toUpperCase() === `DOM-${p.playerTag}`);
-          const matchId = p.playerId && q.toLowerCase() === p.playerId.toLowerCase();
-          const matchHandle = p.name && p.playerTag && `${p.name}#${p.playerTag}`.toLowerCase() === q.toLowerCase();
-
-          if (matchTag || matchId || matchHandle) {
-            safeAck(callback, {
-              success: true,
-              player: {
-                name: p.name,
-                playerId: p.playerId || `DOM-${p.playerTag || '0000'}`,
-                playerTag: p.playerTag || '0000',
-                handle: `${p.name}#${p.playerTag || '0000'}`,
-                avatarId: p.avatarId || 'avatar_baku_classic',
-                frameId: p.frameId,
-                title: p.title || 'Çayxana Dominocusu',
-                isOnline: true
-              }
-            });
-            return;
-          }
-        }
-      }
-
-      // Check user database
-      for (const [googleId, userRecord] of Object.entries(userDatabase)) {
-        const uProfile = (userRecord as any).profile || {};
-        const uStats = (userRecord as any).stats || {};
-        let hash = 0;
-        for (let i = 0; i < googleId.length; i++) {
-          hash = (hash << 5) - hash + googleId.charCodeAt(i);
-          hash |= 0;
-        }
-        const tag = ((Math.abs(hash) % 9000) + 1000).toString();
-        const pid = `DOM-${googleId.slice(-6).toUpperCase()}`;
-        const handle = `${uProfile.name}#${tag}`;
-
-        const matchTag = q === tag || q === `#${tag}` || q.toUpperCase() === `DOM-${tag}`;
-        const matchId = q.toLowerCase() === pid.toLowerCase();
-        const matchHandle = q.toLowerCase() === handle.toLowerCase();
-
-        if (matchTag || matchId || matchHandle) {
-          safeAck(callback, {
-            success: true,
-            player: {
-              name: uProfile.name || 'Dominocu',
-              playerId: pid,
-              playerTag: tag,
-              handle,
-              avatarId: uStats.equippedAvatar || 'avatar_baku_classic',
-              frameId: uStats.equippedFrame,
-              title: uStats.equippedTitle || 'Çayxana Qonağı',
-              matchesWon: uStats.matchesWon || 0,
-              isOnline: false
-            }
-          });
-          return;
-        }
+      const found = findPlayerProfileByQuery(q);
+      if (found) {
+        safeAck(callback, { success: true, player: found });
+        return;
       }
 
       safeAck(callback, { success: false, error: 'Bu kod və ya taqa uyğun oyunçu tapılmadı.' });
@@ -669,6 +864,242 @@ io.on('connection', (socket: Socket) => {
       safeAck(callback, { success: false, error: e.message });
     }
   });
+
+  // 3.2 Register Live Presence & Push Two-Way Social State
+  socket.on('register_presence', (profile: SocialProfile) => {
+    try {
+      if (!profile?.playerId) return;
+      const prevId = socketToPlayerId.get(socket.id);
+      if (prevId && prevId !== profile.playerId) {
+        playerIdToSockets.get(prevId)?.delete(socket.id);
+      }
+
+      socketToPlayerId.set(socket.id, profile.playerId);
+      if (!playerIdToSockets.has(profile.playerId)) {
+        playerIdToSockets.set(profile.playerId, new Set());
+      }
+      playerIdToSockets.get(profile.playerId)!.add(socket.id);
+
+      const normalized: SocialProfile = {
+        playerId: profile.playerId,
+        playerTag: profile.playerTag || '0000',
+        name: profile.name || 'Oyunçu',
+        handle: profile.handle || `${profile.name || 'Oyunçu'}#${profile.playerTag || '0000'}`,
+        avatarId: profile.avatarId,
+        frameId: profile.frameId,
+        title: profile.title,
+        matchesWon: profile.matchesWon
+      };
+      onlineProfiles.set(profile.playerId, normalized);
+
+      emitSocialSync(profile.playerId);
+
+      // Update online status on friends' lists
+      const myFriends = socialDb.friendsByPlayerId[profile.playerId] || [];
+      for (const f of myFriends) {
+        upsertFriendRecord(f.playerId, normalized);
+        emitSocialSync(f.playerId);
+      }
+    } catch (e) {
+      console.error('register_presence error:', e);
+    }
+  });
+
+  // 3.3 Get Social State (Friends + Pending Requests)
+  socket.on('get_social_state', (playerId: string, callback) => {
+    if (!playerId) {
+      safeAck(callback, { success: false, friends: [], incomingRequests: [], outgoingRequestIds: [] });
+      return;
+    }
+    safeAck(callback, { success: true, ...buildSocialStateForPlayer(playerId) });
+  });
+
+  // 3.4 Send Two-Way Friend Request
+  socket.on(
+    'send_friend_request',
+    (data: { from: SocialProfile; toPlayerId?: string; toPlayerTag?: string; toName?: string }, callback) => {
+      try {
+        const from = data?.from;
+        if (!from?.playerId) {
+          safeAck(callback, { success: false, error: 'Profil məlumatı tapılmadı.' });
+          return;
+        }
+
+        // Resolve canonical target profile
+        const resolved =
+          (data.toPlayerId ? findPlayerProfileByQuery(data.toPlayerId) : null) ||
+          (data.toPlayerTag ? findPlayerProfileByQuery(data.toPlayerTag) : null);
+
+        const targetId = resolved?.playerId || data.toPlayerId || (data.toPlayerTag ? `DOM-${data.toPlayerTag}` : '');
+        if (!targetId) {
+          safeAck(callback, { success: false, error: 'Hədəf oyunçu tapılmadı.' });
+          return;
+        }
+        if (targetId === from.playerId) {
+          safeAck(callback, { success: false, error: 'Özünüzə dostluq sorğusu göndərə bilməzsiniz.' });
+          return;
+        }
+
+        const existingFriends = socialDb.friendsByPlayerId[from.playerId] || [];
+        if (existingFriends.some((f) => f.playerId === targetId)) {
+          safeAck(callback, { success: false, error: 'Bu oyunçu artıq dost siyahınızdadır.' });
+          return;
+        }
+
+        // If target already sent us a request, auto-accept both sides!
+        const myIncoming = socialDb.requestsByTargetId[from.playerId] || [];
+        const reverseIdx = myIncoming.findIndex((r) => r.from.playerId === targetId);
+        if (reverseIdx >= 0) {
+          const [reverseReq] = myIncoming.splice(reverseIdx, 1);
+          socialDb.requestsByTargetId[from.playerId] = myIncoming;
+          addMutualFriendship(from, reverseReq.from);
+          emitToPlayer(targetId, 'friend_request_accepted', { friend: from });
+          safeAck(callback, {
+            success: true,
+            autoAccepted: true,
+            message: `${reverseReq.from.name} ilə qarşılıqlı dost oldunuz! 🎉`
+          });
+          return;
+        }
+
+        if (!socialDb.requestsByTargetId[targetId]) {
+          socialDb.requestsByTargetId[targetId] = [];
+        }
+        const targetReqs = socialDb.requestsByTargetId[targetId];
+        const existingIdx = targetReqs.findIndex((r) => r.from.playerId === from.playerId);
+        const reqRecord: FriendRequestRecord = {
+          id: `req_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          from,
+          createdAt: Date.now()
+        };
+        if (existingIdx >= 0) {
+          targetReqs[existingIdx] = reqRecord;
+        } else {
+          targetReqs.push(reqRecord);
+        }
+
+        saveSocialDatabase(socialDb);
+        emitSocialSync(from.playerId);
+        emitSocialSync(targetId);
+        emitToPlayer(targetId, 'friend_request_received', reqRecord);
+
+        const targetName = resolved?.name || data.toName || 'Oyunçu';
+        safeAck(callback, {
+          success: true,
+          targetOnline: isPlayerOnline(targetId),
+          message: `${targetName} adlı oyunçuya dostluq sorğusu göndərildi! 📩`
+        });
+      } catch (e: any) {
+        safeAck(callback, { success: false, error: e?.message || 'Sorğu göndərilə bilmədi.' });
+      }
+    }
+  );
+
+  // 3.5 Respond to Incoming Friend Request (Accept / Decline)
+  socket.on(
+    'respond_friend_request',
+    (data: { playerId: string; myProfile: SocialProfile; requestId: string; accept: boolean }, callback) => {
+      try {
+        const { playerId, myProfile, requestId, accept } = data || {};
+        const reqs = socialDb.requestsByTargetId[playerId] || [];
+        const idx = reqs.findIndex((r) => r.id === requestId);
+        if (idx < 0) {
+          safeAck(callback, { success: false, error: 'Sorğu artıq mövcud deyil.' });
+          return;
+        }
+        const [req] = reqs.splice(idx, 1);
+        socialDb.requestsByTargetId[playerId] = reqs;
+
+        if (accept) {
+          addMutualFriendship(myProfile, req.from);
+          emitToPlayer(req.from.playerId, 'friend_request_accepted', { friend: myProfile });
+        } else {
+          saveSocialDatabase(socialDb);
+          emitSocialSync(playerId);
+          emitSocialSync(req.from.playerId);
+        }
+
+        safeAck(callback, { success: true, accepted: accept });
+      } catch (e: any) {
+        safeAck(callback, { success: false, error: e?.message });
+      }
+    }
+  );
+
+  // 3.6 Remove Friend (Two-Way)
+  socket.on('remove_friend', (data: { playerId: string; friendPlayerId: string }, callback) => {
+    try {
+      const { playerId, friendPlayerId } = data || {};
+      if (playerId && friendPlayerId) {
+        if (socialDb.friendsByPlayerId[playerId]) {
+          socialDb.friendsByPlayerId[playerId] = socialDb.friendsByPlayerId[playerId].filter(
+            (f) => f.playerId !== friendPlayerId
+          );
+        }
+        if (socialDb.friendsByPlayerId[friendPlayerId]) {
+          socialDb.friendsByPlayerId[friendPlayerId] = socialDb.friendsByPlayerId[friendPlayerId].filter(
+            (f) => f.playerId !== playerId
+          );
+        }
+        saveSocialDatabase(socialDb);
+        emitSocialSync(playerId);
+        emitSocialSync(friendPlayerId);
+      }
+      safeAck(callback, { success: true });
+    } catch (e: any) {
+      safeAck(callback, { success: false, error: e?.message });
+    }
+  });
+
+  // 3.7 Invite Friend to Active Waiting Room
+  socket.on(
+    'invite_friend_to_room',
+    (
+      data: { from: SocialProfile; targetPlayerId: string; targetPlayerTag?: string; roomCode: string },
+      callback
+    ) => {
+      try {
+        const room = rooms.get((data.roomCode || '').toUpperCase());
+        if (!room) {
+          safeAck(callback, { success: false, error: 'Otaq tapılmadı.' });
+          return;
+        }
+        if (room.status !== 'waiting') {
+          safeAck(callback, { success: false, error: 'Oyun artıq başlayıb.' });
+          return;
+        }
+
+        let targetId = data.targetPlayerId;
+        if (!isPlayerOnline(targetId) && data.targetPlayerTag) {
+          const resolved = findPlayerProfileByQuery(data.targetPlayerTag);
+          if (resolved && isPlayerOnline(resolved.playerId)) {
+            targetId = resolved.playerId;
+          }
+        }
+
+        if (!isPlayerOnline(targetId)) {
+          safeAck(callback, {
+            success: false,
+            error: `Dostunuz hazırda onlayn deyil. Otaq kodunu paylaşa bilərsiniz: ${room.code}`
+          });
+          return;
+        }
+
+        emitToPlayer(targetId, 'room_invite_received', {
+          inviteId: `inv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          roomCode: room.code,
+          mode: room.mode,
+          variant: room.variant,
+          from: data.from,
+          createdAt: Date.now()
+        });
+
+        safeAck(callback, { success: true });
+      } catch (e: any) {
+        safeAck(callback, { success: false, error: e?.message || 'Dəvət göndərilə bilmədi.' });
+      }
+    }
+  );
 
   // 3.5 Reconnect to Room after F5 / Refresh
   socket.on(
@@ -928,6 +1359,23 @@ io.on('connection', (socket: Socket) => {
 
   // 14. Disconnect / F5 Page Reload with 45s Grace Period
   socket.on('disconnect', () => {
+    // Clean up social live presence
+    const pId = socketToPlayerId.get(socket.id);
+    if (pId) {
+      socketToPlayerId.delete(socket.id);
+      const set = playerIdToSockets.get(pId);
+      if (set) {
+        set.delete(socket.id);
+        if (set.size === 0) {
+          playerIdToSockets.delete(pId);
+          const friends = socialDb.friendsByPlayerId[pId] || [];
+          for (const f of friends) {
+            emitSocialSync(f.playerId);
+          }
+        }
+      }
+    }
+
     const code = socketToRoom.get(socket.id);
     if (!code) return;
     socketToRoom.delete(socket.id);
@@ -974,6 +1422,17 @@ app.use((_req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`Domino PRO Realtime Server running on port ${PORT}`);
-});
+initStorage()
+  .then(({ users, social }) => {
+    userDatabase = users;
+    socialDb = social;
+    server.listen(PORT, () => {
+      console.log(`Domino PRO Realtime Server running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('Failed to initialize storage:', err);
+    server.listen(PORT, () => {
+      console.log(`Domino PRO Realtime Server running on port ${PORT} (fallback mode)`);
+    });
+  });

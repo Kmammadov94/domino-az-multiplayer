@@ -38,9 +38,9 @@ interface MultiplayerLobbyModalProps {
   initialRoomCode?: string;
   initialError?: string | null;
   isAutoJoining?: boolean;
-  onCreateRoom: (mode: GameMode, playerName: string, isLocked?: boolean, turnDuration?: number, variant?: GameVariant) => Promise<void>;
-  onJoinRoom: (roomCode: string, playerName: string) => Promise<void>;
-  onQuickMatch: (mode: GameMode, playerName: string, variant?: GameVariant) => Promise<void>;
+  onCreateRoom: (mode: GameMode, playerName: string, isLocked?: boolean, turnDuration?: number, variant?: GameVariant) => Promise<string | void | undefined>;
+  onJoinRoom: (roomCode: string, playerName: string) => Promise<string | void | undefined>;
+  onQuickMatch: (mode: GameMode, playerName: string, variant?: GameVariant) => Promise<string | void | undefined>;
   onAddBot: () => Promise<void>;
   onToggleReady: (isReady: boolean) => void;
   onStartGame: () => Promise<void>;
