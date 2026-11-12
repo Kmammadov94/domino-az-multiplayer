@@ -159,7 +159,7 @@ export const process101Round = (
 
     let winnerIdx = lastTilePlacedPlayerIndex;
     let isSeka = false;
-    let capturedPoints = 0;
+    let capturedPoints: number;
 
     if (isBaglandi) {
       if (minPlayers.length > 1) {
@@ -298,10 +298,10 @@ export const process101Round = (
     }
   });
 
-  let winningTeam: 1 | 2 | null = null;
-  let winnerPlayerIndex = lastTilePlacedPlayerIndex;
+  let winningTeam: 1 | 2 | null;
+  let winnerPlayerIndex: number;
   let isSeka = false;
-  let roundRawPoints = 0;
+  let roundRawPoints: number;
 
   if (isBaglandi) {
     if (team1Pips < team2Pips) {
@@ -324,7 +324,6 @@ export const process101Round = (
     } else {
       // Perfect tie in a blocked game: SEKA!
       isSeka = true;
-      winningTeam = null;
       const pooledPoints = team1Pips + team2Pips;
       nextState.sekaBank += pooledPoints;
       nextState.lastRoundEvent = 'seka_tie';

@@ -9,6 +9,7 @@ import {
   type AdMobRewardItem,
 } from '@capacitor-community/admob';
 import { isNativeMobileApp } from '../utils/storage';
+import { devWarn } from '../utils/logger';
 
 // Live Google AdMob IDs for Domino PRO (Android)
 export const ADMOB_REWARDED_COINS_ID = 'ca-app-pub-7168141178694506/1731069314';
@@ -151,7 +152,7 @@ export async function initializeAdMob(): Promise<boolean> {
       void prepareMatchEndInterstitial();
       return true;
     } catch (err) {
-      console.warn('[AdMob] Initialization failed:', err);
+      devWarn('[AdMob] Initialization failed:', err);
       initPromise = null;
       return false;
     }
@@ -179,7 +180,7 @@ export async function prepareRewardedCoinsAd(): Promise<boolean> {
       rewardedPrepared = true;
       return true;
     } catch (err) {
-      console.warn('[AdMob] Rewarded prepare failed:', err);
+      devWarn('[AdMob] Rewarded prepare failed:', err);
       rewardedPrepared = false;
       return false;
     } finally {
@@ -210,7 +211,7 @@ export async function prepareMatchEndInterstitial(): Promise<boolean> {
     interstitialPrepared = true;
     return true;
   } catch (err) {
-    console.warn('[AdMob] Interstitial prepare failed:', err);
+    devWarn('[AdMob] Interstitial prepare failed:', err);
     interstitialPrepared = false;
     return false;
   } finally {
@@ -256,7 +257,7 @@ export async function showRewardedCoinsAd(): Promise<RewardedAdResult> {
     // Native @capacitor-community/admob only resolves showRewardVideoAd() when
     // reward is earned, and leaves the call pending if dismissed early or failed to show.
     // Racing against Dismissed / FailedToShow ensures the UI never locks up.
-    const result = await new Promise<RewardedAdResult>(async (resolve) => {
+    const result = await new Promise<RewardedAdResult>((resolve) => {
       let settled = false;
       const finish = (res: RewardedAdResult) => {
         if (settled) return;
@@ -273,59 +274,61 @@ export async function showRewardedCoinsAd(): Promise<RewardedAdResult> {
         });
       }, 90_000);
 
-      try {
-        handles.push(
-          await AdMob.addListener(RewardAdPluginEvents.Rewarded, (reward: AdMobRewardItem) => {
-            if (reward && typeof reward.amount === 'number' && reward.amount > 0) {
-              earnedReward = true;
-            }
-          })
-        );
+      void (async () => {
+        try {
+          handles.push(
+            await AdMob.addListener(RewardAdPluginEvents.Rewarded, (reward: AdMobRewardItem) => {
+              if (reward && typeof reward.amount === 'number' && reward.amount > 0) {
+                earnedReward = true;
+              }
+            })
+          );
 
-        handles.push(
-          await AdMob.addListener(RewardAdPluginEvents.Dismissed, () => {
-            finish({
-              rewarded: earnedReward,
-              reason: earnedReward ? 'earned' : 'dismissed',
-            });
-          })
-        );
+          handles.push(
+            await AdMob.addListener(RewardAdPluginEvents.Dismissed, () => {
+              finish({
+                rewarded: earnedReward,
+                reason: earnedReward ? 'earned' : 'dismissed',
+              });
+            })
+          );
 
-        handles.push(
-          await AdMob.addListener(RewardAdPluginEvents.FailedToShow, (err) => {
-            finish({
-              rewarded: false,
-              reason: 'unavailable',
-              errorDetail: extractAdError(err),
-            });
-          })
-        );
+          handles.push(
+            await AdMob.addListener(RewardAdPluginEvents.FailedToShow, (err) => {
+              finish({
+                rewarded: false,
+                reason: 'unavailable',
+                errorDetail: extractAdError(err),
+              });
+            })
+          );
 
-        const item = await AdMob.showRewardVideoAd();
-        rewardedPrepared = false;
-        if (item && typeof item.amount === 'number' && item.amount > 0) {
-          earnedReward = true;
+          const item = await AdMob.showRewardVideoAd();
+          rewardedPrepared = false;
+          if (item && typeof item.amount === 'number' && item.amount > 0) {
+            earnedReward = true;
+          }
+          // Wait briefly for Dismissed if user hasn't tapped X yet, otherwise settle if reward earned
+          if (earnedReward) {
+            setTimeout(() => {
+              finish({ rewarded: true, reason: 'earned' });
+            }, 300);
+          }
+        } catch (showErr) {
+          rewardedPrepared = false;
+          finish({
+            rewarded: false,
+            reason: 'unavailable',
+            errorDetail: extractAdError(showErr),
+          });
         }
-        // Wait briefly for Dismissed if user hasn't tapped X yet, otherwise settle if reward earned
-        if (earnedReward) {
-          setTimeout(() => {
-            finish({ rewarded: true, reason: 'earned' });
-          }, 300);
-        }
-      } catch (showErr) {
-        rewardedPrepared = false;
-        finish({
-          rewarded: false,
-          reason: 'unavailable',
-          errorDetail: extractAdError(showErr),
-        });
-      }
+      })();
     });
 
     rewardedPrepared = false;
     return result;
   } catch (err) {
-    console.warn('[AdMob] Rewarded show failed:', err);
+    devWarn('[AdMob] Rewarded show failed:', err);
     rewardedPrepared = false;
     return {
       rewarded: false,
@@ -376,7 +379,7 @@ export async function maybeShowMatchEndInterstitial(): Promise<boolean> {
     lastInterstitialShownAt = Date.now();
     return true;
   } catch (err) {
-    console.warn('[AdMob] Interstitial show failed:', err);
+    devWarn('[AdMob] Interstitial show failed:', err);
     interstitialPrepared = false;
     return false;
   } finally {
@@ -425,7 +428,7 @@ export function setLobbyBannerVisible(visible: boolean): Promise<void> {
           }
         }
       } catch (err) {
-        console.warn('[AdMob] Banner show failed:', err);
+        devWarn('[AdMob] Banner show failed:', err);
         bannerVisible = false;
         bannerCreated = false;
         setBannerHeight(0);

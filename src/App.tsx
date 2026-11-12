@@ -761,7 +761,7 @@ export const App: React.FC = () => {
     const myIdx = mpGameState.myPlayerIndex ?? 0;
     const mySlot = mpGameState.players[myIdx];
     const myTeam = mySlot?.team ?? 1;
-    let mpUserWon = false;
+    let mpUserWon: boolean;
 
     if (mpGameState.isInstant35) {
       mpUserWon =
@@ -1205,6 +1205,24 @@ export const App: React.FC = () => {
       });
     }
   }, [googleUser?.googleId]);
+
+  // Prompt legacy signed-in users once per session when server requires fresh authToken
+  useEffect(() => {
+    let prompted = false;
+    const onAuthExpired = () => {
+      if (prompted) return;
+      prompted = true;
+      setGoogleUser((prev) => {
+        if (!prev) return null;
+        const refreshed = { ...prev, authToken: undefined };
+        saveGoogleUser(refreshed);
+        return refreshed;
+      });
+      setShowGoogleAuthModal(true);
+    };
+    window.addEventListener('domino:auth-expired', onAuthExpired);
+    return () => window.removeEventListener('domino:auth-expired', onAuthExpired);
+  }, []);
 
 
   // Persist stats whenever changed (and auto-sync with cloud if signed in)
@@ -2256,7 +2274,7 @@ export const App: React.FC = () => {
 
   const effectivePlayers: Player[] = effectiveInMultiplayer
     ? mpGameState.players.map((p, idx) => {
-        let playerHand: TileData[] = [];
+        let playerHand: TileData[];
         if (idx === mpMyIndex) {
           playerHand = mpGameState.myHand;
         } else if (mpGameState.handRevealed && mpGameState.handResults?.revealedHands) {

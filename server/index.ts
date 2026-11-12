@@ -11,19 +11,10 @@ import { GameRoom } from './gameRoom';
 import { ChatMessage, MultiplayerRoomSummary } from '../src/types/multiplayer';
 import { validatePlayerName, cleanProfanity } from '../src/utils/profanityFilter';
 import {
-  extractBearerToken,
-  isValidSafeId,
-  safeTimingEqual,
-  signSessionToken,
-  verifyGoogleIdToken,
-  verifySessionToken
-} from './auth';
-import {
   initStorage,
-  isPostgresEnabled,
-  persistSocialDatabase,
-  persistUserRecord
+  persistSocialDatabase
 } from './db';
+import { createApiRouter } from './routes/api';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -71,17 +62,6 @@ app.use(express.static(distPath, {
     }
   }
 }));
-
-// Health check endpoint for zero-downtime hosting pings (Render / Koyeb / Railway)
-app.get('/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    game: 'Domino PRO (Telefon 365)',
-    storage: isPostgresEnabled() ? 'postgresql' : 'local_json',
-    activeRooms: rooms.size,
-    timestamp: Date.now()
-  });
-});
 
 // User Cloud Storage (backed by Neon PostgreSQL when DATABASE_URL is set, or local JSON fallback)
 let userDatabase: Record<string, any> = {};
@@ -256,325 +236,12 @@ const findPlayerProfileByQuery = (qRaw: string): (SocialProfile & { isOnline: bo
   return null;
 };
 
-// Verify Google ID Token and issue a signed server session token
-app.post('/api/auth/google', async (req, res) => {
-  const { credential } = req.body || {};
-  if (typeof credential !== 'string' || !credential) {
-    return res.status(400).json({ error: 'Google ID token (credential) is required' });
-  }
-  const verified = await verifyGoogleIdToken(credential);
-  if (!verified) {
-    return res.status(401).json({ error: 'Invalid or expired Google token' });
-  }
-  const authToken = signSessionToken(verified.googleId);
-  res.json({
-    success: true,
-    profile: {
-      ...verified,
-      signedInAt: Date.now(),
-      authToken
-    }
-  });
-});
-
-// Sync user stats endpoint (authenticated)
-app.post('/api/user-stats', (req, res) => {
-  const { googleId, email, name, picture, stats, isInitialLogin } = req.body || {};
-  if (!isValidSafeId(googleId)) {
-    return res.status(400).json({ error: 'Valid googleId is required' });
-  }
-
-  const token = extractBearerToken(req.headers.authorization);
-  const verifiedToken = verifySessionToken(token);
-  if (!verifiedToken || verifiedToken.googleId !== googleId) {
-    return res.status(401).json({ error: 'Authentication required. Please sign in again.' });
-  }
-
-  const existing = Object.prototype.hasOwnProperty.call(userDatabase, googleId)
-    ? userDatabase[googleId]
-    : {};
-  const existingStats = existing.stats || {};
-  const pendingGrant = existing.pendingCoinGrant || 0;
-
-  // Handle coins: on initial sign-in, preserve whichever balance is higher (cloud vs local)
-  // so a player never loses their cloud coins when switching to a new device or re-logging in.
-  // During normal gameplay, sync the current balance directly + apply any pending admin grants.
-  let finalCoins: number;
-  if (typeof stats?.coins === 'number') {
-    if (isInitialLogin) {
-      finalCoins = Math.max(existingStats.coins || 0, stats.coins) + pendingGrant;
-    } else {
-      finalCoins = stats.coins + pendingGrant;
-    }
-  } else {
-    finalCoins = (existingStats.coins ?? 20) + pendingGrant;
-  }
-
-  // Cosmetics merging with default-fallback protection:
-  // If local client has default 'ivory_classic' (e.g. fresh install or not selected), prefer existing cloud equipped skin!
-  const resolvedEquippedSkin =
-    (stats?.equippedSkin && stats.equippedSkin !== 'ivory_classic')
-      ? stats.equippedSkin
-      : (existingStats.equippedSkin || stats?.equippedSkin || 'ivory_classic');
-
-  const resolvedEquippedAvatar =
-    (stats?.equippedAvatar && stats.equippedAvatar !== 'avatar_baku_classic')
-      ? stats.equippedAvatar
-      : (existingStats.equippedAvatar || stats?.equippedAvatar || 'avatar_baku_classic');
-
-  const resolvedEquippedFrame =
-    (stats?.equippedFrame && stats.equippedFrame !== 'frame_none')
-      ? stats.equippedFrame
-      : (existingStats.equippedFrame || stats?.equippedFrame || 'frame_none');
-
-  const resolvedEquippedTitle =
-    (stats?.equippedTitle && stats.equippedTitle !== 'title_tea_elder')
-      ? stats.equippedTitle
-      : (existingStats.equippedTitle || stats?.equippedTitle || 'title_tea_elder');
-
-  const resolvedEquippedTable =
-    (stats?.equippedTableTheme && stats.equippedTableTheme !== 'table_emerald_classic')
-      ? stats.equippedTableTheme
-      : (existingStats.equippedTableTheme || stats?.equippedTableTheme || 'table_emerald_classic');
-
-  const mergedUnlockedSkins = Array.from(
-    new Set([
-      'ivory_classic',
-      ...(existingStats.unlockedSkins || []),
-      ...(stats?.unlockedSkins || [])
-    ])
-  );
-
-  const mergedUnlockedAvatars = Array.from(
-    new Set([
-      ...(existingStats.unlockedAvatars || []),
-      ...(stats?.unlockedAvatars || [])
-    ])
-  );
-
-  const mergedUnlockedFrames = Array.from(
-    new Set([
-      'frame_none',
-      ...(existingStats.unlockedFrames || []),
-      ...(stats?.unlockedFrames || [])
-    ])
-  );
-
-  const mergedUnlockedTitles = Array.from(
-    new Set([
-      'title_tea_elder',
-      ...(existingStats.unlockedTitles || []),
-      ...(stats?.unlockedTitles || [])
-    ])
-  );
-
-  // Merge stats intelligently (union of unlocked cosmetics, max streak, etc.)
-  const mergedStats = {
-    coins: finalCoins,
-    equippedSkin: mergedUnlockedSkins.includes(resolvedEquippedSkin) ? resolvedEquippedSkin : 'ivory_classic',
-    unlockedSkins: mergedUnlockedSkins,
-    equippedAvatar: resolvedEquippedAvatar,
-    unlockedAvatars: mergedUnlockedAvatars,
-    equippedFrame: resolvedEquippedFrame,
-    unlockedFrames: mergedUnlockedFrames,
-    equippedTitle: resolvedEquippedTitle,
-    unlockedTitles: mergedUnlockedTitles,
-    equippedTableTheme: resolvedEquippedTable,
-    dailyStreak: Math.max(existingStats.dailyStreak || 0, stats?.dailyStreak || 0),
-    matchesPlayed: Math.max(existingStats.matchesPlayed || 0, stats?.matchesPlayed || 0),
-    matchesWon: Math.max(existingStats.matchesWon || 0, stats?.matchesWon || 0),
-    lastDailyClaim: stats?.lastDailyClaim || existingStats.lastDailyClaim
-  };
-
-  userDatabase[googleId] = {
-    profile: {
-      googleId,
-      email: email || existing.profile?.email || '',
-      name: name || existing.profile?.name || '',
-      picture: picture || existing.profile?.picture || ''
-    },
-    stats: mergedStats,
-    pendingCoinGrant: 0, // Cleared once applied to user's balance
-    claimedGrants: pendingGrant > 0
-      ? [...(existing.claimedGrants || []), { amount: pendingGrant, claimedAt: Date.now() }]
-      : (existing.claimedGrants || []),
-    updatedAt: Date.now()
-  };
-
-  persistUserRecord(googleId, userDatabase[googleId], userDatabase);
-
-  res.json({
-    success: true,
-    profile: userDatabase[googleId].profile,
-    stats: mergedStats
-  });
-});
-
-// Admin helper to validate configured ADMIN_SECRET (no hardcoded fallback)
-const isAuthorizedAdmin = (providedKey: unknown): boolean => {
-  const secret = process.env.ADMIN_SECRET;
-  if (!secret || typeof providedKey !== 'string' || !providedKey) return false;
-  return safeTimingEqual(providedKey, secret);
-};
-
-// Admin endpoint to inspect registered users
-app.get('/api/admin/users', (req, res) => {
-  if (!process.env.ADMIN_SECRET) {
-    return res.status(503).json({ error: 'Admin endpoints are disabled (ADMIN_SECRET not configured).' });
-  }
-  const adminKey = (req.headers['x-admin-key'] as string) || (req.query.adminKey as string);
-  if (!isAuthorizedAdmin(adminKey)) {
-    return res.status(403).json({ error: 'Unauthorized. Provide valid adminKey.' });
-  }
-
-  const users = Object.entries(userDatabase).map(([id, rec]: [string, any]) => ({
-    googleId: id,
-    email: rec.profile?.email || '',
-    name: rec.profile?.name || '',
-    picture: rec.profile?.picture || '',
-    coins: rec.stats?.coins ?? 0,
-    equippedSkin: rec.stats?.equippedSkin || 'ivory_classic',
-    unlockedSkins: rec.stats?.unlockedSkins || [],
-    matchesPlayed: rec.stats?.matchesPlayed ?? 0,
-    matchesWon: rec.stats?.matchesWon ?? 0,
-    pendingCoinGrant: rec.pendingCoinGrant || 0,
-    updatedAt: rec.updatedAt ? new Date(rec.updatedAt).toISOString() : null
-  }));
-
-  res.json({
-    totalUsers: users.length,
-    users
-  });
-});
-
-// Admin endpoint to add or subtract coins to an account (POST only)
-const handleAdminGrantCoins = (req: any, res: any) => {
-  if (!process.env.ADMIN_SECRET) {
-    return res.status(503).json({ error: 'Admin endpoints are disabled (ADMIN_SECRET not configured).' });
-  }
-  const adminKey = (req.headers['x-admin-key'] as string) || req.body?.adminKey;
-  if (!isAuthorizedAdmin(adminKey)) {
-    return res.status(403).json({ error: 'Unauthorized. Provide valid adminKey.' });
-  }
-
-  const googleId = req.body?.googleId;
-  const email = req.body?.email;
-  const rawAmount = req.body?.amount;
-  const delta = Number(rawAmount);
-
-  if (isNaN(delta) || delta === 0) {
-    return res.status(400).json({ error: 'Valid numerical amount is required (e.g. 5000)' });
-  }
-
-  // Find user by googleId or email
-  let targetId = googleId;
-  if (!targetId && email) {
-    for (const [id, rec] of Object.entries(userDatabase)) {
-      if ((rec as any).profile?.email?.toLowerCase() === email.toLowerCase()) {
-        targetId = id;
-        break;
-      }
-    }
-  }
-
-  if (!targetId || !userDatabase[targetId]) {
-    return res.status(404).json({ error: 'User not found in cloud database' });
-  }
-
-  const user = userDatabase[targetId];
-  if (!user.stats) user.stats = {};
-  const prevCoins = user.stats.coins ?? 0;
-  user.stats.coins = Math.max(0, prevCoins + delta);
-  user.pendingCoinGrant = (user.pendingCoinGrant || 0) + delta;
-  user.updatedAt = Date.now();
-  persistUserRecord(targetId, userDatabase[targetId], userDatabase);
-
-  res.json({
-    success: true,
-    user: {
-      googleId: targetId,
-      name: user.profile?.name,
-      email: user.profile?.email,
-      previousCoins: prevCoins,
-      added: delta,
-      currentServerCoins: user.stats.coins,
-      pendingCoinGrant: user.pendingCoinGrant
-    }
-  });
-};
-
-app.post('/api/admin/grant-coins', handleAdminGrantCoins);
-
-// Temporary store for Mobile APK Google Auth Handshake Sessions (expires after 5 minutes)
-const apkAuthSessions = new Map<string, { user: any; createdAt: number; consumedAt?: number }>();
-
-app.post('/api/apk-auth/:sessionId', async (req, res) => {
-  const { sessionId } = req.params;
-  const { credential } = req.body || {};
-  if (!isValidSafeId(sessionId) || typeof credential !== 'string' || !credential) {
-    return res.status(400).json({ error: 'Valid sessionId and Google credential are required' });
-  }
-
-  const verified = await verifyGoogleIdToken(credential);
-  if (!verified) {
-    return res.status(401).json({ error: 'Invalid or expired Google credential' });
-  }
-
-  const authToken = signSessionToken(verified.googleId);
-  const authenticatedUser = {
-    ...verified,
-    signedInAt: Date.now(),
-    authToken
-  };
-
-  apkAuthSessions.set(sessionId, { user: authenticatedUser, createdAt: Date.now() });
-  // Cleanup expired or consumed sessions
-  const now = Date.now();
-  for (const [k, v] of apkAuthSessions.entries()) {
-    if (now - v.createdAt > 5 * 60 * 1000 || (v.consumedAt && now - v.consumedAt > 15_000)) {
-      apkAuthSessions.delete(k);
-    }
-  }
-  res.json({ success: true, user: authenticatedUser });
-});
-
-app.get('/api/apk-auth/:sessionId', (req, res) => {
-  const { sessionId } = req.params;
-  const record = apkAuthSessions.get(sessionId);
-  if (!record || Date.now() - record.createdAt > 5 * 60 * 1000) {
-    apkAuthSessions.delete(sessionId);
-    return res.json({ authenticated: false });
-  }
-  // Allow a brief 15-second window for concurrent poll + deep-link retries, then expire
-  if (!record.consumedAt) {
-    record.consumedAt = Date.now();
-  }
-  res.json({ authenticated: true, user: record.user });
-});
-
-// Fetch user stats endpoint (authenticated)
-app.get('/api/user-stats/:googleId', (req, res) => {
-  const { googleId } = req.params;
-  if (!isValidSafeId(googleId)) {
-    return res.status(400).json({ error: 'Invalid googleId' });
-  }
-  const token = extractBearerToken(req.headers.authorization);
-  const verifiedToken = verifySessionToken(token);
-  if (!verifiedToken || verifiedToken.googleId !== googleId) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-  const user = Object.prototype.hasOwnProperty.call(userDatabase, googleId)
-    ? userDatabase[googleId]
-    : null;
-  if (!user) {
-    return res.status(404).json({ error: 'User not found in cloud' });
-  }
-  res.json({
-    success: true,
-    profile: user.profile,
-    stats: user.stats
-  });
-});
+app.use(
+  createApiRouter({
+    getUserDatabase: () => userDatabase,
+    getActiveRoomCount: () => rooms.size
+  })
+);
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -592,7 +259,7 @@ const socketToRoom: Map<string, string> = new Map();
 // 100% Random Alphanumeric Room Code Generator (e.g. 7K4X, M9P2)
 const generateRoomCode = (): string => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
+  let code: string;
   do {
     code = '';
     for (let i = 0; i < 4; i++) {

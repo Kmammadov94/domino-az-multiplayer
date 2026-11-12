@@ -382,7 +382,7 @@ export class GameRoom {
     }
 
     let nextBoard: GameBoard;
-    let scored = 0;
+    let scored: number;
 
     if (this.board.tiles.length === 0) {
       nextBoard = placeFirstTile(this.board, tile);

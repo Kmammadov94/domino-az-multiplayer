@@ -1,6 +1,7 @@
 import { PlayerStats } from '../types/domino';
 import { DEFAULT_AVATAR_ID, FREE_AVATAR_IDS } from '../data/avatars';
 import { DOMINO_SKINS } from '../data/skins';
+import { devWarn } from './logger';
 
 const STORAGE_KEY = 'az_domino_telefon365_v1';
 const GOOGLE_USER_KEY = 'az_domino_google_user_v1';
@@ -230,9 +231,11 @@ export const syncWithCloud = async (
         }
         return resolvedStats;
       }
+    } else if (res.status === 401 && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('domino:auth-expired'));
     }
   } catch (e) {
-    console.warn('Cloud sync offline or server unreachable, using local stats:', e);
+    devWarn('Cloud sync offline or server unreachable, using local stats:', e);
   }
   return currentStats;
 };
