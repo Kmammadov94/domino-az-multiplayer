@@ -45,6 +45,32 @@ export function createApiRouter({ getUserDatabase, getActiveRoomCount, getGuestR
     });
   });
 
+  const ensureUserRecordFromProfile = (verified: {
+    googleId: string;
+    email: string;
+    name: string;
+    picture: string;
+  }) => {
+    const userDatabase = getUserDatabase();
+    const existing = Object.prototype.hasOwnProperty.call(userDatabase, verified.googleId)
+      ? userDatabase[verified.googleId]
+      : {};
+    userDatabase[verified.googleId] = {
+      ...existing,
+      profile: {
+        googleId: verified.googleId,
+        email: verified.email || existing.profile?.email || '',
+        name: verified.name || existing.profile?.name || '',
+        picture: verified.picture || existing.profile?.picture || ''
+      },
+      stats: existing.stats || {},
+      pendingCoinGrant: existing.pendingCoinGrant || 0,
+      claimedGrants: existing.claimedGrants || [],
+      updatedAt: Date.now()
+    };
+    persistUserRecord(verified.googleId, userDatabase[verified.googleId], userDatabase);
+  };
+
   // Verify Google ID Token and issue a signed server session token
   router.post('/api/auth/google', async (req, res) => {
     const { credential } = req.body || {};
@@ -55,6 +81,7 @@ export function createApiRouter({ getUserDatabase, getActiveRoomCount, getGuestR
     if (!verified) {
       return res.status(401).json({ error: 'Invalid or expired Google token' });
     }
+    ensureUserRecordFromProfile(verified);
     const authToken = signSessionToken(verified.googleId);
     res.json({
       success: true,
@@ -305,6 +332,7 @@ export function createApiRouter({ getUserDatabase, getActiveRoomCount, getGuestR
       return res.status(401).json({ error: 'Invalid or expired Google credential' });
     }
 
+    ensureUserRecordFromProfile(verified);
     const authToken = signSessionToken(verified.googleId);
     const authenticatedUser = {
       ...verified,
