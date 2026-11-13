@@ -22,7 +22,7 @@ export const ApkAuthBridgeView: React.FC<ApkAuthBridgeViewProps> = ({ apkAuthSes
         setGisLoaded(true);
         win.google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
-          callback: (response: { credential?: string }) => {
+          callback: async (response: { credential?: string }) => {
             if (!response?.credential) return;
             try {
               const base64Url = response.credential.split('.')[1];
@@ -42,38 +42,44 @@ export const ApkAuthBridgeView: React.FC<ApkAuthBridgeViewProps> = ({ apkAuthSes
                 signedInAt: Date.now()
               };
 
+              let resolvedProfile: GoogleUserProfile = profile;
+
+              // Post Google credential to server with retries to verify & store session
+              for (let attempt = 1; attempt <= 4; attempt++) {
+                try {
+                  const res = await fetch(`/api/apk-auth/${encodeURIComponent(apkAuthSessionId)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ credential: response.credential, user: profile })
+                  });
+                  if (res.ok) {
+                    const data = await res.json();
+                    if (data?.user) {
+                      resolvedProfile = data.user;
+                    }
+                    break;
+                  }
+                } catch (e) {
+                  console.warn('Bridge POST attempt ' + attempt + ' failed:', e);
+                }
+                await new Promise((r) => setTimeout(r, 350));
+              }
+
               const qs = new URLSearchParams({
-                googleId: profile.googleId,
-                name: profile.name,
-                email: profile.email,
-                picture: profile.picture || '',
+                googleId: resolvedProfile.googleId,
+                name: resolvedProfile.name,
+                email: resolvedProfile.email,
+                picture: resolvedProfile.picture || '',
+                authToken: resolvedProfile.authToken || '',
                 sessionId: apkAuthSessionId,
-                signedInAt: String(profile.signedInAt)
+                signedInAt: String(resolvedProfile.signedInAt)
               }).toString();
 
               const schemeUrl = `dominoaz://auth?${qs}`;
               const intentUrl = `intent://auth?${qs}#Intent;scheme=dominoaz;package=az.domino.telefon365;end`;
 
-              setCompletedUser(profile);
+              setCompletedUser(resolvedProfile);
               setDeepLinkUrls({ scheme: schemeUrl, intent: intentUrl });
-
-              // Post Google credential to server with retries to verify & store session
-              const sendAuthWithRetry = async () => {
-                for (let attempt = 1; attempt <= 4; attempt++) {
-                  try {
-                    const res = await fetch(`/api/apk-auth/${encodeURIComponent(apkAuthSessionId)}`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ credential: response.credential, user: profile })
-                    });
-                    if (res.ok) break;
-                  } catch (e) {
-                    console.warn('Bridge POST attempt ' + attempt + ' failed:', e);
-                  }
-                  await new Promise((r) => setTimeout(r, 350));
-                }
-              };
-              sendAuthWithRetry();
 
               // Automatic redirect attempt
               setTimeout(() => {

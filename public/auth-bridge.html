@@ -192,23 +192,24 @@
       }
     }
 
-    async function sendAuthToServerWithRetry(sessId, profile) {
+    async function sendAuthToServerWithRetry(sessId, profile, credential) {
       for (let attempt = 1; attempt <= 4; attempt++) {
         try {
           const res = await fetch('/api/apk-auth/' + encodeURIComponent(sessId), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user: profile })
+            body: JSON.stringify({ credential: credential, user: profile })
           });
           if (res.ok) {
-            return true;
+            const data = await res.json();
+            return (data && data.user) ? data.user : profile;
           }
         } catch (err) {
           console.warn('POST attempt ' + attempt + ' failed:', err);
         }
         await new Promise((r) => setTimeout(r, 350));
       }
-      return false;
+      return null;
     }
 
     async function handleCredentialResponse(response) {
@@ -216,7 +217,7 @@
       const payload = parseJwt(response.credential);
       if (!payload) return;
 
-      const profile = {
+      let profile = {
         googleId: payload.sub,
         email: payload.email,
         name: payload.name || payload.given_name || 'Google Oyunçusu',
@@ -234,7 +235,10 @@
       if (sessionId) {
         statusText.innerHTML = '<span class="loading-spinner"></span> Tətbiqə bağlanır: <strong>' + profile.name + '</strong>';
         
-        await sendAuthToServerWithRetry(sessionId, profile);
+        const serverUser = await sendAuthToServerWithRetry(sessionId, profile, response.credential);
+        if (serverUser) {
+          profile = Object.assign({}, profile, serverUser);
+        }
 
         statusTitle.textContent = 'Giriş Uğurla Tamamlandı!';
         statusText.innerHTML = '<strong>' + profile.name + '</strong> hesabınız bağlandı.<br/>Aşağıdakı düyməyə vuraraq tətbiqə qayıdın.';
@@ -243,6 +247,7 @@
           '&name=' + encodeURIComponent(profile.name) +
           '&email=' + encodeURIComponent(profile.email) +
           (profile.picture ? '&picture=' + encodeURIComponent(profile.picture) : '') +
+          (profile.authToken ? '&authToken=' + encodeURIComponent(profile.authToken) : '') +
           (sessionId ? '&sessionId=' + encodeURIComponent(sessionId) : '') +
           '&signedInAt=' + Date.now();
 
