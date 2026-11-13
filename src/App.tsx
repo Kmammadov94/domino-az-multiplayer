@@ -13,8 +13,7 @@ import {
   createInitial101State,
   findFirstHandStarter101,
   process101Round,
-  getMinBoneyardReserve,
-  sumHandPips101
+  getMinBoneyardReserve
 } from './utils/domino101Logic';
 import { DOMINO_SKINS } from './data/skins';
 import { translations } from './i18n/translations';
@@ -60,8 +59,7 @@ import {
 import { triggerHaptic } from './utils/haptics';
 import { App as CapApp } from '@capacitor/app';
 import { Browser as CapBrowser } from '@capacitor/browser';
-import { TABLE_THEMES, DEFAULT_TABLE_THEME_ID } from './data/tableThemes';
-import { PLAYER_TITLES } from './data/profileCustomization';
+import { DEFAULT_TABLE_THEME_ID } from './data/tableThemes';
 import { TABLE_GIFTS, TableGiftDef } from './data/tableGifts';
 const TeahousesModal = lazy(() => import('./components/TeahousesModal').then((m) => ({ default: m.TeahousesModal })));
 import { TableGiftPicker } from './components/TableGiftPicker';
@@ -70,10 +68,8 @@ import { BoardView } from './components/BoardView';
 import { FloatingScoreOverlay, FloatingScoreItem } from './components/FloatingScoreOverlay';
 const FriendsModal = lazy(() => import('./components/FriendsModal').then((m) => ({ default: m.FriendsModal })));
 import {
-  recordRecentPlayer,
   loadRecentPlayers,
   isBotName,
-  addFriend,
   FriendItem,
   loadFriends,
   saveFriends
@@ -90,7 +86,7 @@ const GameEndModal = lazy(() => import('./components/GameEndModal').then((m) => 
 import { AzerbaijanLogo } from './components/AzerbaijanLogo';
 import { BazaarTray } from './components/BazaarTray';
 import { AvatarView } from './components/AvatarView';
-import { PLAYER_AVATARS, DEFAULT_AVATAR_ID } from './data/avatars';
+import { DEFAULT_AVATAR_ID } from './data/avatars';
 const MultiplayerLobbyModal = lazy(() => import('./components/MultiplayerLobbyModal').then((m) => ({ default: m.MultiplayerLobbyModal })));
 import { TeahouseChatOverlay } from './components/TeahouseChatOverlay';
 const GoogleAuthModal = lazy(() => import('./components/GoogleAuthModal').then((m) => ({ default: m.GoogleAuthModal })));
@@ -137,17 +133,14 @@ import {
   GraduationCap,
   Volume2,
   VolumeX,
-  Languages,
   LogOut,
   Play,
   RotateCcw,
   Sparkles,
   Globe,
   Clock,
-  Cloud,
   ShieldAlert,
   Users,
-  Bot,
   Trophy,
   X,
   ChevronRight,
@@ -779,6 +772,16 @@ export const App: React.FC = () => {
       return;
     }
     if (chargedTeahouseMatchRef.current === mpGameState.roomCode) return;
+    const storageKey = `domino_charged_teahouse_${mpGameState.roomCode}`;
+    try {
+      if (localStorage.getItem(storageKey) === '1') {
+        chargedTeahouseMatchRef.current = mpGameState.roomCode;
+        return;
+      }
+      localStorage.setItem(storageKey, '1');
+    } catch {
+      // ignore storage errors
+    }
     chargedTeahouseMatchRef.current = mpGameState.roomCode;
     const buyIn = mpGameState.teahouseBuyIn;
     handleUpdateStats({
@@ -1866,6 +1869,11 @@ export const App: React.FC = () => {
 
   const handleRestartMatchAction = () => {
     if (isMultiplayer && mpGameState !== null) {
+      if (mpGameState.isRanked && mpGameState.isMatchOver) {
+        handleForfeitAction();
+        setShowTeahousesModal(true);
+        return;
+      }
       multiplayerSocket.nextHand();
       setShowGameEnd(false);
       return;
@@ -1875,6 +1883,21 @@ export const App: React.FC = () => {
 
   const handleForfeitAction = () => {
     if (isMultiplayer) {
+      // If leaving mid-game in Ranked Çayxana, record Elo loss locally too (server also settles)
+      if (mpGameState?.isRanked && mpGameState.status === 'in_game' && !mpGameState.isMatchOver) {
+        const myIdx = mpGameState.myPlayerIndex ?? 0;
+        const oppSlot = mpGameState.players.find((_, idx) => idx !== myIdx);
+        const curMmr = statsRef.current.mmr ?? DEFAULT_RANKED_MMR;
+        const oppMmr = oppSlot?.mmr ?? DEFAULT_RANKED_MMR;
+        const curPlayed = statsRef.current.rankedPlayed ?? 0;
+        const { nextMmr } = calculateEloUpdate(curMmr, oppMmr, false, curPlayed);
+        handleUpdateStats({
+          ...statsRef.current,
+          matchesPlayed: statsRef.current.matchesPlayed + 1,
+          mmr: nextMmr,
+          rankedPlayed: curPlayed + 1
+        });
+      }
       multiplayerSocket.leaveRoom();
       multiplayerSocket.disconnectIfIdle();
       try {
@@ -2227,7 +2250,7 @@ export const App: React.FC = () => {
     if (currentTurn !== 0 || availableToDraw === 0 || handRevealed) return;
     // In 101 mode: players draw 2 tiles at a time from bazaar ("2 daş 2 daş gedirsən")!
     const countToDraw = gameVariant === '101' ? Math.min(2, availableToDraw) : 1;
-    let nextBoneyard = [...boneyard];
+    const nextBoneyard = [...boneyard];
     const drawnTiles: TileData[] = [];
     for (let c = 0; c < countToDraw; c++) {
       if (nextBoneyard.length > 0) {
@@ -4034,6 +4057,9 @@ export const App: React.FC = () => {
         match101State={effectiveInMultiplayer ? (mpGameState?.match101State || match101State) : match101State}
         isSeka={effectiveInMultiplayer ? !!mpGameState?.handResults?.isSeka : is101Seka}
         ayazCaught={effectiveInMultiplayer ? !!mpGameState?.handResults?.ayazCaught : is101AyazCaught}
+        isRanked={effectiveInMultiplayer ? Boolean(mpGameState?.isRanked) : false}
+        teahousePrizePot={effectiveInMultiplayer ? (mpGameState?.teahousePrizePot || 0) : 0}
+        userMmr={stats.mmr ?? DEFAULT_RANKED_MMR}
       />
 
       <MultiplayerLobbyModal

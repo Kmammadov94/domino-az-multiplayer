@@ -1,4 +1,4 @@
-import { TileData, PipValue, Player, GameMode, GameVariant, PlacedTile, OpenEnd } from '../types/domino';
+import { TileData, PipValue, GameMode, GameVariant, OpenEnd } from '../types/domino';
 
 // Generate standard 28 double-six domino set
 export const createDominoSet = (): TileData[] => {

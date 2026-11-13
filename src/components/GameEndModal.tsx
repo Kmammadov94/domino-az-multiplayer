@@ -37,6 +37,9 @@ interface GameEndModalProps {
   match101State?: Match101State;
   isSeka?: boolean;
   ayazCaught?: boolean;
+  isRanked?: boolean;
+  teahousePrizePot?: number;
+  userMmr?: number;
 }
 
 export const GameEndModal: React.FC<GameEndModalProps> = ({
@@ -61,7 +64,10 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
   variant = '365',
   match101State,
   isSeka = false,
-  ayazCaught = false
+  ayazCaught = false,
+  isRanked = false,
+  teahousePrizePot = 0,
+  userMmr
 }) => {
   const [isViewingBoard, setIsViewingBoard] = useState<boolean>(false);
   const [claimingAdBonus, setClaimingAdBonus] = useState<boolean>(false);
@@ -232,11 +238,15 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
               </div>
             )}
 
-            {/* Coin reward badge */}
+            {/* Coin / Ranked MMR reward badge */}
             <div className="bg-amber-500/20 border border-amber-500/40 rounded-xl px-4 py-2 flex items-center gap-2 mb-3">
               <Coins className="w-5 h-5 text-amber-400" />
               <span className="font-bold text-amber-300 text-sm">
-                {`+${getMatchCoinReward(variant, userWon)} Qızıl qazanıldı!`}
+                {isRanked
+                  ? userWon
+                    ? `+${teahousePrizePot} Qızıl qazanıldı!${userMmr ? ` • ${userMmr} MMR` : ''}`
+                    : `Çayxana Reytinq${userMmr ? ` • ${userMmr} MMR` : ''}`
+                  : `+${getMatchCoinReward(variant, userWon)} Qızıl qazanıldı!`}
               </span>
             </div>
 

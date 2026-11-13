@@ -16,7 +16,6 @@ import {
   createInitialBoard,
   placeFirstTile,
   placeTileOnBranch,
-  getPlayableBranches,
   isBoardGloballyBlocked,
   getActiveOpenEnds
 } from '../boardEngine';

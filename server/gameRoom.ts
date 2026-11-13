@@ -19,7 +19,6 @@ import {
 } from '../src/utils/dominoLogic';
 import {
   findFirstHandStarter101,
-  sumHandPips101,
   getMinBoneyardReserve,
   createInitial101State,
   process101Round,
@@ -31,7 +30,6 @@ import {
   createInitialBoard,
   placeFirstTile,
   placeTileOnBranch,
-  getPlayableBranches,
   isBoardGloballyBlocked,
   canAnyTileBePlayed,
   isHandBlockedAfterPlay
@@ -866,14 +864,49 @@ export class GameRoom {
       }
       this.notifyState();
     } else {
-      // In-game: mark as bot or disconnected so game doesn't stall
       const p = this.players[pIdx];
+      if (this.isRanked) {
+        // In Ranked Çayxana 1v1, leaving mid-game is an immediate forfeit win for the opponent
+        const opponent = this.players.find((_, idx) => idx !== pIdx);
+        p.isConnected = false;
+        this.clearTurnTimer();
+        this.status = 'finished';
+        this.isMatchOver = true;
+        this.handRevealed = true;
+        this.revealPhase = 2;
+        this.matchWinnerIndex = opponent ? opponent.id : 0;
+        this.notifyState();
+        return;
+      }
+      // Casual in-game: mark as bot so game doesn't stall
       p.isConnected = false;
       p.isAI = true; // Bot takes over gracefully
       p.name = `${p.name} (Bot)`;
       this.notifyState();
       this.checkBotTurn();
     }
+  }
+
+  public forfeitDisconnectedPlayer(socketId: string): boolean {
+    if (!this.isRanked || this.status !== 'in_game' || this.isMatchOver) {
+      return false;
+    }
+    const pIdx = this.players.findIndex((p) => p.socketId === socketId);
+    if (pIdx < 0 || this.players[pIdx].isConnected) {
+      return false;
+    }
+    const opponent = this.players.find((_, idx) => idx !== pIdx);
+    if (!opponent || !opponent.isConnected) {
+      return false;
+    }
+    this.clearTurnTimer();
+    this.status = 'finished';
+    this.isMatchOver = true;
+    this.handRevealed = true;
+    this.revealPhase = 2;
+    this.matchWinnerIndex = opponent.id;
+    this.notifyState();
+    return true;
   }
 
   private resetTurnTimer(): void {

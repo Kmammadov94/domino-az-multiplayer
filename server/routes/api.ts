@@ -9,9 +9,19 @@ import {
 } from '../auth';
 import { isPostgresEnabled, persistUserRecord } from '../db';
 
+export interface RankedLeaderboardEntry {
+  googleId: string;
+  name: string;
+  mmr: number;
+  rankedPlayed: number;
+  rankedWon: number;
+  avatarId: string;
+}
+
 interface ApiRouterDeps {
   getUserDatabase: () => Record<string, any>;
   getActiveRoomCount: () => number;
+  getGuestRankedEntries?: () => RankedLeaderboardEntry[];
 }
 
 const isAuthorizedAdmin = (providedKey: unknown): boolean => {
@@ -20,7 +30,7 @@ const isAuthorizedAdmin = (providedKey: unknown): boolean => {
   return safeTimingEqual(providedKey, secret);
 };
 
-export function createApiRouter({ getUserDatabase, getActiveRoomCount }: ApiRouterDeps): Router {
+export function createApiRouter({ getUserDatabase, getActiveRoomCount, getGuestRankedEntries }: ApiRouterDeps): Router {
   const router = Router();
   const apkAuthSessions = new Map<string, { user: any; createdAt: number; consumedAt?: number }>();
 
@@ -139,6 +149,14 @@ export function createApiRouter({ getUserDatabase, getActiveRoomCount }: ApiRout
       dailyStreak: Math.max(existingStats.dailyStreak || 0, stats?.dailyStreak || 0),
       matchesPlayed: Math.max(existingStats.matchesPlayed || 0, stats?.matchesPlayed || 0),
       matchesWon: Math.max(existingStats.matchesWon || 0, stats?.matchesWon || 0),
+      mmr:
+        typeof existingStats.rankedPlayed === 'number' &&
+        existingStats.rankedPlayed >= (typeof stats?.rankedPlayed === 'number' ? stats.rankedPlayed : 0) &&
+        typeof existingStats.mmr === 'number'
+          ? existingStats.mmr
+          : Math.min(5000, Math.max(100, typeof stats?.mmr === 'number' ? Math.round(stats.mmr) : existingStats.mmr ?? 1000)),
+      rankedPlayed: Math.max(existingStats.rankedPlayed || 0, typeof stats?.rankedPlayed === 'number' ? stats.rankedPlayed : 0),
+      rankedWon: Math.max(existingStats.rankedWon || 0, typeof stats?.rankedWon === 'number' ? stats.rankedWon : 0),
       lastDailyClaim: stats?.lastDailyClaim || existingStats.lastDailyClaim
     };
 
@@ -317,25 +335,33 @@ export function createApiRouter({ getUserDatabase, getActiveRoomCount }: ApiRout
     res.json({ authenticated: true, user: record.user });
   });
 
-  // Çayxana Ranked MMR Leaderboard (placement list)
+  // Çayxana Ranked MMR Leaderboard (Google users + Guest players)
   router.get('/api/ranked/leaderboard', (_req, res) => {
     const db = getUserDatabase();
-    const entries = Object.entries(db)
-      .map(([googleId, rec]) => {
-        const stats = rec?.stats || {};
-        const mmr = typeof stats.mmr === 'number' && Number.isFinite(stats.mmr) ? stats.mmr : 1000;
-        const rankedPlayed = typeof stats.rankedPlayed === 'number' ? stats.rankedPlayed : 0;
-        const rankedWon = typeof stats.rankedWon === 'number' ? stats.rankedWon : 0;
-        return {
-          googleId,
-          name: rec?.name || 'Oyunçu',
-          mmr,
-          rankedPlayed,
-          rankedWon,
-          avatarId: stats.equippedAvatar || 'avatar_baku_classic'
-        };
-      })
-      .filter((entry) => entry.rankedPlayed > 0)
+    const byId = new Map<string, RankedLeaderboardEntry>();
+
+    for (const [googleId, rec] of Object.entries(db)) {
+      const stats = rec?.stats || {};
+      const mmr = typeof stats.mmr === 'number' && Number.isFinite(stats.mmr) ? stats.mmr : 1000;
+      const rankedPlayed = typeof stats.rankedPlayed === 'number' ? stats.rankedPlayed : 0;
+      const rankedWon = typeof stats.rankedWon === 'number' ? stats.rankedWon : 0;
+      if (rankedPlayed <= 0) continue;
+      byId.set(googleId, {
+        googleId,
+        name: rec?.profile?.name || rec?.name || 'Oyunçu',
+        mmr,
+        rankedPlayed,
+        rankedWon,
+        avatarId: stats.equippedAvatar || 'avatar_baku_classic'
+      });
+    }
+
+    for (const guest of getGuestRankedEntries ? getGuestRankedEntries() : []) {
+      if (guest.rankedPlayed <= 0 || byId.has(guest.googleId)) continue;
+      byId.set(guest.googleId, guest);
+    }
+
+    const entries = Array.from(byId.values())
       .sort((a, b) => b.mmr - a.mmr || b.rankedWon - a.rankedWon)
       .slice(0, 30);
 

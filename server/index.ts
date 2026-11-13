@@ -9,13 +9,14 @@ import { GameMode, GameVariant } from '../src/types/domino';
 import { DoubleComboMove } from '../src/utils/comboEngine';
 import { GameRoom } from './gameRoom';
 import { ChatMessage, MultiplayerRoomSummary } from '../src/types/multiplayer';
-import { TEAHOUSE_TIERS, getTeahouseTierById } from '../src/data/teahouses';
+import { TEAHOUSE_TIERS, getTeahouseTierById, calculateEloUpdate, DEFAULT_RANKED_MMR } from '../src/data/teahouses';
 import { validatePlayerName, cleanProfanity } from '../src/utils/profanityFilter';
 import {
   initStorage,
-  persistSocialDatabase
+  persistSocialDatabase,
+  persistUserRecord
 } from './db';
-import { createApiRouter } from './routes/api';
+import { createApiRouter, RankedLeaderboardEntry } from './routes/api';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -237,10 +238,14 @@ const findPlayerProfileByQuery = (qRaw: string): (SocialProfile & { isOnline: bo
   return null;
 };
 
+const guestRankedDb: Map<string, RankedLeaderboardEntry> = new Map();
+const settledRankedRooms: Set<string> = new Set();
+
 app.use(
   createApiRouter({
     getUserDatabase: () => userDatabase,
-    getActiveRoomCount: () => rooms.size
+    getActiveRoomCount: () => rooms.size,
+    getGuestRankedEntries: () => Array.from(guestRankedDb.values())
   })
 );
 
@@ -288,8 +293,74 @@ const getRoomSummary = (room: GameRoom): MultiplayerRoomSummary => ({
   isRanked: room.isRanked
 });
 
+// Server-authoritative settlement for Ranked Çayxana matches (MMR + coins + Guest leaderboard)
+const settleRankedMatchIfNeeded = (room: GameRoom) => {
+  if (!room.isRanked || !room.isMatchOver || settledRankedRooms.has(room.code)) return;
+  if (room.players.length < 2) return;
+  settledRankedRooms.add(room.code);
+
+  const p0 = room.players[0];
+  const p1 = room.players[1];
+  const winnerIdx = room.matchWinnerIndex;
+  const buyIn = room.teahouseBuyIn || 0;
+  const prizePot = room.teahousePrizePot || 0;
+
+  const p0Record = p0.playerId && userDatabase[p0.playerId] ? userDatabase[p0.playerId] : null;
+  const p1Record = p1.playerId && userDatabase[p1.playerId] ? userDatabase[p1.playerId] : null;
+
+  const p0Mmr = p0Record?.stats?.mmr ?? (p0.playerId ? guestRankedDb.get(p0.playerId)?.mmr : undefined) ?? p0.mmr ?? DEFAULT_RANKED_MMR;
+  const p1Mmr = p1Record?.stats?.mmr ?? (p1.playerId ? guestRankedDb.get(p1.playerId)?.mmr : undefined) ?? p1.mmr ?? DEFAULT_RANKED_MMR;
+
+  const pairs: Array<{ slot: typeof p0; oppMmr: number; won: boolean; record: any }> = [
+    { slot: p0, oppMmr: p1Mmr, won: winnerIdx === p0.id, record: p0Record },
+    { slot: p1, oppMmr: p0Mmr, won: winnerIdx === p1.id, record: p1Record }
+  ];
+
+  for (const { slot, oppMmr, won, record } of pairs) {
+    const pid = slot.playerId;
+    if (!pid) continue;
+
+    if (record) {
+      const s = record.stats || {};
+      const curMmr = typeof s.mmr === 'number' ? s.mmr : p0 === slot ? p0Mmr : p1Mmr;
+      const curPlayed = typeof s.rankedPlayed === 'number' ? s.rankedPlayed : 0;
+      const curWon = typeof s.rankedWon === 'number' ? s.rankedWon : 0;
+      const { nextMmr } = calculateEloUpdate(curMmr, oppMmr, won, curPlayed);
+      const curCoins = typeof s.coins === 'number' ? s.coins : 0;
+      const nextCoins = Math.max(0, curCoins - buyIn + (won ? prizePot : 0));
+
+      record.stats = {
+        ...s,
+        coins: nextCoins,
+        matchesPlayed: (s.matchesPlayed || 0) + 1,
+        matchesWon: (s.matchesWon || 0) + (won ? 1 : 0),
+        mmr: nextMmr,
+        rankedPlayed: curPlayed + 1,
+        rankedWon: curWon + (won ? 1 : 0)
+      };
+      record.updatedAt = Date.now();
+      persistUserRecord(pid, record, userDatabase);
+    } else {
+      const prev = guestRankedDb.get(pid);
+      const curMmr = prev?.mmr ?? slot.mmr ?? DEFAULT_RANKED_MMR;
+      const curPlayed = prev?.rankedPlayed ?? 0;
+      const curWon = prev?.rankedWon ?? 0;
+      const { nextMmr } = calculateEloUpdate(curMmr, oppMmr, won, curPlayed);
+      guestRankedDb.set(pid, {
+        googleId: pid,
+        name: slot.name || 'Qonaq',
+        mmr: nextMmr,
+        rankedPlayed: curPlayed + 1,
+        rankedWon: curWon + (won ? 1 : 0),
+        avatarId: slot.avatarId || 'avatar_baku_classic'
+      });
+    }
+  }
+};
+
 // Broadcast personalized state to each player in room
 const broadcastRoom = (room: GameRoom) => {
+  settleRankedMatchIfNeeded(room);
   const summary = getRoomSummary(room);
 
   // Directly emit to each player's individual socket
@@ -307,6 +378,31 @@ const broadcastRoom = (room: GameRoom) => {
 
 // Grace period timers for page refresh (F5) / disconnects
 const roomCleanupTimers = new Map<string, NodeJS.Timeout>();
+const rankedForfeitTimers = new Map<string, NodeJS.Timeout>();
+
+function leaveCurrentRoomIfAny(socket: Socket) {
+  const prevCode = socketToRoom.get(socket.id);
+  if (!prevCode) return;
+  socketToRoom.delete(socket.id);
+  socket.leave(`room_${prevCode}`);
+
+  const prevRoom = rooms.get(prevCode);
+  if (!prevRoom) return;
+
+  prevRoom.removePlayer(socket.id);
+  broadcastRoom(prevRoom);
+
+  const realPlayers = prevRoom.players.filter((p) => !p.isAI && p.isConnected);
+  if (realPlayers.length === 0) {
+    prevRoom.destroy();
+    rooms.delete(prevCode);
+    const timer = roomCleanupTimers.get(prevCode);
+    if (timer) {
+      clearTimeout(timer);
+      roomCleanupTimers.delete(prevCode);
+    }
+  }
+}
 
 function safeAck(cb: unknown, data: any) {
   if (typeof cb === 'function') {
@@ -336,6 +432,7 @@ io.on('connection', (socket: Socket) => {
           safeAck(callback, { success: false, error: nameValidation.error || 'Nalayiq ad seçilə bilməz!' });
           return;
         }
+        leaveCurrentRoomIfAny(socket);
 
         const roomCode = generateRoomCode();
         const sessionToken = data.sessionToken || `sess_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -395,6 +492,7 @@ io.on('connection', (socket: Socket) => {
           safeAck(callback, { success: false, error: 'Otaq tapılmadı! Kodu yoxlayın.' });
           return;
         }
+        leaveCurrentRoomIfAny(socket);
 
         const sessionToken = data.sessionToken || `sess_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
@@ -436,6 +534,7 @@ io.on('connection', (socket: Socket) => {
           safeAck(callback, { success: false, error: nameValidation.error || 'Nalayiq ad seçilə bilməz!' });
           return;
         }
+        leaveCurrentRoomIfAny(socket);
 
         const mode = data.mode || '2p_solo';
         const variant = data.variant || '365';
@@ -570,6 +669,7 @@ io.on('connection', (socket: Socket) => {
           safeAck(callback, { success: false, error: nameValidation.error || 'Nalayiq ad seçilə bilməz!' });
           return;
         }
+        leaveCurrentRoomIfAny(socket);
 
         const variant: GameVariant = data.variant === '101' ? '101' : '365';
         const sessionToken = data.sessionToken || `sess_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -942,10 +1042,21 @@ io.on('connection', (socket: Socket) => {
           return;
         }
 
+        const existingSlot = room.players.find((p) => p.sessionToken === data.sessionToken);
+        const oldSocketId = existingSlot?.socketId;
+
         const res = room.reconnectPlayer(socket.id, data.sessionToken);
         if (!res.success) {
           safeAck(callback, { success: false, error: res.error });
           return;
+        }
+
+        if (oldSocketId) {
+          const forfeitTimer = rankedForfeitTimers.get(oldSocketId);
+          if (forfeitTimer) {
+            clearTimeout(forfeitTimer);
+            rankedForfeitTimers.delete(oldSocketId);
+          }
         }
 
         socketToRoom.set(socket.id, code);
@@ -1140,6 +1251,12 @@ io.on('connection', (socket: Socket) => {
     if (!code) return safeAck(callback, { success: false, error: 'Otaq tapılmadı' });
     const room = rooms.get(code);
     if (!room) return safeAck(callback, { success: false, error: 'Otaq tapılmadı' });
+    if (room.isRanked && room.isMatchOver) {
+      return safeAck(callback, {
+        success: false,
+        error: 'Çayxana reytinq matçı bitdi! Yeni oyun üçün Çayxanadan qoşulun.'
+      });
+    }
     const res = room.nextHand(socket.id);
     safeAck(callback, res);
   });
@@ -1167,27 +1284,7 @@ io.on('connection', (socket: Socket) => {
 
   // 13. Explicit Leave Room
   socket.on('leave_room', () => {
-    const code = socketToRoom.get(socket.id);
-    if (!code) return;
-    socketToRoom.delete(socket.id);
-    socket.leave(`room_${code}`);
-
-    const room = rooms.get(code);
-    if (!room) return;
-
-    room.removePlayer(socket.id);
-    broadcastRoom(room);
-
-    const realPlayers = room.players.filter((p) => !p.isAI && p.isConnected);
-    if (realPlayers.length === 0) {
-      room.destroy();
-      rooms.delete(code);
-      const timer = roomCleanupTimers.get(code);
-      if (timer) {
-        clearTimeout(timer);
-        roomCleanupTimers.delete(code);
-      }
-    }
+    leaveCurrentRoomIfAny(socket);
   });
 
   // 14. Disconnect / F5 Page Reload with 45s Grace Period
@@ -1219,6 +1316,21 @@ io.on('connection', (socket: Socket) => {
     // Gracefully mark as disconnected without immediately destroying room
     room.markPlayerDisconnected(socket.id);
     broadcastRoom(room);
+
+    // For Ranked Çayxana matches, forfeit to opponent if disconnected player doesn't return in 45s
+    if (room.isRanked && room.status === 'in_game') {
+      const prevTimer = rankedForfeitTimers.get(socket.id);
+      if (prevTimer) clearTimeout(prevTimer);
+      const disconnectedSlotSocketId = socket.id;
+      const timer = setTimeout(() => {
+        rankedForfeitTimers.delete(disconnectedSlotSocketId);
+        const activeRoom = rooms.get(code);
+        if (activeRoom && activeRoom.forfeitDisconnectedPlayer(disconnectedSlotSocketId)) {
+          broadcastRoom(activeRoom);
+        }
+      }, 45000);
+      rankedForfeitTimers.set(socket.id, timer);
+    }
 
     // If NO real players are currently connected, start 45-second room cleanup timer
     const anyConnected = room.players.some((p) => !p.isAI && p.isConnected);

@@ -131,7 +131,7 @@ const EXACT_MATCH_PROFANITIES = new Set([
 export function normalizeText(text: string): string {
   if (!text) return '';
 
-  let normalized = text
+  const normalized = text
     .toLowerCase()
     .trim()
     // Azerbaijani diacritic mapping

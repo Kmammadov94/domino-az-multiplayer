@@ -257,7 +257,7 @@ export const placeTileOnBranch = (
   }
 
   // Curving (Snake / 90-degree L-shape turn) when a line extends too far
-  let direction = branch.direction;
+  const direction = branch.direction;
   let shouldTurn = false;
   let nextDirection = direction;
 
