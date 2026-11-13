@@ -207,13 +207,32 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
     onSignIn(resolvedProfile);
     setCompletedProfile(resolvedProfile);
 
-    // If this browser tab was opened from the Android APK (?apk_auth=...), send the credential to the bridge endpoint!
+    // If this browser tab was opened from the Android APK (?apk_auth=...), send the credential to the bridge endpoint first so we get the signed authToken!
     if (apkAuthSessionId) {
+      try {
+        const res = await fetch(`${getBackendServerUrl() || PRODUCTION_SERVER_URL}/api/apk-auth/${encodeURIComponent(apkAuthSessionId)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential, user: resolvedProfile })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.user) {
+            resolvedProfile = data.user;
+            onSignIn(resolvedProfile);
+            setCompletedProfile(resolvedProfile);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to send APK bridge auth:', e);
+      }
+
       const qs = new URLSearchParams({
         googleId: resolvedProfile.googleId,
         name: resolvedProfile.name,
         email: resolvedProfile.email,
         picture: resolvedProfile.picture || '',
+        authToken: resolvedProfile.authToken || '',
         sessionId: apkAuthSessionId,
         signedInAt: String(resolvedProfile.signedInAt)
       }).toString();
@@ -223,16 +242,6 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
 
       setBridgeReturnUrls({ scheme: schemeUrl, intent: intentUrl });
       setApkBridgeCompleted(true);
-
-      try {
-        await fetch(`${getBackendServerUrl()}/api/apk-auth/${encodeURIComponent(apkAuthSessionId)}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ credential, user: resolvedProfile })
-        }).catch(() => {});
-      } catch (e) {
-        console.warn('Failed to send APK bridge auth:', e);
-      }
 
       // Attempt automatic deep-link redirect back into the Android APK
       setTimeout(() => {

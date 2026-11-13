@@ -372,6 +372,7 @@ export const App: React.FC = () => {
           let email: string | null = null;
           let name: string | null = null;
           let picture: string | null = null;
+          let authToken: string | null = null;
 
           try {
             const parsed = new URL(data.url);
@@ -379,6 +380,7 @@ export const App: React.FC = () => {
             email = parsed.searchParams.get('email');
             name = parsed.searchParams.get('name');
             picture = parsed.searchParams.get('picture');
+            authToken = parsed.searchParams.get('authToken');
           } catch {
             const raw = data.url.replace('dominoaz://auth', 'https://dummy.local');
             try {
@@ -387,6 +389,7 @@ export const App: React.FC = () => {
               email = parsed.searchParams.get('email');
               name = parsed.searchParams.get('name');
               picture = parsed.searchParams.get('picture');
+              authToken = parsed.searchParams.get('authToken');
             } catch {
               const qStr = data.url.includes('?') ? data.url.split('?')[1] : '';
               const sp = new URLSearchParams(qStr);
@@ -394,6 +397,7 @@ export const App: React.FC = () => {
               email = sp.get('email');
               name = sp.get('name');
               picture = sp.get('picture');
+              authToken = sp.get('authToken');
             }
           }
 
@@ -403,6 +407,7 @@ export const App: React.FC = () => {
               email,
               name: name || 'Google Oyunçusu',
               picture: picture || undefined,
+              authToken: authToken || undefined,
               signedInAt: Date.now()
             };
             saveGoogleUser(userProfile);
@@ -1319,10 +1324,10 @@ export const App: React.FC = () => {
     sounds.enabled = soundEnabled;
   }, [soundEnabled]);
 
-  // Initial cloud sync if already signed in with Google
+  // Initial cloud sync if already signed in with Google (use merge mode so stale device never overwrites newer cloud coins)
   useEffect(() => {
     if (googleUser) {
-      syncWithCloud(googleUser, stats).then((synced) => {
+      syncWithCloud(googleUser, stats, true).then((synced) => {
         if (synced && JSON.stringify(synced) !== JSON.stringify(stats)) {
           setStats(synced);
         }
@@ -1360,6 +1365,10 @@ export const App: React.FC = () => {
 
   // Start a new Match
   const startMatch = (chosenMode: GameMode, chosenVariant: GameVariant = gameVariant) => {
+    if (isMultiplayer || mpRoom) {
+      handleLeaveRoom();
+      multiplayerSocket.disconnectIfIdle();
+    }
     setGameVariant(chosenVariant);
     setMode(chosenMode);
     if (chosenVariant === '101') {
@@ -4065,6 +4074,10 @@ export const App: React.FC = () => {
       <MultiplayerLobbyModal
         isOpen={showMultiplayerLobby}
         onClose={() => {
+          if (mpRoom?.teahouseTierId && mpRoom.status === 'waiting') {
+            handleLeaveRoom();
+            multiplayerSocket.disconnectIfIdle();
+          }
           setShowMultiplayerLobby(false);
           setInviteCode(null);
           setInviteError(null);
