@@ -116,7 +116,9 @@ export function createApiRouter({ getUserDatabase, getActiveRoomCount, getGuestR
     let finalCoins: number;
     if (typeof stats?.coins === 'number') {
       if (isInitialLogin) {
-        finalCoins = Math.max(existingStats.coins || 0, stats.coins) + pendingGrant;
+        finalCoins =
+          (typeof existingStats.coins === 'number' ? existingStats.coins : stats.coins) +
+          pendingGrant;
       } else {
         finalCoins = stats.coins + pendingGrant;
       }

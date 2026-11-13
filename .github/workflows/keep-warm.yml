@@ -1,0 +1,13 @@
+name: Keep Render Server Warm
+
+on:
+  schedule:
+    - cron: '*/12 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping-health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render /health endpoint
+        run: curl -fsS --max-time 30 https://domino-az-multiplayer.onrender.com/health
