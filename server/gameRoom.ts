@@ -72,6 +72,10 @@ export class GameRoom {
   public lastTilePlacedPlayerIndex: number = 0;
   public nextHandStarterIndex: number = 0;
   public match101State: Match101State = createInitial101State();
+  public teahouseTierId?: string;
+  public teahouseBuyIn?: number;
+  public teahousePrizePot?: number;
+  public isRanked: boolean = false;
 
   private turnTimerInterval: NodeJS.Timeout | null = null;
   private autoPassTimeout: NodeJS.Timeout | null = null;
@@ -93,7 +97,8 @@ export class GameRoom {
     hostPlayerTag?: string,
     hostFrameId?: string,
     hostTitle?: string,
-    variant: GameVariant = '365'
+    variant: GameVariant = '365',
+    teahouseOptions?: { tierId: string; buyIn: number; prizePot: number; hostMmr?: number }
   ) {
     this.code = code;
     this.mode = mode;
@@ -104,6 +109,12 @@ export class GameRoom {
     this.hostSocketId = hostSocketId;
     this.maxPlayers = mode === '2p_solo' ? 2 : mode === '3p_solo' ? 3 : 4;
     this.onStateChangeCallback = onStateChange;
+    if (teahouseOptions) {
+      this.teahouseTierId = teahouseOptions.tierId;
+      this.teahouseBuyIn = teahouseOptions.buyIn;
+      this.teahousePrizePot = teahouseOptions.prizePot;
+      this.isRanked = true;
+    }
 
     // Add host as player 0
     this.players.push({
@@ -124,7 +135,8 @@ export class GameRoom {
       equippedSkinId: hostSkin || 'ivory_classic',
       avatarId: hostAvatar || 'avatar_baku_classic',
       isConnected: true,
-      sessionToken: hostSessionToken || `sess_${Date.now()}_0`
+      sessionToken: hostSessionToken || `sess_${Date.now()}_0`,
+      mmr: teahouseOptions?.hostMmr
     });
   }
 
@@ -137,7 +149,8 @@ export class GameRoom {
     playerId?: string,
     playerTag?: string,
     frameId?: string,
-    title?: string
+    title?: string,
+    mmr?: number
   ): { success: boolean; error?: string } {
     if (this.status !== 'waiting') {
       return { success: false, error: 'Oyun artıq başlayıb!' };
@@ -168,7 +181,8 @@ export class GameRoom {
       equippedSkinId: skinId || 'ivory_classic',
       avatarId: avatarId || 'avatar_baku_classic',
       isConnected: true,
-      sessionToken: sessionToken || `sess_${Date.now()}_${newIndex}`
+      sessionToken: sessionToken || `sess_${Date.now()}_${newIndex}`,
+      mmr
     });
 
     this.notifyState();
@@ -203,6 +217,9 @@ export class GameRoom {
   }
 
   public addBot(): { success: boolean; error?: string } {
+    if (this.teahouseTierId) {
+      return { success: false, error: 'Çayxana reytinq otağına bot əlavə edilə bilməz!' };
+    }
     if (this.status !== 'waiting') {
       return { success: false, error: 'Oyun artıq başlayıb!' };
     }
@@ -1019,7 +1036,11 @@ export class GameRoom {
       isMatchOver: this.isMatchOver,
       matchWinnerIndex: this.matchWinnerIndex,
       isInstant35: this.isInstant35,
-      match101State: this.match101State
+      match101State: this.match101State,
+      teahouseTierId: this.teahouseTierId,
+      teahouseBuyIn: this.teahouseBuyIn,
+      teahousePrizePot: this.teahousePrizePot,
+      isRanked: this.isRanked
     };
   }
 

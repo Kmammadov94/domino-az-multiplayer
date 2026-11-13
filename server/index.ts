@@ -9,6 +9,7 @@ import { GameMode, GameVariant } from '../src/types/domino';
 import { DoubleComboMove } from '../src/utils/comboEngine';
 import { GameRoom } from './gameRoom';
 import { ChatMessage, MultiplayerRoomSummary } from '../src/types/multiplayer';
+import { TEAHOUSE_TIERS, getTeahouseTierById } from '../src/data/teahouses';
 import { validatePlayerName, cleanProfanity } from '../src/utils/profanityFilter';
 import {
   initStorage,
@@ -280,7 +281,11 @@ const getRoomSummary = (room: GameRoom): MultiplayerRoomSummary => ({
   maxPlayers: room.maxPlayers,
   players: room.players,
   isLocked: Boolean(room.isLocked),
-  turnDuration: room.turnDuration || 30
+  turnDuration: room.turnDuration || 30,
+  teahouseTierId: room.teahouseTierId,
+  teahouseBuyIn: room.teahouseBuyIn,
+  teahousePrizePot: room.teahousePrizePot,
+  isRanked: room.isRanked
 });
 
 // Broadcast personalized state to each player in room
@@ -436,10 +441,11 @@ io.on('connection', (socket: Socket) => {
         const variant = data.variant || '365';
         const sessionToken = data.sessionToken || `sess_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-        // Find existing open waiting room with same mode & variant (must be public / unlocked)
+        // Find existing open waiting room with same mode & variant (must be public / unlocked, never Çayxana)
         let targetRoom: GameRoom | null = null;
         for (const room of rooms.values()) {
           if (
+            !room.teahouseTierId &&
             room.mode === mode &&
             (room.variant || '365') === variant &&
             room.status === 'waiting' &&
@@ -501,6 +507,162 @@ io.on('connection', (socket: Socket) => {
             sessionToken,
             myPlayerIndex: 0,
             isHost: true,
+            summary
+          });
+          broadcastRoom(room);
+        }
+      } catch (err: unknown) {
+        safeAck(callback, { success: false, error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+  );
+
+  // 3.0b Get live Çayxana (Teahouse) waiting & active room counts per tier & variant
+  socket.on('get_teahouse_stats', (data: { variant?: GameVariant } | undefined, callback) => {
+    try {
+      const requestedVariant = data?.variant;
+      const counts: Record<string, { waiting: number; active: number }> = {};
+      for (const tier of TEAHOUSE_TIERS) {
+        counts[tier.id] = { waiting: 0, active: 0 };
+      }
+      for (const room of rooms.values()) {
+        if (!room.teahouseTierId || !counts[room.teahouseTierId]) continue;
+        if (requestedVariant && (room.variant || '365') !== requestedVariant) continue;
+        if (room.status === 'waiting' && room.players.length < room.maxPlayers) {
+          counts[room.teahouseTierId].waiting += 1;
+        } else if (room.status === 'in_game') {
+          counts[room.teahouseTierId].active += 1;
+        }
+      }
+      safeAck(callback, { success: true, counts });
+    } catch (err: unknown) {
+      safeAck(callback, { success: false, error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  // 3.0c Join or Host an isolated Çayxana Ranked 1v1 room (60s turn timer, locked settings, auto-start on 2nd player)
+  socket.on(
+    'join_teahouse',
+    (
+      data: {
+        tierId: string;
+        variant?: GameVariant;
+        playerName: string;
+        skinId: string;
+        avatarId?: string;
+        sessionToken?: string;
+        playerId?: string;
+        playerTag?: string;
+        frameId?: string;
+        title?: string;
+        mmr?: number;
+      },
+      callback
+    ) => {
+      try {
+        const tier = getTeahouseTierById(data?.tierId);
+        if (!tier) {
+          safeAck(callback, { success: false, error: 'Çayxana səviyyəsi tapılmadı!' });
+          return;
+        }
+        const nameValidation = validatePlayerName(data.playerName || 'Oyunçu');
+        if (!nameValidation.isValid) {
+          safeAck(callback, { success: false, error: nameValidation.error || 'Nalayiq ad seçilə bilməz!' });
+          return;
+        }
+
+        const variant: GameVariant = data.variant === '101' ? '101' : '365';
+        const sessionToken = data.sessionToken || `sess_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+        // Find existing waiting Çayxana room with the exact same tier & variant (MMR is NOT used for matchmaking)
+        let targetRoom: GameRoom | null = null;
+        for (const room of rooms.values()) {
+          if (
+            room.teahouseTierId === tier.id &&
+            (room.variant || '365') === variant &&
+            room.status === 'waiting' &&
+            room.players.length < room.maxPlayers
+          ) {
+            targetRoom = room;
+            break;
+          }
+        }
+
+        if (targetRoom) {
+          socketToRoom.set(socket.id, targetRoom.code);
+          socket.join(`room_${targetRoom.code}`);
+
+          targetRoom.addPlayer(
+            socket.id,
+            nameValidation.sanitizedName,
+            data.skinId,
+            data.avatarId,
+            sessionToken,
+            data.playerId,
+            data.playerTag,
+            data.frameId,
+            data.title,
+            data.mmr
+          );
+          const mySlot = targetRoom.players.find((p) => p.socketId === socket.id);
+          if (mySlot) mySlot.isReady = true;
+          const myPlayerIndex = mySlot ? mySlot.id : targetRoom.players.length - 1;
+
+          // Auto-start immediately when 2nd Çayxana player joins
+          if (targetRoom.players.length >= targetRoom.maxPlayers) {
+            targetRoom.startMatch(targetRoom.hostSocketId);
+          }
+
+          const summary = getRoomSummary(targetRoom);
+          safeAck(callback, {
+            success: true,
+            roomCode: targetRoom.code,
+            sessionToken,
+            myPlayerIndex,
+            isHost: false,
+            autoStarted: targetRoom.status === 'in_game',
+            summary
+          });
+          broadcastRoom(targetRoom);
+        } else {
+          // Host a new isolated 1v1 Çayxana room (1 minute = 60s timer, locked settings)
+          const roomCode = generateRoomCode();
+          const room = new GameRoom(
+            roomCode,
+            '2p_solo',
+            socket.id,
+            nameValidation.sanitizedName,
+            data.skinId || 'ivory_classic',
+            () => broadcastRoom(room),
+            data.avatarId || 'avatar_baku_classic',
+            sessionToken,
+            true, // locked: hidden from public browser & casual quick match
+            60, // 1 minute default wait/turn timer for Çayxana
+            data.playerId,
+            data.playerTag,
+            data.frameId,
+            data.title,
+            variant,
+            {
+              tierId: tier.id,
+              buyIn: tier.buyIn,
+              prizePot: tier.prizePot,
+              hostMmr: data.mmr
+            }
+          );
+
+          rooms.set(roomCode, room);
+          socketToRoom.set(socket.id, roomCode);
+          socket.join(`room_${roomCode}`);
+
+          const summary = getRoomSummary(room);
+          safeAck(callback, {
+            success: true,
+            roomCode,
+            sessionToken,
+            myPlayerIndex: 0,
+            isHost: true,
+            autoStarted: false,
             summary
           });
           broadcastRoom(room);
@@ -823,7 +985,7 @@ io.on('connection', (socket: Socket) => {
   socket.on('get_public_rooms', (callback) => {
     try {
       const roomList = Array.from(rooms.values())
-        .filter((r) => r.status === 'waiting' && r.players.length < r.maxPlayers)
+        .filter((r) => !r.teahouseTierId && r.status === 'waiting' && r.players.length < r.maxPlayers)
         .map((r) => {
           const hostP = r.players.find((p) => p.isHost) || r.players[0];
           return {
@@ -852,6 +1014,10 @@ io.on('connection', (socket: Socket) => {
       const room = rooms.get(code);
       if (!room) {
         safeAck(callback, { success: false, error: 'Otaq tapılmadı' });
+        return;
+      }
+      if (room.teahouseTierId) {
+        safeAck(callback, { success: false, error: 'Çayxana otağının parametrləri dəyişdirilə bilməz!' });
         return;
       }
       const player = room.players.find((p) => p.socketId === socket.id);

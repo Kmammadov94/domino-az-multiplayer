@@ -371,8 +371,8 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                 </div>
               </div>
 
-              {/* Host Toggle Lock Button */}
-              {amIHost && (
+              {/* Host Toggle Lock Button (disabled in Çayxana ranked rooms) */}
+              {amIHost && !currentRoom.teahouseTierId && (
                 <button
                   onClick={handleToggleLock}
                   disabled={togglingLock}
@@ -460,9 +460,14 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
 
               {/* Action Buttons in Room */}
               <div className="w-full space-y-2 mt-2">
+                {currentRoom.teahouseTierId && (
+                  <div className="w-full py-2 px-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs font-bold text-center">
+                    ☕ Çayxana Reytinq Masası ({currentRoom.teahouseBuyIn} → {currentRoom.teahousePrizePot} sikkə) • Rəqib qoşulanda oyun avtomatik başlayacaq
+                  </div>
+                )}
                 {amIHost ? (
                   <div className="flex flex-col sm:flex-row items-center gap-2">
-                    {currentRoom.players.length < currentRoom.maxPlayers && (
+                    {currentRoom.players.length < currentRoom.maxPlayers && !currentRoom.teahouseTierId && (
                       <button
                         onClick={onAddBot}
                         className="w-full sm:flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95"

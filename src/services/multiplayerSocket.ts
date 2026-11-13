@@ -6,7 +6,8 @@ import {
   MultiplayerClientGameState,
   MultiplayerRoomSummary,
   PublicRoomInfo,
-  ChatMessage
+  ChatMessage,
+  TeahouseTierCounts
 } from '../types/multiplayer';
 
 export interface SocialProfilePayload {
@@ -250,6 +251,39 @@ class MultiplayerSocketService {
       frameId,
       title
     });
+  }
+
+  public getTeahouseStats(variant?: GameVariant): Promise<{
+    success: boolean;
+    counts?: Record<string, TeahouseTierCounts>;
+    error?: string;
+  }> {
+    return this.emitWithTimeout('get_teahouse_stats', { variant });
+  }
+
+  public joinTeahouse(params: {
+    tierId: string;
+    variant: GameVariant;
+    playerName: string;
+    skinId: string;
+    avatarId?: string;
+    sessionToken?: string;
+    playerId?: string;
+    playerTag?: string;
+    frameId?: string;
+    title?: string;
+    mmr?: number;
+  }): Promise<{
+    success: boolean;
+    roomCode?: string;
+    sessionToken?: string;
+    myPlayerIndex?: number;
+    isHost?: boolean;
+    autoStarted?: boolean;
+    summary?: MultiplayerRoomSummary;
+    error?: string;
+  }> {
+    return this.emitWithTimeout('join_teahouse', params);
   }
 
   public lookupPlayer(query: string): Promise<{

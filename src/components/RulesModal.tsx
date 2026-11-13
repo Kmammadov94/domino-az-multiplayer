@@ -1,17 +1,20 @@
 import React from 'react';
 import { Language } from '../types/domino';
 import { translations } from '../i18n/translations';
-import { X, BookOpen, CheckCircle2 } from 'lucide-react';
+import { X, BookOpen, CheckCircle2, GraduationCap } from 'lucide-react';
+import { getTutorialCopy } from '../utils/tutorialScenario';
 
 interface RulesModalProps {
   isOpen: boolean;
   onClose: () => void;
   lang: Language;
+  onStartTutorial?: () => void;
 }
 
-export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose, lang }) => {
+export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose, lang, onStartTutorial }) => {
   if (!isOpen) return null;
   const t = translations[lang];
+  const tutCopy = getTutorialCopy(lang);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in pointer-events-auto">
@@ -22,12 +25,26 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose, lang })
             <BookOpen className="w-5 h-5 text-amber-400" />
             <h2 className="text-lg font-bold text-amber-300">{t.rules} — {t.title}</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white p-1 hover:bg-slate-800 rounded-lg transition"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {onStartTutorial && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onStartTutorial();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-300 text-xs font-bold transition"
+              >
+                <GraduationCap className="w-4 h-4" />
+                <span>{tutCopy.rulesButton}</span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-slate-400 hover:text-white p-1 hover:bg-slate-800 rounded-lg transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}

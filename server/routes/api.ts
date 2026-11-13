@@ -317,5 +317,30 @@ export function createApiRouter({ getUserDatabase, getActiveRoomCount }: ApiRout
     res.json({ authenticated: true, user: record.user });
   });
 
+  // Çayxana Ranked MMR Leaderboard (placement list)
+  router.get('/api/ranked/leaderboard', (_req, res) => {
+    const db = getUserDatabase();
+    const entries = Object.entries(db)
+      .map(([googleId, rec]) => {
+        const stats = rec?.stats || {};
+        const mmr = typeof stats.mmr === 'number' && Number.isFinite(stats.mmr) ? stats.mmr : 1000;
+        const rankedPlayed = typeof stats.rankedPlayed === 'number' ? stats.rankedPlayed : 0;
+        const rankedWon = typeof stats.rankedWon === 'number' ? stats.rankedWon : 0;
+        return {
+          googleId,
+          name: rec?.name || 'Oyunçu',
+          mmr,
+          rankedPlayed,
+          rankedWon,
+          avatarId: stats.equippedAvatar || 'avatar_baku_classic'
+        };
+      })
+      .filter((entry) => entry.rankedPlayed > 0)
+      .sort((a, b) => b.mmr - a.mmr || b.rankedWon - a.rankedWon)
+      .slice(0, 30);
+
+    res.json({ success: true, leaderboard: entries });
+  });
+
   return router;
 }

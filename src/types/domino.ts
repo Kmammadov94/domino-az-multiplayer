@@ -91,4 +91,7 @@ export interface PlayerStats {
   dailyStreak: number;
   matchesPlayed: number;
   matchesWon: number;
+  mmr?: number;
+  rankedPlayed?: number;
+  rankedWon?: number;
 }

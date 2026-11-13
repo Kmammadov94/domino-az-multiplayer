@@ -22,6 +22,12 @@ export interface MultiplayerPlayerSlot {
   avatarId?: string;
   isConnected: boolean;
   sessionToken?: string;
+  mmr?: number;
+}
+
+export interface TeahouseTierCounts {
+  waiting: number;
+  active: number;
 }
 
 export interface MultiplayerRoomSummary {
@@ -35,6 +41,10 @@ export interface MultiplayerRoomSummary {
   players: MultiplayerPlayerSlot[];
   isLocked?: boolean;
   turnDuration?: number;
+  teahouseTierId?: string;
+  teahouseBuyIn?: number;
+  teahousePrizePot?: number;
+  isRanked?: boolean;
 }
 
 export interface PublicRoomInfo {
@@ -84,6 +94,10 @@ export interface MultiplayerClientGameState {
   matchWinnerIndex: number;
   isInstant35: boolean;
   match101State?: Match101State;
+  teahouseTierId?: string;
+  teahouseBuyIn?: number;
+  teahousePrizePot?: number;
+  isRanked?: boolean;
 }
 
 export interface ChatMessage {

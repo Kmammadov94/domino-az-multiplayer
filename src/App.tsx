@@ -116,12 +116,25 @@ import {
   ChatMessage
 } from './types/multiplayer';
 import { DoubleComboMove, findDoubleCombos } from './utils/comboEngine';
+import {
+  TUTORIAL_SEEN_KEY,
+  createTutorialSetup,
+  getTutorialBotMove,
+  getTutorialCopy,
+  getTutorialStep
+} from './utils/tutorialScenario';
+import {
+  DEFAULT_RANKED_MMR,
+  calculateEloUpdate,
+  getTeahouseTierById
+} from './data/teahouses';
 
 import {
   Coins,
   ShoppingBag,
   Gift,
   BookOpen,
+  GraduationCap,
   Volume2,
   VolumeX,
   Languages,
@@ -153,6 +166,18 @@ export const App: React.FC = () => {
   const [showDailyReward, setShowDailyReward] = useState<boolean>(false);
   const [showRules, setShowRules] = useState<boolean>(false);
   const [showGameEnd, setShowGameEnd] = useState<boolean>(false);
+  const [isTutorialMode, setIsTutorialMode] = useState<boolean>(false);
+  const [tutorialCompleted, setTutorialCompleted] = useState<boolean>(false);
+  const [showTutorialPrompt, setShowTutorialPrompt] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const p = new URLSearchParams(window.location.search).get('apk_auth');
+      if (p) return false;
+      return localStorage.getItem(TUTORIAL_SEEN_KEY) !== '1';
+    } catch {
+      return false;
+    }
+  });
   const [apkAuthSessionId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     const p = new URLSearchParams(window.location.search).get('apk_auth');
@@ -748,6 +773,20 @@ export const App: React.FC = () => {
     }
   }, [isMultiplayer, mpGameState?.handRevealed, mpGameState?.roundNumber]);
 
+  const chargedTeahouseMatchRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isMultiplayer || !mpGameState || mpGameState.status !== 'in_game' || !mpGameState.isRanked || !mpGameState.teahouseBuyIn) {
+      return;
+    }
+    if (chargedTeahouseMatchRef.current === mpGameState.roomCode) return;
+    chargedTeahouseMatchRef.current = mpGameState.roomCode;
+    const buyIn = mpGameState.teahouseBuyIn;
+    handleUpdateStats({
+      ...statsRef.current,
+      coins: Math.max(0, statsRef.current.coins - buyIn)
+    });
+  }, [isMultiplayer, mpGameState?.status, mpGameState?.roomCode]);
+
   const awardedMpMatchRef = useRef<string | null>(null);
   useEffect(() => {
     if (!isMultiplayer || !mpGameState?.isMatchOver) {
@@ -780,7 +819,31 @@ export const App: React.FC = () => {
       mpUserWon = otherScores.length === 0 || myScore >= Math.max(...otherScores);
     }
 
-    awardMatchCoins(mpUserWon, mpGameState.variant || '365');
+    if (mpGameState.isRanked && mpGameState.teahousePrizePot) {
+      // Ranked Çayxana match: award 90% pot on win + update Chess.com-style Elo MMR
+      const oppSlot = mpGameState.players.find((_, idx) => idx !== myIdx);
+      const myMmr = statsRef.current.mmr ?? DEFAULT_RANKED_MMR;
+      const oppMmr = oppSlot?.mmr ?? DEFAULT_RANKED_MMR;
+      const rankedPlayed = statsRef.current.rankedPlayed ?? 0;
+      const rankedWon = statsRef.current.rankedWon ?? 0;
+      const { nextMmr } = calculateEloUpdate(myMmr, oppMmr, mpUserWon, rankedPlayed);
+      const prize = mpUserWon ? mpGameState.teahousePrizePot : 0;
+
+      triggerHaptic('success');
+      if (mpUserWon) sounds.playCoinChime();
+      recordRecentOpponents(players);
+      handleUpdateStats({
+        ...statsRef.current,
+        coins: statsRef.current.coins + prize,
+        matchesPlayed: statsRef.current.matchesPlayed + 1,
+        matchesWon: statsRef.current.matchesWon + (mpUserWon ? 1 : 0),
+        mmr: nextMmr,
+        rankedPlayed: rankedPlayed + 1,
+        rankedWon: rankedWon + (mpUserWon ? 1 : 0)
+      });
+    } else {
+      awardMatchCoins(mpUserWon, mpGameState.variant || '365');
+    }
   }, [isMultiplayer, mpGameState?.isMatchOver, mpGameState?.roomCode, mpGameState?.roundNumber]);
 
   const handleCreateRoom = async (
@@ -924,6 +987,64 @@ export const App: React.FC = () => {
     }
     setShowMultiplayerLobby(true);
     return res.roomCode;
+  };
+
+  const handleJoinTeahouse = async (tierId: string, teahouseVariant: GameVariant) => {
+    const tier = getTeahouseTierById(tierId);
+    if (!tier) throw new Error('Çayxana səviyyəsi tapılmadı');
+    if (statsRef.current.coins < tier.buyIn) {
+      throw new Error(`Bu masa üçün ən azı ${tier.buyIn} sikkə lazımdır!`);
+    }
+
+    multiplayerSocket.connect();
+    const myId = getMyPlayerIdentity(googleUser, statsRef.current);
+    const playerName = googleUser?.name || myId.name;
+    const res = await multiplayerSocket.joinTeahouse({
+      tierId,
+      variant: teahouseVariant,
+      playerName,
+      skinId: statsRef.current.equippedSkin,
+      avatarId: statsRef.current.equippedAvatar || DEFAULT_AVATAR_ID,
+      playerId: myId.id,
+      playerTag: myId.tag,
+      frameId: statsRef.current.equippedFrame,
+      title: statsRef.current.equippedTitle,
+      mmr: statsRef.current.mmr ?? DEFAULT_RANKED_MMR
+    });
+
+    if (!res.success) {
+      throw new Error(res.error || 'Çayxana masasına qoşulmaq mümkün olmadı');
+    }
+
+    setGameVariant(teahouseVariant);
+    setMode('2p_solo');
+    setIsMultiplayer(true);
+    setMpIsHost(Boolean(res.isHost));
+    if (res.roomCode && res.sessionToken) {
+      try {
+        localStorage.setItem(
+          'domino_mp_session',
+          JSON.stringify({
+            roomCode: res.roomCode,
+            sessionToken: res.sessionToken,
+            playerName,
+            isHost: res.isHost ?? false
+          })
+        );
+      } catch {
+        // ignore storage errors
+      }
+    }
+    if (res.summary) {
+      setMpRoom(res.summary);
+      const mySocketId = multiplayerSocket.getSocket()?.id;
+      const mySlot = res.summary.players.find((p) => p.socketId === mySocketId);
+      if (mySlot) setMpMyIndex(mySlot.id);
+    }
+    setShowTeahousesModal(false);
+    if (!res.autoStarted) {
+      setShowMultiplayerLobby(true);
+    }
   };
 
   const handleAddBot = async () => {
@@ -1289,10 +1410,68 @@ export const App: React.FC = () => {
       });
     }
 
+    setIsTutorialMode(false);
+    setTutorialCompleted(false);
     setPlayers(initialPlayers);
     setRoundNumber(1);
     setIsMatchOver(false);
     startHand(chosenMode, initialPlayers, 1, true, 0);
+    setInGame(true);
+  };
+
+  // Start scripted ~45s 1v1 Tutorial Match
+  const startTutorialMatch = () => {
+    try {
+      localStorage.setItem(TUTORIAL_SEEN_KEY, '1');
+    } catch {
+      // ignore storage errors
+    }
+    setShowTutorialPrompt(false);
+    setShowRules(false);
+    setShowGameEnd(false);
+    setHandRevealed(false);
+    setIsMatchOver(false);
+    setGameVariant('365');
+    setMode('2p_solo');
+    setIsTutorialMode(true);
+    setTutorialCompleted(false);
+
+    const setup = createTutorialSetup();
+    const botName = pickAIPersonas(1, lang)[0] || 'Usta';
+    const tutorialPlayers: Player[] = [
+      {
+        id: 0,
+        name: t.player,
+        isAI: false,
+        hand: setup.humanHand,
+        score: 0,
+        handRoundPoints: 0,
+        team: 1,
+        avatarId: stats.equippedAvatar || DEFAULT_AVATAR_ID
+      },
+      {
+        id: 1,
+        name: botName,
+        isAI: true,
+        hand: setup.botHand,
+        score: 0,
+        handRoundPoints: 0,
+        team: 2,
+        avatarId: 'avatar_tea_master'
+      }
+    ];
+
+    setPlayers(tutorialPlayers);
+    setBoneyard(setup.boneyard);
+    setBoard(createInitialBoard());
+    setSelectedTile(null);
+    setForcedTile(setup.forcedTile);
+    setCurrentTurn(0);
+    setRoundNumber(1);
+    setConsecutivePasses(0);
+    setLastTilePlacedPlayerIndex(0);
+    setLastScoredPoints(null);
+    setFloatingScore(null);
     setInGame(true);
   };
 
@@ -1407,6 +1586,14 @@ export const App: React.FC = () => {
     if (turnTimeoutRef.current) {
       clearTimeout(turnTimeoutRef.current);
       turnTimeoutRef.current = null;
+    }
+
+    if (isTutorialMode) {
+      setPlayers(finalPlayers);
+      setTutorialCompleted(true);
+      sounds.playVictory();
+      triggerHaptic('success');
+      return;
     }
 
     // Azerbaijani rule: In 101 and 365, whoever blocked the road (placed last tile) starts the next hand!
@@ -1699,6 +1886,8 @@ export const App: React.FC = () => {
       setMpRoom(null);
       setMpIsHost(false);
     }
+    setIsTutorialMode(false);
+    setTutorialCompleted(false);
     setShowGameEnd(false);
     setHandRevealed(false);
     setInGame(false);
@@ -2120,15 +2309,17 @@ export const App: React.FC = () => {
         return;
       }
 
-      // Check best move
+      // Check best move (or deterministic scripted move in Tutorial mode)
       const aiScore =
         mode === '4p_duo'
           ? players.find((p) => p.team === activePlayer.team)?.score || 0
           : activePlayer.score;
-      const bestMove = selectBestAIMove(activePlayer.hand, board, aiScore, gameVariant);
+      const bestMove = isTutorialMode
+        ? getTutorialBotMove(board, activePlayer.hand)
+        : selectBestAIMove(activePlayer.hand, board, aiScore, gameVariant);
 
       // If Double Combos are enabled, check if AI can score with a combo!
-      if (allowDoubleCombo) {
+      if (!isTutorialMode && allowDoubleCombo) {
         const aiCombos = findDoubleCombos(activePlayer.hand, board);
         if (
           aiCombos.length > 0 &&
@@ -3502,6 +3693,77 @@ export const App: React.FC = () => {
                       </div>
                     )}
 
+                    {/* Scripted Tutorial Guide Banner (Non-blocking, with Exit anytime) */}
+                    {isTutorialMode && !tutorialCompleted && (() => {
+                      const tutCopy = getTutorialCopy(lang);
+                      const stepKind = getTutorialStep(board.tiles.length, currentTurn, humanHand);
+                      const stepInfo = stepKind === 'wait_bot' ? null : tutCopy.steps[stepKind];
+                      return (
+                        <div className="w-full max-w-xl mx-auto px-2.5 pt-1.5 z-30 flex-shrink-0">
+                          <div className="bg-slate-950/90 backdrop-blur-md border border-emerald-400/50 rounded-2xl px-3.5 py-2.5 shadow-lg flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-2.5 min-w-0">
+                              <div className="p-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 flex-shrink-0 mt-0.5">
+                                <GraduationCap className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                                    {tutCopy.badgeLabel}
+                                  </span>
+                                  <span className="text-xs sm:text-sm font-black text-amber-300">
+                                    {stepInfo ? stepInfo.title : tutCopy.botThinking}
+                                  </span>
+                                </div>
+                                {stepInfo && (
+                                  <p className="text-[11px] sm:text-xs text-slate-200 mt-1 leading-snug">
+                                    {stepInfo.body}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              onClick={handleForfeitAction}
+                              className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-bold flex-shrink-0 transition border border-slate-700"
+                            >
+                              {tutCopy.exitButton}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Tutorial Complete Overlay */}
+                    {isTutorialMode && tutorialCompleted && (() => {
+                      const tutCopy = getTutorialCopy(lang);
+                      return (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+                          <div className="bg-slate-900 border border-emerald-500/50 rounded-3xl max-w-md w-full p-6 shadow-2xl text-center space-y-4">
+                            <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center">
+                              <Trophy className="w-7 h-7 text-emerald-300" />
+                            </div>
+                            <h3 className="text-xl font-black text-white">{tutCopy.completeTitle}</h3>
+                            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                              {tutCopy.completeBody}
+                            </p>
+                            <div className="flex flex-col gap-2 pt-2">
+                              <button
+                                onClick={() => startMatch('2p_solo')}
+                                className="w-full py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-lg transition"
+                              >
+                                {tutCopy.completePlayReal}
+                              </button>
+                              <button
+                                onClick={handleForfeitAction}
+                                className="w-full py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition"
+                              >
+                                {tutCopy.completeMenu}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {/* Center Domino Table Canvas: 1:1 framed square in portrait mode, full-bleed in landscape */}
                     {isPortraitMatch ? (
                       <div className={`flex-1 min-h-0 w-full flex items-center justify-center relative ${effectivePlayers.length >= 3 ? 'px-1' : 'px-3.5'}`}>
@@ -3671,7 +3933,73 @@ export const App: React.FC = () => {
         isOpen={showRules}
         onClose={() => setShowRules(false)}
         lang={lang}
+        onStartTutorial={startTutorialMatch}
       />
+
+      {/* Optional First-Launch Tutorial Prompt Modal (~45 seconds) */}
+      {!inGame && showTutorialPrompt && !showGoogleAuthModal && !showRules && (() => {
+        const tutCopy = getTutorialCopy(lang);
+        const dismissTutorialPrompt = () => {
+          try {
+            localStorage.setItem(TUTORIAL_SEEN_KEY, '1');
+          } catch {
+            // ignore storage errors
+          }
+          setShowTutorialPrompt(false);
+        };
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+            <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2.5 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-300">
+                    <GraduationCap className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300">
+                      {tutCopy.promptBadge}
+                    </span>
+                    <h3 className="text-base sm:text-lg font-black text-white leading-tight">
+                      {tutCopy.promptTitle}
+                    </h3>
+                  </div>
+                </div>
+                <button
+                  onClick={dismissTutorialPrompt}
+                  className="text-slate-400 hover:text-white p-1 hover:bg-slate-800 rounded-lg transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                {tutCopy.promptBody}
+              </p>
+
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs font-bold">
+                <Clock className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <span>{tutCopy.promptDuration}</span>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-1">
+                <button
+                  onClick={startTutorialMatch}
+                  className="w-full py-3 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-lg transition flex items-center justify-center gap-2"
+                >
+                  <Play className="w-4 h-4 fill-slate-950" />
+                  <span>{tutCopy.promptStart}</span>
+                </button>
+                <button
+                  onClick={dismissTutorialPrompt}
+                  className="w-full py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition"
+                >
+                  {tutCopy.promptSkip}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <GameEndModal
         isOpen={showGameEnd}
@@ -3794,12 +4122,16 @@ export const App: React.FC = () => {
       {/* Floating Animated Score Badges */}
       <FloatingScoreOverlay scoreItem={floatingScore} />
 
-      {/* Teahouses & Stakes Modal [Coming Soon] */}
+      {/* Teahouses & Ranked 1v1 Modal */}
       <TeahousesModal
         isOpen={showTeahousesModal}
         onClose={() => setShowTeahousesModal(false)}
         lang={lang}
         userCoins={stats.coins}
+        userMmr={stats.mmr ?? DEFAULT_RANKED_MMR}
+        rankedPlayed={stats.rankedPlayed ?? 0}
+        rankedWon={stats.rankedWon ?? 0}
+        onJoinTeahouse={handleJoinTeahouse}
       />
 
       {/* Incoming Game Room Invite Banner */}
