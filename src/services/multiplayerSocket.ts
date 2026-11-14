@@ -443,6 +443,7 @@ class MultiplayerSocketService {
     from: SocialProfilePayload;
     targetPlayerId: string;
     targetPlayerTag?: string;
+    targetName?: string;
     roomCode: string;
   }): Promise<{ success: boolean; error?: string }> {
     return this.emitWithTimeout('invite_friend_to_room', data);

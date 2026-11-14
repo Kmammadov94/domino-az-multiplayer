@@ -92,6 +92,7 @@ export interface MultiplayerClientGameState {
   isMatchOver: boolean;
   matchWinnerIndex: number;
   isInstant35: boolean;
+  hadHumanOpponentLeave?: boolean;
   match101State?: Match101State;
   teahouseTierId?: string;
   teahouseBuyIn?: number;

@@ -1,3 +1,5 @@
+import { syncFriendAchievements } from '../services/playGamesAchievements';
+
 export interface FriendItem {
   id: string; // unique record identifier in friends list
   playerId: string; // permanent unique player ID (e.g. "DOM-839214")
@@ -123,6 +125,9 @@ export const loadFriends = (): FriendItem[] => {
     if (changed) {
       localStorage.setItem(FRIENDS_KEY, JSON.stringify(filtered));
     }
+    if (filtered.length > 0) {
+      syncFriendAchievements(filtered.length);
+    }
     return filtered;
   } catch {
     return [];
@@ -133,6 +138,7 @@ export const saveFriends = (friends: FriendItem[]): void => {
   try {
     const cleaned = friends.filter((f) => f && f.name && !isBotName(f.name));
     localStorage.setItem(FRIENDS_KEY, JSON.stringify(cleaned));
+    syncFriendAchievements(cleaned.length);
   } catch (e) {
     console.error('Failed to save friends:', e);
   }

@@ -28,6 +28,55 @@ export interface PlayerIdentity {
 const PLAYER_ID_KEY = 'domino_player_unique_id';
 const PLAYER_TAG_KEY = 'domino_player_tag';
 const PLAYER_NAME_KEY = 'domino_player_name';
+const CUSTOM_NICKNAME_KEY = 'domino_custom_nickname';
+
+export const getCustomNickname = (): string => {
+  try {
+    return (localStorage.getItem(CUSTOM_NICKNAME_KEY) || '').trim();
+  } catch {
+    return '';
+  }
+};
+
+export const saveCustomNickname = (nickname: string): string => {
+  const cleaned = nickname.trim().slice(0, 24);
+  try {
+    if (cleaned) {
+      localStorage.setItem(CUSTOM_NICKNAME_KEY, cleaned);
+      localStorage.setItem(PLAYER_NAME_KEY, cleaned);
+    } else {
+      localStorage.removeItem(CUSTOM_NICKNAME_KEY);
+    }
+  } catch {}
+  return cleaned;
+};
+
+const GUEST_NAME_PREFIXES = [
+  'Usta',
+  'Xəzər',
+  'Qartal',
+  'Aslan',
+  'Turan',
+  'Şah',
+  'Pəhləvan',
+  'Zər',
+  'Bakılı',
+  'Dəniz',
+  'Gəncə',
+  'Şəki',
+  'Quba',
+  'Alov',
+  'Qızıl',
+  'Ulduz'
+];
+
+const LEGACY_GENERIC_NAMES = new Set(['Siz', 'You', 'Вы', 'Oyunçu', 'Player', 'Игрок']);
+
+const generateRandomGuestName = (): string => {
+  const prefix = GUEST_NAME_PREFIXES[Math.floor(Math.random() * GUEST_NAME_PREFIXES.length)];
+  const suffix = Math.floor(100 + Math.random() * 900);
+  return `${prefix}${suffix}`;
+};
 
 /**
  * Deterministically generates a 4-digit tag from a string (e.g. Google ID)
@@ -97,10 +146,16 @@ export const getMyPlayerIdentity = (
     name = localStorage.getItem(PLAYER_NAME_KEY) || '';
   } catch {}
 
-  if (googleUser?.name) {
+  const customNickname = getCustomNickname();
+  if (customNickname) {
+    name = customNickname;
+  } else if (googleUser?.name) {
     name = googleUser.name;
-  } else if (!name || name === 'Siz') {
-    name = `Oyunçu`;
+  } else if (!name || LEGACY_GENERIC_NAMES.has(name.trim())) {
+    name = generateRandomGuestName();
+    try {
+      localStorage.setItem(PLAYER_NAME_KEY, name);
+    } catch {}
   }
 
   const handle = `${name}#${tag}`;

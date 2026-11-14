@@ -165,6 +165,7 @@ const addMutualFriendship = (p1: SocialProfile, p2: SocialProfile) => {
 const findPlayerProfileByQuery = (qRaw: string): (SocialProfile & { isOnline: boolean }) | null => {
   const q = (qRaw || '').trim();
   if (!q) return null;
+  const isTagOrIdQuery = /^#?\d{4}$/.test(q) || /^DOM-/i.test(q);
 
   // 1. Live online profiles (Home screen + Lobby + In-Game)
   for (const prof of onlineProfiles.values()) {
@@ -173,7 +174,8 @@ const findPlayerProfileByQuery = (qRaw: string): (SocialProfile & { isOnline: bo
       (q === prof.playerTag || q === `#${prof.playerTag}` || q.toUpperCase() === `DOM-${prof.playerTag}`);
     const matchId = prof.playerId && q.toLowerCase() === prof.playerId.toLowerCase();
     const matchHandle = prof.handle && prof.handle.toLowerCase() === q.toLowerCase();
-    if (matchTag || matchId || matchHandle) {
+    const matchName = !isTagOrIdQuery && prof.name && prof.name.toLowerCase() === q.toLowerCase();
+    if (matchTag || matchId || matchHandle || matchName) {
       return { ...prof, isOnline: isPlayerOnline(prof.playerId) };
     }
   }
@@ -187,7 +189,8 @@ const findPlayerProfileByQuery = (qRaw: string): (SocialProfile & { isOnline: bo
         (q === p.playerTag || q === `#${p.playerTag}` || q.toUpperCase() === `DOM-${p.playerTag}`);
       const matchId = p.playerId && q.toLowerCase() === p.playerId.toLowerCase();
       const matchHandle = p.name && p.playerTag && `${p.name}#${p.playerTag}`.toLowerCase() === q.toLowerCase();
-      if (matchTag || matchId || matchHandle) {
+      const matchName = !isTagOrIdQuery && p.name && p.name.toLowerCase() === q.toLowerCase();
+      if (matchTag || matchId || matchHandle || matchName) {
         const pid = p.playerId || `DOM-${p.playerTag || '0000'}`;
         return {
           name: p.name,
@@ -220,7 +223,8 @@ const findPlayerProfileByQuery = (qRaw: string): (SocialProfile & { isOnline: bo
     const matchTag = q === tag || q === `#${tag}` || q.toUpperCase() === `DOM-${tag}`;
     const matchId = q.toLowerCase() === pid.toLowerCase();
     const matchHandle = q.toLowerCase() === handle.toLowerCase();
-    if (matchTag || matchId || matchHandle) {
+    const matchName = !isTagOrIdQuery && name.toLowerCase() === q.toLowerCase();
+    if (matchTag || matchId || matchHandle || matchName) {
       return {
         name,
         playerId: pid,
@@ -293,6 +297,21 @@ const getRoomSummary = (room: GameRoom): MultiplayerRoomSummary => ({
   isRanked: room.isRanked
 });
 
+const findUserRecordByPlayerId = (playerId?: string): { googleId: string; record: any } | null => {
+  if (!playerId) return null;
+  if (userDatabase[playerId]) {
+    return { googleId: playerId, record: userDatabase[playerId] };
+  }
+  const normalized = playerId.trim().toUpperCase();
+  for (const [gId, rec] of Object.entries(userDatabase)) {
+    const derivedId = `DOM-${gId.slice(-6).toUpperCase()}`;
+    if (derivedId === normalized) {
+      return { googleId: gId, record: rec };
+    }
+  }
+  return null;
+};
+
 // Server-authoritative settlement for Ranked Çayxana matches (MMR + coins + Guest leaderboard)
 const settleRankedMatchIfNeeded = (room: GameRoom) => {
   if (!room.isRanked || !room.isMatchOver || settledRankedRooms.has(room.code)) return;
@@ -305,22 +324,24 @@ const settleRankedMatchIfNeeded = (room: GameRoom) => {
   const buyIn = room.teahouseBuyIn || 0;
   const prizePot = room.teahousePrizePot || 0;
 
-  const p0Record = p0.playerId && userDatabase[p0.playerId] ? userDatabase[p0.playerId] : null;
-  const p1Record = p1.playerId && userDatabase[p1.playerId] ? userDatabase[p1.playerId] : null;
+  const p0Resolved = findUserRecordByPlayerId(p0.playerId);
+  const p1Resolved = findUserRecordByPlayerId(p1.playerId);
+  const p0Record = p0Resolved?.record || null;
+  const p1Record = p1Resolved?.record || null;
 
   const p0Mmr = p0Record?.stats?.mmr ?? (p0.playerId ? guestRankedDb.get(p0.playerId)?.mmr : undefined) ?? p0.mmr ?? DEFAULT_RANKED_MMR;
   const p1Mmr = p1Record?.stats?.mmr ?? (p1.playerId ? guestRankedDb.get(p1.playerId)?.mmr : undefined) ?? p1.mmr ?? DEFAULT_RANKED_MMR;
 
-  const pairs: Array<{ slot: typeof p0; oppMmr: number; won: boolean; record: any }> = [
-    { slot: p0, oppMmr: p1Mmr, won: winnerIdx === p0.id, record: p0Record },
-    { slot: p1, oppMmr: p0Mmr, won: winnerIdx === p1.id, record: p1Record }
+  const pairs: Array<{ slot: typeof p0; oppMmr: number; won: boolean; record: any; googleId?: string }> = [
+    { slot: p0, oppMmr: p1Mmr, won: winnerIdx === p0.id, record: p0Record, googleId: p0Resolved?.googleId },
+    { slot: p1, oppMmr: p0Mmr, won: winnerIdx === p1.id, record: p1Record, googleId: p1Resolved?.googleId }
   ];
 
-  for (const { slot, oppMmr, won, record } of pairs) {
+  for (const { slot, oppMmr, won, record, googleId } of pairs) {
     const pid = slot.playerId;
     if (!pid) continue;
 
-    if (record) {
+    if (record && googleId) {
       const s = record.stats || {};
       const curMmr = typeof s.mmr === 'number' ? s.mmr : p0 === slot ? p0Mmr : p1Mmr;
       const curPlayed = typeof s.rankedPlayed === 'number' ? s.rankedPlayed : 0;
@@ -339,7 +360,8 @@ const settleRankedMatchIfNeeded = (room: GameRoom) => {
         rankedWon: curWon + (won ? 1 : 0)
       };
       record.updatedAt = Date.now();
-      persistUserRecord(pid, record, userDatabase);
+      guestRankedDb.delete(pid);
+      persistUserRecord(googleId, record, userDatabase);
     } else {
       const prev = guestRankedDb.get(pid);
       const curMmr = prev?.mmr ?? slot.mmr ?? DEFAULT_RANKED_MMR;
@@ -671,6 +693,10 @@ io.on('connection', (socket: Socket) => {
         }
         leaveCurrentRoomIfAny(socket);
 
+        const displayName =
+          nameValidation.sanitizedName === 'Oyunçu' && data.playerTag
+            ? `Oyunçu#${data.playerTag}`
+            : nameValidation.sanitizedName;
         const variant: GameVariant = data.variant === '101' ? '101' : '365';
         const sessionToken = data.sessionToken || `sess_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
@@ -681,7 +707,8 @@ io.on('connection', (socket: Socket) => {
             room.teahouseTierId === tier.id &&
             (room.variant || '365') === variant &&
             room.status === 'waiting' &&
-            room.players.length < room.maxPlayers
+            room.players.length < room.maxPlayers &&
+            room.players.every((p) => p.socketId !== socket.id && (!data.playerId || p.playerId !== data.playerId))
           ) {
             targetRoom = room;
             break;
@@ -694,7 +721,7 @@ io.on('connection', (socket: Socket) => {
 
           targetRoom.addPlayer(
             socket.id,
-            nameValidation.sanitizedName,
+            displayName,
             data.skinId,
             data.avatarId,
             sessionToken,
@@ -731,7 +758,7 @@ io.on('connection', (socket: Socket) => {
             roomCode,
             '2p_solo',
             socket.id,
-            nameValidation.sanitizedName,
+            displayName,
             data.skinId || 'ivory_classic',
             () => broadcastRoom(room),
             data.avatarId || 'avatar_baku_classic',
@@ -821,6 +848,37 @@ io.on('connection', (socket: Socket) => {
       };
       onlineProfiles.set(profile.playerId, normalized);
 
+      // Migrate any friend requests or friends sent to the player's 4-digit DOM-XXXX tag alias
+      const tagAliasId = normalized.playerTag ? `DOM-${normalized.playerTag}` : '';
+      if (tagAliasId && tagAliasId !== profile.playerId) {
+        let migrated = false;
+        const aliasReqs = socialDb.requestsByTargetId[tagAliasId];
+        if (Array.isArray(aliasReqs) && aliasReqs.length > 0) {
+          if (!socialDb.requestsByTargetId[profile.playerId]) {
+            socialDb.requestsByTargetId[profile.playerId] = [];
+          }
+          const targetList = socialDb.requestsByTargetId[profile.playerId];
+          for (const req of aliasReqs) {
+            if (!targetList.some((r) => r.from.playerId === req.from.playerId)) {
+              targetList.push(req);
+            }
+          }
+          delete socialDb.requestsByTargetId[tagAliasId];
+          migrated = true;
+        }
+        const aliasFriends = socialDb.friendsByPlayerId[tagAliasId];
+        if (Array.isArray(aliasFriends) && aliasFriends.length > 0) {
+          for (const f of aliasFriends) {
+            upsertFriendRecord(profile.playerId, f);
+          }
+          delete socialDb.friendsByPlayerId[tagAliasId];
+          migrated = true;
+        }
+        if (migrated) {
+          saveSocialDatabase(socialDb);
+        }
+      }
+
       emitSocialSync(profile.playerId);
 
       // Update online status on friends' lists
@@ -857,7 +915,8 @@ io.on('connection', (socket: Socket) => {
         // Resolve canonical target profile
         const resolved =
           (data.toPlayerId ? findPlayerProfileByQuery(data.toPlayerId) : null) ||
-          (data.toPlayerTag ? findPlayerProfileByQuery(data.toPlayerTag) : null);
+          (data.toPlayerTag ? findPlayerProfileByQuery(data.toPlayerTag) : null) ||
+          (data.toName ? findPlayerProfileByQuery(data.toName) : null);
 
         const targetId = resolved?.playerId || data.toPlayerId || (data.toPlayerTag ? `DOM-${data.toPlayerTag}` : '');
         if (!targetId) {
@@ -896,16 +955,23 @@ io.on('connection', (socket: Socket) => {
         }
         const targetReqs = socialDb.requestsByTargetId[targetId];
         const existingIdx = targetReqs.findIndex((r) => r.from.playerId === from.playerId);
+        if (existingIdx >= 0) {
+          const targetName = resolved?.name || data.toName || 'Oyunçu';
+          safeAck(callback, {
+            success: true,
+            alreadyPending: true,
+            targetOnline: isPlayerOnline(targetId),
+            message: `${targetName} adlı oyunçuya sorğu artıq göndərilib.`
+          });
+          return;
+        }
+
         const reqRecord: FriendRequestRecord = {
           id: `req_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
           from,
           createdAt: Date.now()
         };
-        if (existingIdx >= 0) {
-          targetReqs[existingIdx] = reqRecord;
-        } else {
-          targetReqs.push(reqRecord);
-        }
+        targetReqs.push(reqRecord);
 
         saveSocialDatabase(socialDb);
         emitSocialSync(from.playerId);
@@ -984,7 +1050,7 @@ io.on('connection', (socket: Socket) => {
   socket.on(
     'invite_friend_to_room',
     (
-      data: { from: SocialProfile; targetPlayerId: string; targetPlayerTag?: string; roomCode: string },
+      data: { from: SocialProfile; targetPlayerId: string; targetPlayerTag?: string; targetName?: string; roomCode: string },
       callback
     ) => {
       try {
@@ -1001,6 +1067,12 @@ io.on('connection', (socket: Socket) => {
         let targetId = data.targetPlayerId;
         if (!isPlayerOnline(targetId) && data.targetPlayerTag) {
           const resolved = findPlayerProfileByQuery(data.targetPlayerTag);
+          if (resolved && isPlayerOnline(resolved.playerId)) {
+            targetId = resolved.playerId;
+          }
+        }
+        if (!isPlayerOnline(targetId) && data.targetName) {
+          const resolved = findPlayerProfileByQuery(data.targetName);
           if (resolved && isPlayerOnline(resolved.playerId)) {
             targetId = resolved.playerId;
           }
@@ -1317,8 +1389,8 @@ io.on('connection', (socket: Socket) => {
     room.markPlayerDisconnected(socket.id);
     broadcastRoom(room);
 
-    // For Ranked Çayxana matches, forfeit to opponent if disconnected player doesn't return in 45s
-    if (room.isRanked && room.status === 'in_game') {
+    // For active matches, forfeit 1v1 (or convert 3p/4p slot to bot) if disconnected player doesn't return in 45s
+    if (room.status === 'in_game') {
       const prevTimer = rankedForfeitTimers.get(socket.id);
       if (prevTimer) clearTimeout(prevTimer);
       const disconnectedSlotSocketId = socket.id;
@@ -1344,6 +1416,9 @@ io.on('connection', (socket: Socket) => {
         if (activeRoom) {
           const stillHasReal = activeRoom.players.some((p) => !p.isAI && p.isConnected);
           if (!stillHasReal) {
+            if (activeRoom.isMatchOver) {
+              settleRankedMatchIfNeeded(activeRoom);
+            }
             activeRoom.destroy();
             rooms.delete(code);
           }

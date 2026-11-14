@@ -7,7 +7,8 @@ import {
   getRankTierForMmr
 } from '../data/teahouses';
 import { multiplayerSocket } from '../services/multiplayerSocket';
-import { getBackendServerUrl } from '../utils/storage';
+import { getBackendServerUrl, loadGoogleUser } from '../utils/storage';
+import { unlockPlayAchievement } from '../services/playGamesAchievements';
 import { AvatarView } from './AvatarView';
 import { X, Coins, Users, Trophy, Sparkles, Clock, RefreshCw } from 'lucide-react';
 
@@ -28,6 +29,7 @@ interface TeahousesModalProps {
   userMmr?: number;
   rankedPlayed?: number;
   rankedWon?: number;
+  currentUserId?: string;
   onJoinTeahouse: (tierId: string, variant: GameVariant) => Promise<void>;
 }
 
@@ -39,6 +41,7 @@ export const TeahousesModal: React.FC<TeahousesModalProps> = ({
   userMmr = DEFAULT_RANKED_MMR,
   rankedPlayed = 0,
   rankedWon = 0,
+  currentUserId,
   onJoinTeahouse
 }) => {
   const [activeTab, setActiveTab] = useState<'tables' | 'leaderboard'>('tables');
@@ -70,6 +73,23 @@ export const TeahousesModal: React.FC<TeahousesModalProps> = ({
       const data = await res.json();
       if (data?.success && Array.isArray(data.leaderboard)) {
         setLeaderboard(data.leaderboard);
+        const myGoogleId = currentUserId || loadGoogleUser()?.googleId;
+        let myPlayerId = '';
+        try {
+          myPlayerId = localStorage.getItem('domino_player_unique_id') || '';
+        } catch {
+          // ignore storage errors
+        }
+        const top5Index = (data.leaderboard as LeaderboardEntry[])
+          .slice(0, 5)
+          .findIndex(
+            (entry) =>
+              Boolean(myGoogleId && entry.googleId === myGoogleId) ||
+              Boolean(myPlayerId && entry.googleId === myPlayerId)
+          );
+        if (top5Index >= 0) {
+          unlockPlayAchievement('high_roller_top5');
+        }
       }
     } catch {
       // Ignore transient errors
@@ -124,13 +144,13 @@ export const TeahousesModal: React.FC<TeahousesModalProps> = ({
                 </h2>
                 <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border flex items-center gap-1 ${rankTier.badgeBgClass}`}>
                   <span>{rankTier.icon}</span>
-                  <span>{rankTier.name[lang]} • {userMmr} MMR</span>
+                  <span>{rankTier.name[lang]} • {userMmr}</span>
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
-                {lang === 'az' && `Yalnız Çayxana oyunları MMR reytinqinə təsir edir • ${rankedWon} Qələbə / ${rankedPlayed} Oyun`}
-                {lang === 'ru' && `Только матчи Чайханы влияют на MMR • ${rankedWon} Побед / ${rankedPlayed} Игр`}
-                {lang === 'en' && `Only Teahouse matches affect MMR • ${rankedWon}W / ${rankedPlayed}P`}
+                {lang === 'az' && `Yalnız Çayxana oyunları reytinqə təsir edir • ${rankedWon} Qələbə / ${rankedPlayed} Oyun`}
+                {lang === 'ru' && `Только матчи Чайханы влияют на рейтинг • ${rankedWon} Побед / ${rankedPlayed} Игр`}
+                {lang === 'en' && `Only Teahouse matches affect rating • ${rankedWon}W / ${rankedPlayed}P`}
               </p>
             </div>
           </div>
@@ -303,10 +323,10 @@ export const TeahousesModal: React.FC<TeahousesModalProps> = ({
             <div className="flex items-center justify-between px-1 pb-1">
               <span className="text-xs font-bold text-slate-400">
                 {lang === 'az'
-                  ? 'Top Çayxana Oyunçuları (MMR üzrə)'
+                  ? 'Top Çayxana Oyunçuları'
                   : lang === 'ru'
-                  ? 'Топ игроков Чайханы (по MMR)'
-                  : 'Top Teahouse Players (by MMR)'}
+                  ? 'Топ игроков Чайханы'
+                  : 'Top Teahouse Players'}
               </span>
               <button
                 onClick={() => void fetchLeaderboard()}
@@ -343,12 +363,17 @@ export const TeahousesModal: React.FC<TeahousesModalProps> = ({
                       <div className="min-w-0">
                         <div className="text-sm font-black text-white truncate">{entry.name}</div>
                         <div className="text-[11px] text-slate-400">
-                          {entryTier.icon} {entryTier.name[lang]} • {entry.rankedWon}W / {entry.rankedPlayed}P
+                          {entryTier.icon} {entryTier.name[lang]} •{' '}
+                        {lang === 'az'
+                          ? `${entry.rankedWon} Qələbə / ${entry.rankedPlayed} Oyun`
+                          : lang === 'ru'
+                            ? `${entry.rankedWon} Побед / ${entry.rankedPlayed} Игр`
+                            : `${entry.rankedWon}W / ${entry.rankedPlayed}P`}
                         </div>
                       </div>
                     </div>
                     <div className="px-3 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 font-black text-xs flex-shrink-0">
-                      {entry.mmr} MMR
+                      {entry.mmr}
                     </div>
                   </div>
                 );

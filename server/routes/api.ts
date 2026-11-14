@@ -112,6 +112,7 @@ export function createApiRouter({ getUserDatabase, getActiveRoomCount, getGuestR
       : {};
     const existingStats = existing.stats || {};
     const pendingGrant = existing.pendingCoinGrant || 0;
+    const pendingGrantMessage = existing.pendingGrantMessage || null;
 
     let finalCoins: number;
     if (typeof stats?.coins === 'number') {
@@ -123,7 +124,7 @@ export function createApiRouter({ getUserDatabase, getActiveRoomCount, getGuestR
         finalCoins = stats.coins + pendingGrant;
       }
     } else {
-      finalCoins = (existingStats.coins ?? 20) + pendingGrant;
+      finalCoins = (existingStats.coins ?? 50) + pendingGrant;
     }
 
     const resolvedEquippedSkin =
@@ -147,9 +148,9 @@ export function createApiRouter({ getUserDatabase, getActiveRoomCount, getGuestR
         : existingStats.equippedTitle || stats?.equippedTitle || 'title_tea_elder';
 
     const resolvedEquippedTable =
-      stats?.equippedTableTheme && stats.equippedTableTheme !== 'table_emerald_classic'
+      stats?.equippedTableTheme && stats.equippedTableTheme !== 'classic_green'
         ? stats.equippedTableTheme
-        : existingStats.equippedTableTheme || stats?.equippedTableTheme || 'table_emerald_classic';
+        : existingStats.equippedTableTheme || stats?.equippedTableTheme || 'classic_green';
 
     const mergedUnlockedSkins = Array.from(
       new Set(['ivory_classic', ...(existingStats.unlockedSkins || []), ...(stats?.unlockedSkins || [])])
@@ -163,6 +164,9 @@ export function createApiRouter({ getUserDatabase, getActiveRoomCount, getGuestR
     const mergedUnlockedTitles = Array.from(
       new Set(['title_tea_elder', ...(existingStats.unlockedTitles || []), ...(stats?.unlockedTitles || [])])
     );
+    const mergedUnlockedTableThemes = Array.from(
+      new Set(['classic_green', ...(existingStats.unlockedTableThemes || []), ...(stats?.unlockedTableThemes || [])])
+    );
 
     const mergedStats = {
       coins: finalCoins,
@@ -175,6 +179,7 @@ export function createApiRouter({ getUserDatabase, getActiveRoomCount, getGuestR
       equippedTitle: resolvedEquippedTitle,
       unlockedTitles: mergedUnlockedTitles,
       equippedTableTheme: resolvedEquippedTable,
+      unlockedTableThemes: mergedUnlockedTableThemes,
       dailyStreak: Math.max(existingStats.dailyStreak || 0, stats?.dailyStreak || 0),
       matchesPlayed: Math.max(existingStats.matchesPlayed || 0, stats?.matchesPlayed || 0),
       matchesWon: Math.max(existingStats.matchesWon || 0, stats?.matchesWon || 0),
@@ -198,9 +203,10 @@ export function createApiRouter({ getUserDatabase, getActiveRoomCount, getGuestR
       },
       stats: mergedStats,
       pendingCoinGrant: 0,
+      pendingGrantMessage: null,
       claimedGrants:
         pendingGrant > 0
-          ? [...(existing.claimedGrants || []), { amount: pendingGrant, claimedAt: Date.now() }]
+          ? [...(existing.claimedGrants || []), { amount: pendingGrant, message: pendingGrantMessage, claimedAt: Date.now() }]
           : existing.claimedGrants || [],
       updatedAt: Date.now()
     };
@@ -210,7 +216,9 @@ export function createApiRouter({ getUserDatabase, getActiveRoomCount, getGuestR
     res.json({
       success: true,
       profile: userDatabase[googleId].profile,
-      stats: mergedStats
+      stats: mergedStats,
+      grantedCoins: pendingGrant,
+      grantMessage: pendingGrantMessage
     });
   });
 
@@ -235,7 +243,10 @@ export function createApiRouter({ getUserDatabase, getActiveRoomCount, getGuestR
     res.json({
       success: true,
       profile: user.profile,
-      stats: user.stats
+      stats: {
+        ...(user.stats || {}),
+        coins: (user.stats?.coins ?? 0) + (user.pendingCoinGrant || 0)
+      }
     });
   });
 
@@ -302,8 +313,10 @@ export function createApiRouter({ getUserDatabase, getActiveRoomCount, getGuestR
     const user = userDatabase[targetId];
     if (!user.stats) user.stats = {};
     const prevCoins = user.stats.coins ?? 0;
-    user.stats.coins = Math.max(0, prevCoins + delta);
     user.pendingCoinGrant = (user.pendingCoinGrant || 0) + delta;
+    if (req.body?.message) {
+      user.pendingGrantMessage = String(req.body.message);
+    }
     user.updatedAt = Date.now();
     persistUserRecord(targetId, userDatabase[targetId], userDatabase);
 
@@ -315,8 +328,9 @@ export function createApiRouter({ getUserDatabase, getActiveRoomCount, getGuestR
         email: user.profile?.email,
         previousCoins: prevCoins,
         added: delta,
-        currentServerCoins: user.stats.coins,
-        pendingCoinGrant: user.pendingCoinGrant
+        currentServerCoins: prevCoins + user.pendingCoinGrant,
+        pendingCoinGrant: user.pendingCoinGrant,
+        pendingGrantMessage: user.pendingGrantMessage || null
       }
     });
   });
@@ -369,6 +383,7 @@ export function createApiRouter({ getUserDatabase, getActiveRoomCount, getGuestR
   router.get('/api/ranked/leaderboard', (_req, res) => {
     const db = getUserDatabase();
     const byId = new Map<string, RankedLeaderboardEntry>();
+    const knownDomIds = new Set<string>();
 
     for (const [googleId, rec] of Object.entries(db)) {
       const stats = rec?.stats || {};
@@ -376,6 +391,7 @@ export function createApiRouter({ getUserDatabase, getActiveRoomCount, getGuestR
       const rankedPlayed = typeof stats.rankedPlayed === 'number' ? stats.rankedPlayed : 0;
       const rankedWon = typeof stats.rankedWon === 'number' ? stats.rankedWon : 0;
       if (rankedPlayed <= 0) continue;
+      knownDomIds.add(`DOM-${googleId.slice(-6).toUpperCase()}`);
       byId.set(googleId, {
         googleId,
         name: rec?.profile?.name || rec?.name || 'Oyunçu',
@@ -387,7 +403,13 @@ export function createApiRouter({ getUserDatabase, getActiveRoomCount, getGuestR
     }
 
     for (const guest of getGuestRankedEntries ? getGuestRankedEntries() : []) {
-      if (guest.rankedPlayed <= 0 || byId.has(guest.googleId)) continue;
+      if (
+        guest.rankedPlayed <= 0 ||
+        byId.has(guest.googleId) ||
+        knownDomIds.has(guest.googleId.toUpperCase())
+      ) {
+        continue;
+      }
       byId.set(guest.googleId, guest);
     }
 

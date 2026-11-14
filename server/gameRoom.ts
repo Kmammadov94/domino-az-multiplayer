@@ -34,7 +34,7 @@ import {
   canAnyTileBePlayed,
   isHandBlockedAfterPlay
 } from '../src/utils/boardEngine';
-import { DoubleComboMove } from '../src/utils/comboEngine';
+import { DoubleComboMove, findDoubleCombos } from '../src/utils/comboEngine';
 import { selectBestAIMove } from '../src/utils/aiPlayer';
 
 export class GameRoom {
@@ -74,6 +74,7 @@ export class GameRoom {
   public teahouseBuyIn?: number;
   public teahousePrizePot?: number;
   public isRanked: boolean = false;
+  public hadHumanOpponentLeave: boolean = false;
 
   private turnTimerInterval: NodeJS.Timeout | null = null;
   private autoPassTimeout: NodeJS.Timeout | null = null;
@@ -282,11 +283,21 @@ export class GameRoom {
     this.roundNumber = 1;
     this.isMatchOver = false;
     this.isInstant35 = false;
+    this.hadHumanOpponentLeave = false;
     if (this.variant === '101') {
       this.match101State = createInitial101State();
     }
 
+    // Randomize seating order for non-team modes so it isn't always host -> 2nd -> 3rd joiner
+    if (this.mode !== '4p_duo' && this.players.length > 1) {
+      for (let i = this.players.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [this.players[i], this.players[j]] = [this.players[j], this.players[i]];
+      }
+    }
+
     this.players.forEach((p, idx) => {
+      p.id = idx;
       p.score = 0;
       p.handRoundPoints = 0;
       if (this.mode === '4p_duo') {
@@ -372,12 +383,35 @@ export class GameRoom {
     this.checkBotTurn();
   }
 
+  private finishInstant35(winnerPlayerId: number): void {
+    this.isInstant35 = true;
+    this.isMatchOver = true;
+    this.status = 'finished';
+    this.matchWinnerIndex = winnerPlayerId;
+    this.handRevealed = true;
+    this.revealPhase = 1;
+    this.handResults = {
+      isBaglandi: false,
+      isSeka: false,
+      winnerIndex: winnerPlayerId,
+      winnerTeam: this.players[winnerPlayerId]?.team,
+      bonusPoints: 35,
+      rawPips: 35,
+      revealedHands: this.players.map((p) => ({
+        playerIndex: p.id,
+        hand: this.secretHands.get(p.id) || []
+      }))
+    };
+    this.clearTurnTimer();
+    this.notifyState();
+  }
+
   public executeMove(
     socketId: string,
     tileId: string,
     branchId: BranchId
   ): { success: boolean; error?: string } {
-    if (this.status !== 'in_game' || this.handRevealed) {
+    if (this.status !== 'in_game' || this.handRevealed || this.isMatchOver) {
       return { success: false, error: 'Hazırda gediş etmək olmaz!' };
     }
 
@@ -445,16 +479,21 @@ export class GameRoom {
     const nextHand = hand.filter((t) => t.id !== tile.id);
     this.secretHands.set(player.id, nextHand);
     player.handCount = nextHand.length;
-    player.score += scored;
-    player.handRoundPoints += scored;
+    if (this.mode === '4p_duo' && scored > 0 && player.team) {
+      this.players.forEach((p) => {
+        if (p.team === player.team) {
+          p.score += scored;
+          p.handRoundPoints += scored;
+        }
+      });
+    } else {
+      player.score += scored;
+      player.handRoundPoints += scored;
+    }
 
     // Check Instant 35 match win
     if (scored === 35) {
-      this.isInstant35 = true;
-      this.isMatchOver = true;
-      this.matchWinnerIndex = player.id;
-      this.clearTurnTimer();
-      this.notifyState();
+      this.finishInstant35(player.id);
       return { success: true };
     }
 
@@ -498,7 +537,7 @@ export class GameRoom {
     socketId: string,
     combo: DoubleComboMove
   ): { success: boolean; error?: string } {
-    if (this.status !== 'in_game' || this.handRevealed) {
+    if (this.status !== 'in_game' || this.handRevealed || this.isMatchOver) {
       return { success: false, error: 'Hazırda gediş etmək olmaz!' };
     }
 
@@ -546,17 +585,22 @@ export class GameRoom {
     const nextHand = hand.filter((t) => !comboTileIds.has(t.id));
     this.secretHands.set(player.id, nextHand);
     player.handCount = nextHand.length;
-    player.score += scored;
-    player.handRoundPoints += scored;
+    if (this.mode === '4p_duo' && scored > 0 && player.team) {
+      this.players.forEach((p) => {
+        if (p.team === player.team) {
+          p.score += scored;
+          p.handRoundPoints += scored;
+        }
+      });
+    } else {
+      player.score += scored;
+      player.handRoundPoints += scored;
+    }
 
     this.lastTilePlacedPlayerIndex = player.id;
 
     if (scored === 35) {
-      this.isInstant35 = true;
-      this.isMatchOver = true;
-      this.matchWinnerIndex = player.id;
-      this.clearTurnTimer();
-      this.notifyState();
+      this.finishInstant35(player.id);
       return { success: true };
     }
 
@@ -594,7 +638,7 @@ export class GameRoom {
   }
 
   public drawBazaar(socketId: string): { success: boolean; error?: string } {
-    if (this.status !== 'in_game' || this.handRevealed) {
+    if (this.status !== 'in_game' || this.handRevealed || this.isMatchOver) {
       return { success: false, error: 'Hazırda daş götürmək olmaz!' };
     }
 
@@ -628,7 +672,7 @@ export class GameRoom {
   }
 
   public passTurn(socketId: string): { success: boolean; error?: string } {
-    if (this.status !== 'in_game' || this.handRevealed) {
+    if (this.status !== 'in_game' || this.handRevealed || this.isMatchOver) {
       return { success: false, error: 'Hazırda pas vermək olmaz!' };
     }
 
@@ -746,6 +790,7 @@ export class GameRoom {
 
       this.isMatchOver = res.isMatchOver;
       if (res.isMatchOver) {
+        this.status = 'finished';
         this.matchWinnerIndex = res.winnerPlayerIndex;
       }
 
@@ -813,15 +858,26 @@ export class GameRoom {
       if (endedInBaglandi) {
         // Over 365 ended in baglandi: must play extra hand
         this.isMatchOver = false;
-      } else {
-        this.isMatchOver = true;
-        if (this.mode === '4p_duo') {
-          const t1 = this.players.find((p) => p.team === 1)?.score || 0;
-          const t2 = this.players.find((p) => p.team === 2)?.score || 0;
-          this.matchWinnerIndex = t1 > t2 ? 0 : 1;
+      } else if (this.mode === '4p_duo') {
+        const t1 = this.players.find((p) => p.team === 1)?.score || 0;
+        const t2 = this.players.find((p) => p.team === 2)?.score || 0;
+        if (t1 === t2) {
+          this.isMatchOver = false;
         } else {
-          const champ = this.players.find((p) => p.score === highestScore);
-          this.matchWinnerIndex = champ?.id ?? 0;
+          this.isMatchOver = true;
+          this.status = 'finished';
+          const winTeam = t1 > t2 ? 1 : 2;
+          this.matchWinnerIndex =
+            this.players.find((p) => p.team === winTeam)?.id ?? (winTeam === 1 ? 0 : 1);
+        }
+      } else {
+        const champs = this.players.filter((p) => p.score === highestScore);
+        if (champs.length > 1) {
+          this.isMatchOver = false;
+        } else {
+          this.isMatchOver = true;
+          this.status = 'finished';
+          this.matchWinnerIndex = champs[0]?.id ?? 0;
         }
       }
     } else {
@@ -832,7 +888,10 @@ export class GameRoom {
   }
 
   public nextHand(requestSocketId: string): { success: boolean; error?: string } {
-    const isHost = this.hostSocketId === requestSocketId;
+    const isHost =
+      this.hostSocketId === requestSocketId ||
+      Boolean(this.players.find((p) => p.socketId === requestSocketId)?.isHost) ||
+      !this.players.some((p) => p.isHost && p.isConnected && !p.isAI);
     if (!isHost && this.players.length > 1) {
       return { success: false, error: 'Yalnız otaq sahibi növbəti ələ başlaya bilər!' };
     }
@@ -845,6 +904,43 @@ export class GameRoom {
     this.roundNumber++;
     this.startHand(false, this.nextHandStarterIndex);
     return { success: true };
+  }
+
+  private awardForfeitWin(winnerId: number): void {
+    this.clearTurnTimer();
+    this.status = 'finished';
+    this.isMatchOver = true;
+    this.handRevealed = true;
+    this.revealPhase = 2;
+    this.matchWinnerIndex = winnerId;
+    this.notifyState();
+  }
+
+  private reassignHostIfNeeded(): void {
+    const activeHumanHost = this.players.find(
+      (p) => p.isHost && p.isConnected && !p.isAI
+    );
+    if (activeHumanHost) return;
+    const nextHuman = this.players.find((p) => p.isConnected && !p.isAI);
+    if (nextHuman) {
+      this.players.forEach((p) => {
+        p.isHost = p.socketId === nextHuman.socketId;
+      });
+      this.hostSocketId = nextHuman.socketId;
+    }
+  }
+
+  private convertPlayerToBot(playerIndex: number): void {
+    const p = this.players[playerIndex];
+    if (!p) return;
+    p.isConnected = false;
+    p.isAI = true;
+    if (!p.name.endsWith(' (Bot)')) {
+      p.name = `${p.name} (Bot)`;
+    }
+    this.reassignHostIfNeeded();
+    this.notifyState();
+    this.checkBotTurn();
   }
 
   public removePlayer(socketId: string): void {
@@ -863,49 +959,53 @@ export class GameRoom {
         this.hostSocketId = this.players[0].socketId;
       }
       this.notifyState();
+    } else if (this.isMatchOver || this.status === 'finished') {
+      this.players[pIdx].isConnected = false;
+      this.reassignHostIfNeeded();
+      this.notifyState();
     } else {
       const p = this.players[pIdx];
       if (this.isRanked) {
-        // In Ranked Çayxana 1v1, leaving mid-game is an immediate forfeit win for the opponent
+        // In Ranked Çayxana 1v1, leaving mid-game is an immediate forfeit win for the staying player
         const opponent = this.players.find((_, idx) => idx !== pIdx);
         p.isConnected = false;
-        this.clearTurnTimer();
-        this.status = 'finished';
-        this.isMatchOver = true;
-        this.handRevealed = true;
-        this.revealPhase = 2;
-        this.matchWinnerIndex = opponent ? opponent.id : 0;
-        this.notifyState();
+        this.awardForfeitWin(opponent ? opponent.id : 0);
         return;
       }
-      // Casual in-game: mark as bot so game doesn't stall
-      p.isConnected = false;
-      p.isAI = true; // Bot takes over gracefully
-      p.name = `${p.name} (Bot)`;
-      this.notifyState();
-      this.checkBotTurn();
+      // Casual (non-ranked) in-game (1v1, 3p, or 4p): mark human leave & bot takes over so the staying player can finish
+      if (!p.isAI) {
+        this.hadHumanOpponentLeave = true;
+      }
+      this.convertPlayerToBot(pIdx);
+      this.reassignHostIfNeeded();
     }
   }
 
   public forfeitDisconnectedPlayer(socketId: string): boolean {
-    if (!this.isRanked || this.status !== 'in_game' || this.isMatchOver) {
+    if (this.status !== 'in_game' || this.isMatchOver) {
       return false;
     }
     const pIdx = this.players.findIndex((p) => p.socketId === socketId);
-    if (pIdx < 0 || this.players[pIdx].isConnected) {
+    if (pIdx < 0 || this.players[pIdx].isConnected || this.players[pIdx].isAI) {
       return false;
     }
-    const opponent = this.players.find((_, idx) => idx !== pIdx);
-    if (!opponent || !opponent.isConnected) {
+    if (this.isRanked) {
+      const opponent = this.players.find((_, idx) => idx !== pIdx);
+      if (!opponent || !opponent.isConnected) {
+        return false;
+      }
+      this.awardForfeitWin(opponent.id);
+      return true;
+    }
+    // Casual (non-ranked): bot takes over after disconnect grace period if at least 1 connected human stays
+    const anyHuman = this.players.some(
+      (pl, idx) => idx !== pIdx && !pl.isAI && pl.isConnected
+    );
+    if (!anyHuman) {
       return false;
     }
-    this.clearTurnTimer();
-    this.status = 'finished';
-    this.isMatchOver = true;
-    this.handRevealed = true;
-    this.revealPhase = 2;
-    this.matchWinnerIndex = opponent.id;
-    this.notifyState();
+    this.hadHumanOpponentLeave = true;
+    this.convertPlayerToBot(pIdx);
     return true;
   }
 
@@ -956,6 +1056,14 @@ export class GameRoom {
         : activePlayer.score;
 
     let bestMove = selectBestAIMove(hand, this.board, botScore, this.variant);
+
+    if (this.variant === '365') {
+      const combos = findDoubleCombos(hand, this.board);
+      if (combos.length > 0 && combos[0].expectedScore >= (bestMove?.expectedScore || 0)) {
+        this.executeCombo(activePlayer.socketId, combos[0]);
+        return;
+      }
+    }
 
     const minReserve = getMinBoneyardReserve(this.variant, this.mode);
     const isGloballyBlocked = isBoardGloballyBlocked(this.board);
@@ -1073,7 +1181,8 @@ export class GameRoom {
       teahouseTierId: this.teahouseTierId,
       teahouseBuyIn: this.teahouseBuyIn,
       teahousePrizePot: this.teahousePrizePot,
-      isRanked: this.isRanked
+      isRanked: this.isRanked,
+      hadHumanOpponentLeave: this.hadHumanOpponentLeave
     };
   }
 

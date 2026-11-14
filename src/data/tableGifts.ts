@@ -49,7 +49,7 @@ export const TABLE_GIFTS: TableGiftDef[] = [
     name: { az: 'Pomidor Şilləsi', ru: 'Бросок Помидором', en: 'Tomato Splat' },
     icon: '🍅',
     type: 'playful',
-    cost: 15,
+    cost: 20,
     impactType: 'splash_red',
     message: { az: 'sənə pomidor atdı! 🍅💥', ru: 'бросил помидор! 🍅💥', en: 'splattered a tomato! 🍅💥' }
   },
@@ -58,7 +58,7 @@ export const TABLE_GIFTS: TableGiftDef[] = [
     name: { az: 'Yumurta Çırpmaq', ru: 'Бросок Яйцом', en: 'Egg Splat' },
     icon: '🥚',
     type: 'playful',
-    cost: 15,
+    cost: 20,
     impactType: 'splash_egg',
     message: { az: 'sənə yumurta vurdu! 🥚🍳', ru: 'разбил яйцо! 🥚🍳', en: 'cracked an egg! 🥚🍳' }
   },

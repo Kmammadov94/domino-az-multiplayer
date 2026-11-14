@@ -79,7 +79,8 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     try {
       saved = localStorage.getItem('domino_player_name') || '';
     } catch {}
-    return defaultPlayerName || saved || 'Siz';
+    const isLegacyGeneric = ['Siz', 'You', 'Вы', 'Oyunçu', 'Player', 'Игрок'].includes(saved.trim());
+    return defaultPlayerName || (!isLegacyGeneric && saved) || 'Usta';
   });
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -101,7 +102,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
   }, [initialError]);
 
   useEffect(() => {
-    if (defaultPlayerName && (playerName === 'Siz' || !playerName)) {
+    if (defaultPlayerName && (!playerName || ['Siz', 'You', 'Вы', 'Oyunçu', 'Player', 'Игрок'].includes(playerName.trim()))) {
       setPlayerName(defaultPlayerName);
     }
   }, [defaultPlayerName]);

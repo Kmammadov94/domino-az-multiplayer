@@ -224,7 +224,7 @@ export const process101Round = (
           ? `🏆 ${winnerName} qalib gəldi: +${capturedPoints} xal və Seka Bankından +${sekaBonus} xal!`
           : `✅ ${winnerName} əsas hesaba +${capturedPoints} xal yazdırdı!`;
     } else {
-      if (capturedPoints >= 13) {
+      if (capturedPoints + sekaBonus >= 13) {
         winnerAcc.isOpen = true;
         const transferred = winnerAcc.draftScore;
         winnerAcc.mainScore += capturedPoints + transferred + sekaBonus;
@@ -381,7 +381,7 @@ export const process101Round = (
         : `✅ ${winningTeam}-ci komanda əsas hesaba +${roundRawPoints} xal yazdırdı!`;
   } else {
     // Not open yet! 13-Point Threshold (Saya Düşmək) applies!
-    if (roundRawPoints >= 13) {
+    if (roundRawPoints + sekaBankBonus >= 13) {
       // Successful Opening (Saya Düşdü!)
       winTeamState.isOpen = true;
       const transferredDraft = winTeamState.draftScore;

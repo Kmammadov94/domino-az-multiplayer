@@ -40,6 +40,7 @@ interface GameEndModalProps {
   isRanked?: boolean;
   teahousePrizePot?: number;
   userMmr?: number;
+  hadHumanOpponentLeave?: boolean;
 }
 
 export const GameEndModal: React.FC<GameEndModalProps> = ({
@@ -67,7 +68,8 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
   ayazCaught = false,
   isRanked = false,
   teahousePrizePot = 0,
-  userMmr
+  userMmr,
+  hadHumanOpponentLeave = false
 }) => {
   const [isViewingBoard, setIsViewingBoard] = useState<boolean>(false);
   const [claimingAdBonus, setClaimingAdBonus] = useState<boolean>(false);
@@ -90,19 +92,11 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
   // Determine whether local User won:
   let userWon = false;
   if (isMatchOver) {
-    if (isInstant35) {
-      userWon =
-        mode === '4p_duo'
-          ? (players[winnerPlayerIndex]?.team ?? 1) === myTeam
-          : winnerPlayerIndex === myIndex;
-    } else if (mode === '4p_duo') {
-      const myTeamScore = players.find((p) => p.team === myTeam)?.score ?? 0;
-      const otherTeamScore = players.find((p) => p.team !== myTeam)?.score ?? 0;
-      userWon = myTeamScore > otherTeamScore;
+    if (mode === '4p_duo') {
+      const winTeam = players[winnerPlayerIndex]?.team ?? winnerTeam ?? 1;
+      userWon = winTeam === myTeam;
     } else {
-      const myScore = myPlayer?.score ?? 0;
-      const otherScores = players.filter((_, idx) => idx !== myIndex).map((p) => p.score ?? 0);
-      userWon = otherScores.length === 0 || myScore >= Math.max(...otherScores);
+      userWon = winnerPlayerIndex === myIndex;
     }
   } else {
     // Single Hand End
@@ -114,6 +108,17 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
   }
 
   const winnerPlayer = players[winnerPlayerIndex] || players[0];
+  const winnerEffectiveScore =
+    variant === '101'
+      ? mode === '4p_duo' || players.length === 2
+        ? Math.max(match101State?.team1?.mainScore ?? 0, match101State?.team2?.mainScore ?? 0)
+        : (match101State?.playerAccounts?.[winnerPlayerIndex]?.mainScore ?? winnerPlayer?.score ?? 0)
+      : (winnerPlayer?.score ?? 0);
+  const isRankedForfeit =
+    Boolean(isRanked) &&
+    isMatchOver &&
+    !isInstant35 &&
+    winnerEffectiveScore < (variant === '101' ? 101 : 365);
 
   useEffect(() => {
     if (isOpen && isMatchOver && (userWon || isInstant35)) {
@@ -200,7 +205,11 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
             </div>
 
             <h2 className="text-2xl font-black text-white mb-1">
-              {isInstant35
+              {isRankedForfeit
+                ? userWon
+                  ? '🏆 Rəqib Oyundan Çıxdı — Siz Qalib Oldunuz!'
+                  : 'Oyundan Çıxdınız — Təslim Sayıldı'
+                : isInstant35
                 ? userWon
                   ? t.instant35Win
                   : t.instant35Loss
@@ -213,7 +222,9 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
                 : `${winnerPlayer?.name || 'Rəqib'} matçın qalibi oldu!`}
             </h2>
             <p className="text-xs text-amber-400/90 mb-4 font-semibold">
-              {isInstant35
+              {isRankedForfeit
+                ? `Reytinq 1v1 (${variant}) • Təslim nəticəsi`
+                : isInstant35
                 ? t.instant35Desc
                 : variant === '101'
                 ? players.length === 3
@@ -246,9 +257,15 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
                   ? userWon
                     ? `+${teahousePrizePot} Qızıl qazanıldı!${userMmr ? ` • ${userMmr} MMR` : ''}`
                     : `Çayxana Reytinq${userMmr ? ` • ${userMmr} MMR` : ''}`
-                  : `+${getMatchCoinReward(variant, userWon)} Qızıl qazanıldı!`}
+                  : `+${getMatchCoinReward(variant, userWon || Boolean(hadHumanOpponentLeave))} Qızıl qazanıldı!`}
               </span>
             </div>
+
+            {!isRanked && isMatchOver && hadHumanOpponentLeave && !userWon && (
+              <p className="text-[11px] text-emerald-300/90 font-semibold -mt-1.5 mb-3 px-2">
+                Rəqib oyundan çıxdığı üçün oyunu botla sona çatdırdığınıza görə tam qələbə qızılı verildi!
+              </p>
+            )}
 
             {onClaimAdBonus && isNativeMobileApp() && !adBonusClaimed && (
               <div className="mb-4 w-full">

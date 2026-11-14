@@ -5,6 +5,9 @@ import { Language } from '../types/domino';
 import { Coins, X, Sparkles, UserPlus, Check } from 'lucide-react';
 import { triggerHaptic } from '../utils/haptics';
 import { addFriend, isFriend, isBotName } from '../utils/friendsStorage';
+import { multiplayerSocket } from '../services/multiplayerSocket';
+import { getMyPlayerIdentity } from '../utils/playerIdentity';
+import { loadGoogleUser, loadPlayerStats } from '../utils/storage';
 
 interface TableGiftPickerProps {
   targetPlayerName: string;
@@ -39,13 +42,32 @@ export const TableGiftPicker: React.FC<TableGiftPickerProps> = ({
   const handleAddFriendClick = () => {
     if (!canAddFriend) return;
     triggerHaptic('success');
+    const cleanName = targetPlayerName.replace(/\s*\((Siz|Вы|You)\)\s*/g, '').trim();
     addFriend({
-      name: targetPlayerName,
+      name: cleanName,
       playerId,
       playerTag,
       avatarId: 'avatar_tea_master',
       title: 'Masa Yoldaşı'
     });
+    const myId = getMyPlayerIdentity(loadGoogleUser(), loadPlayerStats());
+    multiplayerSocket
+      .sendFriendRequest({
+        from: {
+          playerId: myId.id,
+          playerTag: myId.tag,
+          name: myId.name,
+          handle: myId.handle,
+          avatarId: myId.avatarId,
+          frameId: myId.frameId,
+          title: myId.title,
+          matchesWon: myId.matchesWon
+        },
+        toPlayerId: playerId,
+        toPlayerTag: playerTag,
+        toName: cleanName
+      })
+      .catch(() => {});
     setFriendAdded(true);
   };
 

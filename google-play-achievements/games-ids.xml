@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Google Play Games Services Resource IDs Template
+  Copy to android/app/src/main/res/values/games-ids.xml after creating your game
+  and achievements in Google Play Console (Grow users -> Play Games Services),
+  replacing each placeholder with the generated CgkI... / App ID values.
+-->
+<resources>
+    <!-- Your Play Games Services Application ID (numeric) -->
+    <string name="app_id" translatable="false">REPLACE_WITH_PLAY_GAMES_APP_ID</string>
+    <string name="package_name" translatable="false">az.domino.telefon365</string>
+
+    <!-- Achievements (Total: 600 XP) -->
+    <string name="achievement_winner" translatable="false">CgkI_DOMINO_AZ_CAYXANA_WIN</string>
+    <string name="achievement_dragon" translatable="false">CgkI_DOMINO_AZ_EJDAHA_35</string>
+    <string name="achievement_desert_lion" translatable="false">CgkI_DOMINO_AZ_SEHRA_ASLANI</string>
+    <string name="achievement_high_roller" translatable="false">CgkI_DOMINO_AZ_HIGH_ROLLER</string>
+    <string name="achievement_gold_contender" translatable="false">CgkI_DOMINO_AZ_RANK_GOLD</string>
+    <string name="achievement_platinum_tactician" translatable="false">CgkI_DOMINO_AZ_RANK_PLATINUM</string>
+    <string name="achievement_diamond_mind" translatable="false">CgkI_DOMINO_AZ_RANK_DIAMOND</string>
+    <string name="achievement_grand_tactician" translatable="false">CgkI_DOMINO_AZ_RANK_MASTER</string>
+    <string name="achievement_grandmaster" translatable="false">CgkI_DOMINO_AZ_RANK_GM</string>
+    <string name="achievement_power_of_friendship_1" translatable="false">CgkI_DOMINO_AZ_FRIENDS_1</string>
+    <string name="achievement_power_of_friendship_5" translatable="false">CgkI_DOMINO_AZ_FRIENDS_5</string>
+    <string name="achievement_power_of_friendship_10" translatable="false">CgkI_DOMINO_AZ_FRIENDS_10</string>
+    <string name="achievement_power_of_friendship_25" translatable="false">CgkI_DOMINO_AZ_FRIENDS_25</string>
+    <string name="achievement_power_of_friendship_50" translatable="false">CgkI_DOMINO_AZ_FRIENDS_50</string>
+</resources>

@@ -124,6 +124,7 @@ import {
   calculateEloUpdate,
   getTeahouseTierById
 } from './data/teahouses';
+import { unlockPlayAchievement, checkRankAchievements } from './services/playGamesAchievements';
 
 import {
   Coins,
@@ -202,6 +203,7 @@ export const App: React.FC = () => {
   const [showGuestWarning, setShowGuestWarning] = useState<boolean>(
     !loadGoogleUser() && !isGuestNoticeDismissed()
   );
+  const [betaGiftModal, setBetaGiftModal] = useState<{ amount: number; message: string } | null>(null);
 
   // Active Game State
   const [inGame, setInGame] = useState<boolean>(false);
@@ -265,6 +267,7 @@ export const App: React.FC = () => {
 
   // Teahouse Rooms & Interactive Table Gifts State
   const [showTeahousesModal, setShowTeahousesModal] = useState<boolean>(false);
+  const [showRankedForfeitConfirm, setShowRankedForfeitConfirm] = useState<boolean>(false);
   const [showFriendsModal, setShowFriendsModal] = useState<boolean>(false);
   const [incomingFriendRequests, setIncomingFriendRequests] = useState<FriendRequestPayload[]>([]);
   const [outgoingFriendRequestIds, setOutgoingFriendRequestIds] = useState<string[]>([]);
@@ -281,6 +284,32 @@ export const App: React.FC = () => {
     statsRef.current = stats;
   }, [stats]);
 
+  const mpGameStateRef = useRef<MultiplayerClientGameState | null>(mpGameState);
+  useEffect(() => {
+    mpGameStateRef.current = mpGameState;
+  }, [mpGameState]);
+
+  const mpMyIndexRef = useRef<number>(mpMyIndex);
+  useEffect(() => {
+    mpMyIndexRef.current = mpMyIndex;
+  }, [mpMyIndex]);
+
+  const langRef = useRef<Language>(lang);
+  useEffect(() => {
+    langRef.current = lang;
+  }, [lang]);
+
+  const googleUserRef = useRef<GoogleUserProfile | null>(googleUser);
+  useEffect(() => {
+    googleUserRef.current = googleUser;
+  }, [googleUser]);
+
+  const creditedGiftIdsRef = useRef<Set<string>>(new Set());
+  const giftCoinsReceivedMatchRef = useRef<{ roomCode: string; count: number }>({
+    roomCode: '',
+    count: 0
+  });
+
   const watchedRewardedOnCurrentMatchEndRef = useRef<boolean>(false);
   const [lobbyBannerHeight, setLobbyBannerHeight] = useState<number>(0);
 
@@ -291,10 +320,11 @@ export const App: React.FC = () => {
   }));
   const boardStageRef = useRef<HTMLDivElement | null>(null);
   const [boardStageSize, setBoardStageSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
-  const isPortraitMatch = inGame && viewportSize.h > viewportSize.w;
+  // Use the clean 1:1 framed square table layout across portrait, tablet, and desktop viewports
+  const isPortraitMatch = inGame;
   const portraitBoardSide =
     isPortraitMatch && boardStageSize.w > 0 && boardStageSize.h > 0
-      ? Math.floor(Math.min(boardStageSize.w, boardStageSize.h))
+      ? Math.max(180, Math.floor(Math.min(boardStageSize.w - 8, boardStageSize.h - 14)))
       : 0;
 
   useEffect(() => {
@@ -709,16 +739,32 @@ export const App: React.FC = () => {
             const existing = loadRecentPlayers();
             const realOpponents = state.players
               .filter((p, idx) => idx !== state.myPlayerIndex && !p.isAI && p.name && !isBotName(p.name))
-              .map((p) => ({
-                name: p.name.replace(/\s*\((Siz|Вы|You)\)\s*/g, '').trim(),
-                avatarId: p.avatarId || 'avatar_tea_master',
-                date: new Date().toLocaleDateString('az-AZ'),
-                isRealPlayer: true
-              }));
+              .map((p) => {
+                const cleanName = p.name.replace(/\s*\((Siz|Вы|You)\)\s*/g, '').trim();
+                const tag = p.playerTag || undefined;
+                return {
+                  name: cleanName,
+                  playerId: p.playerId || undefined,
+                  playerTag: tag,
+                  handle: tag ? `${cleanName}#${tag}` : undefined,
+                  avatarId: p.avatarId || 'avatar_tea_master',
+                  frameId: p.frameId || undefined,
+                  title: p.title || undefined,
+                  date: new Date().toLocaleDateString('az-AZ'),
+                  isRealPlayer: true
+                };
+              });
             if (realOpponents.length > 0) {
               const merged = [
                 ...realOpponents,
-                ...existing.filter((e) => !realOpponents.some((r) => r.name.toLowerCase() === e.name.toLowerCase()))
+                ...existing.filter(
+                  (e) =>
+                    !realOpponents.some(
+                      (r) =>
+                        (r.playerId && e.playerId && r.playerId === e.playerId) ||
+                        r.name.toLowerCase() === e.name.toLowerCase()
+                    )
+                )
               ].slice(0, 15);
               localStorage.setItem('domino_recent_players', JSON.stringify(merged));
             }
@@ -738,7 +784,8 @@ export const App: React.FC = () => {
       if (msg.emoji && msg.emoji.startsWith('gift:')) {
         const parts = msg.emoji.split(':');
         const giftId = parts[1];
-        const targetIdx = parseInt(parts[2], 10);
+        const targetIdx = parseInt(parts[2] || '0', 10);
+        const targetPlayerId = parts[3] || '';
         const gift = TABLE_GIFTS.find((g) => g.id === giftId);
         if (gift) {
           setActiveGiftAnimation({
@@ -748,6 +795,46 @@ export const App: React.FC = () => {
             senderIndex: msg.senderIndex,
             targetIndex: isNaN(targetIdx) ? 0 : targetIdx
           });
+
+          // Credit 50% of paid gift cost to human recipient (max 5 gifts per match)
+          const curMpState = mpGameStateRef.current;
+          const myIdx = curMpState?.myPlayerIndex ?? mpMyIndexRef.current;
+          const myIdentity = getMyPlayerIdentity(googleUserRef.current, statsRef.current);
+          const senderPlayer = curMpState?.players?.[msg.senderIndex];
+          const rewardCoins = Math.floor(gift.cost * 0.5);
+          const isRecipient =
+            msg.senderIndex !== myIdx &&
+            (targetIdx === myIdx ||
+              (Boolean(targetPlayerId) && targetPlayerId === myIdentity.id) ||
+              ((curMpState?.players?.length ?? 0) === 2 && msg.senderIndex !== myIdx));
+          if (
+            rewardCoins > 0 &&
+            curMpState &&
+            isRecipient &&
+            senderPlayer &&
+            !senderPlayer.isAI &&
+            !creditedGiftIdsRef.current.has(msg.id)
+          ) {
+            if (giftCoinsReceivedMatchRef.current.roomCode !== curMpState.roomCode) {
+              giftCoinsReceivedMatchRef.current = { roomCode: curMpState.roomCode, count: 0 };
+            }
+            if (giftCoinsReceivedMatchRef.current.count < 5) {
+              creditedGiftIdsRef.current.add(msg.id);
+              giftCoinsReceivedMatchRef.current.count += 1;
+              handleUpdateStatsRef.current({
+                ...statsRef.current,
+                coins: statsRef.current.coins + rewardCoins
+              });
+              const curLang = langRef.current;
+              const giftMsg =
+                curLang === 'az'
+                  ? `🎁 ${msg.senderName} sizə hədiyyə göndərdi: +${rewardCoins} sikkə!`
+                  : curLang === 'ru'
+                    ? `🎁 ${msg.senderName} отправил(а) вам подарок: +${rewardCoins} монет!`
+                    : `🎁 ${msg.senderName} sent you a gift: +${rewardCoins} coins!`;
+              showTemporarySocialBanner(giftMsg);
+            }
+          }
         }
       }
     });
@@ -759,17 +846,29 @@ export const App: React.FC = () => {
     };
   }, []);
 
-  // In multiplayer, show GameEndModal automatically after the reveal animation
+  // In multiplayer, show GameEndModal automatically after the reveal animation or match end
   useEffect(() => {
-    if (isMultiplayer && mpGameState?.handRevealed) {
+    const mpEnded =
+      Boolean(mpGameState?.handRevealed) ||
+      Boolean(mpGameState?.isMatchOver) ||
+      mpGameState?.status === 'finished';
+    if (isMultiplayer && mpEnded) {
+      const delay = mpGameState?.isInstant35 ? 650 : 1600;
       const timer = setTimeout(() => {
         setShowGameEnd(true);
-      }, 1600);
+      }, delay);
       return () => clearTimeout(timer);
-    } else if (isMultiplayer && !mpGameState?.handRevealed) {
+    } else if (isMultiplayer && !mpEnded) {
       setShowGameEnd(false);
     }
-  }, [isMultiplayer, mpGameState?.handRevealed, mpGameState?.roundNumber]);
+  }, [
+    isMultiplayer,
+    mpGameState?.handRevealed,
+    mpGameState?.isMatchOver,
+    mpGameState?.status,
+    mpGameState?.isInstant35,
+    mpGameState?.roundNumber
+  ]);
 
   const chargedTeahouseMatchRef = useRef<string | null>(null);
   useEffect(() => {
@@ -810,21 +909,33 @@ export const App: React.FC = () => {
     const myTeam = mySlot?.team ?? 1;
     let mpUserWon: boolean;
 
-    if (mpGameState.isInstant35) {
-      mpUserWon =
-        mpGameState.mode === '4p_duo'
-          ? (mpGameState.players[mpGameState.matchWinnerIndex]?.team ?? 1) === myTeam
-          : mpGameState.matchWinnerIndex === myIdx;
-    } else if (mpGameState.mode === '4p_duo') {
-      const myTeamScore = mpGameState.players.find((p) => p.team === myTeam)?.score ?? 0;
-      const otherTeamScore = mpGameState.players.find((p) => p.team !== myTeam)?.score ?? 0;
-      mpUserWon = myTeamScore > otherTeamScore;
+    if (mpGameState.mode === '4p_duo') {
+      const winTeam =
+        mpGameState.players[mpGameState.matchWinnerIndex]?.team ??
+        mpGameState.handResults?.winnerTeam ??
+        1;
+      mpUserWon = winTeam === myTeam;
     } else {
-      const myScore = mySlot?.score ?? 0;
-      const otherScores = mpGameState.players
-        .filter((_, idx) => idx !== myIdx)
-        .map((p) => p.score ?? 0);
-      mpUserWon = otherScores.length === 0 || myScore >= Math.max(...otherScores);
+      mpUserWon = mpGameState.matchWinnerIndex === myIdx;
+    }
+
+    if (mpUserWon) {
+      if (mpGameState.isRanked) {
+        unlockPlayAchievement('cayxana_winner');
+      }
+      if (mpGameState.isInstant35) {
+        unlockPlayAchievement('ejdaha_35');
+      }
+      const opponents = mpGameState.players.filter((p, idx) =>
+        mpGameState.mode === '4p_duo' ? p.team !== myTeam : idx !== myIdx
+      );
+      if (
+        (mySlot?.score ?? 0) > 0 &&
+        opponents.length > 0 &&
+        opponents.every((p) => (p.score ?? 0) === 0)
+      ) {
+        unlockPlayAchievement('sehra_aslani_dry');
+      }
     }
 
     if (mpGameState.isRanked && mpGameState.teahousePrizePot) {
@@ -850,7 +961,7 @@ export const App: React.FC = () => {
         rankedWon: rankedWon + (mpUserWon ? 1 : 0)
       });
     } else {
-      awardMatchCoins(mpUserWon, mpGameState.variant || '365');
+      awardMatchCoins(mpUserWon, mpGameState.variant || '365', Boolean(mpGameState.hadHumanOpponentLeave));
     }
   }, [isMultiplayer, mpGameState?.isMatchOver, mpGameState?.roomCode, mpGameState?.roundNumber]);
 
@@ -1183,6 +1294,14 @@ export const App: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!incomingRoomInvite) return;
+    const timer = setTimeout(() => {
+      setIncomingRoomInvite(null);
+    }, 30000);
+    return () => clearTimeout(timer);
+  }, [incomingRoomInvite]);
+
   const handleRespondFriendRequest = async (requestId: string, accept: boolean) => {
     const myId = getMyPlayerIdentity(googleUser, statsRef.current);
     const res = await multiplayerSocket.respondFriendRequest({
@@ -1236,6 +1355,7 @@ export const App: React.FC = () => {
         },
         targetPlayerId: friend.playerId,
         targetPlayerTag: friend.playerTag,
+        targetName: friend.name,
         roomCode: targetRoomCode
       });
 
@@ -1251,12 +1371,13 @@ export const App: React.FC = () => {
 
   // Send interactive table gift (armudu tea, tomato splatter, baklava, etc.)
   const handleSendTableGift = (gift: TableGiftDef, targetIndex: number) => {
-    if (stats.coins < gift.cost) return;
+    const curStats = statsRef.current;
+    if (curStats.coins < gift.cost) return;
 
     if (gift.cost > 0) {
       handleUpdateStats({
-        ...stats,
-        coins: Math.max(0, stats.coins - gift.cost)
+        ...curStats,
+        coins: Math.max(0, curStats.coins - gift.cost)
       });
     }
 
@@ -1273,7 +1394,11 @@ export const App: React.FC = () => {
 
     // In multiplayer: broadcast event via chat channel
     if (effectiveInMultiplayer) {
-      multiplayerSocket.sendChatMessage(undefined, `gift:${gift.id}:${targetIndex}`);
+      const targetPlayerId =
+        giftTargetPlayer?.playerId ||
+        (mpGameStateRef.current?.players?.[targetIndex] as any)?.playerId ||
+        '';
+      multiplayerSocket.sendChat(undefined, `gift:${gift.id}:${targetIndex}:${targetPlayerId}`);
     } else {
       // In singleplayer: bot humorous response
       const targetP = effectivePlayers[targetIndex];
@@ -1335,6 +1460,51 @@ export const App: React.FC = () => {
     }
   }, [googleUser?.googleId]);
 
+  // Listen for server-issued coin grants (e.g. closed beta tester reward) & show one-time beta gift popup for thenovruzlu@gmail.com
+  useEffect(() => {
+    const onCoinGrant = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ amount?: number; message?: string }>).detail || {};
+      const amount = typeof detail.amount === 'number' && detail.amount > 0 ? detail.amount : 2000;
+      const message =
+        detail.message ||
+        'Thank you for being a closed beta tester! Qapalı beta test iştirakçısı olduğunuz üçün təşəkkür edirik! — "yetime hediyye"';
+      try {
+        if (
+          googleUserRef.current?.email?.toLowerCase() === 'thenovruzlu@gmail.com' ||
+          googleUserRef.current?.googleId === '100659109498091139761'
+        ) {
+          localStorage.setItem('domino_beta_gift_thenovruzlu_shown_v1', '1');
+        }
+      } catch {}
+      setBetaGiftModal({ amount, message });
+      sounds.playCoinChime();
+      triggerHaptic('success');
+    };
+    window.addEventListener('domino:coin-grant', onCoinGrant);
+    return () => window.removeEventListener('domino:coin-grant', onCoinGrant);
+  }, []);
+
+  useEffect(() => {
+    if (
+      googleUser &&
+      (googleUser.email?.toLowerCase() === 'thenovruzlu@gmail.com' ||
+        googleUser.googleId === '100659109498091139761')
+    ) {
+      try {
+        if (localStorage.getItem('domino_beta_gift_thenovruzlu_shown_v1') !== '1') {
+          localStorage.setItem('domino_beta_gift_thenovruzlu_shown_v1', '1');
+          setBetaGiftModal({
+            amount: 2000,
+            message:
+              'Thank you for being a closed beta tester!\nQapalı beta test iştirakçısı olduğunuz üçün təşəkkür edirik!\n"yetime hediyye"'
+          });
+          sounds.playCoinChime();
+          triggerHaptic('success');
+        }
+      } catch {}
+    }
+  }, [googleUser?.googleId, googleUser?.email]);
+
   // Prompt legacy signed-in users once per session when server requires fresh authToken
   useEffect(() => {
     let prompted = false;
@@ -1354,14 +1524,26 @@ export const App: React.FC = () => {
   }, []);
 
 
+  // Sync rank milestone achievements on launch and whenever MMR updates
+  useEffect(() => {
+    checkRankAchievements(stats.mmr ?? DEFAULT_RANKED_MMR);
+  }, [stats.mmr]);
+
   // Persist stats whenever changed (and auto-sync with cloud if signed in)
   const handleUpdateStats = (newStats: PlayerStats) => {
+    statsRef.current = newStats;
     setStats(newStats);
     savePlayerStats(newStats);
-    if (googleUser) {
-      syncWithCloud(googleUser, newStats);
+    if (typeof newStats.mmr === 'number') {
+      checkRankAchievements(newStats.mmr);
+    }
+    const activeGoogleUser = googleUserRef.current || googleUser;
+    if (activeGoogleUser) {
+      syncWithCloud(activeGoogleUser, newStats);
     }
   };
+  const handleUpdateStatsRef = useRef(handleUpdateStats);
+  handleUpdateStatsRef.current = handleUpdateStats;
 
   // Start a new Match
   const startMatch = (chosenMode: GameMode, chosenVariant: GameVariant = gameVariant) => {
@@ -1384,7 +1566,7 @@ export const App: React.FC = () => {
     const initialPlayers: Player[] = [];
     const aiAvatarPool = ['avatar_tea_master', 'avatar_sheki_guest', 'avatar_icherisheher_sage'];
     for (let i = 0; i < numPlayers; i++) {
-      let pName = t.player;
+      let pName = getMyPlayerIdentity(googleUser, stats).name;
       let isAI = false;
       let team: 1 | 2 = 1;
 
@@ -1453,7 +1635,7 @@ export const App: React.FC = () => {
     const tutorialPlayers: Player[] = [
       {
         id: 0,
-        name: t.player,
+        name: getMyPlayerIdentity(googleUser, stats).name,
         isAI: false,
         hand: setup.humanHand,
         score: 0,
@@ -1586,6 +1768,26 @@ export const App: React.FC = () => {
     setPlayers(updatedPlayers);
   };
 
+  const checkSingleplayerDryWin = (finalPlayerList: Player[], activeMode: GameMode) => {
+    const opponents =
+      activeMode === '4p_duo'
+        ? finalPlayerList.filter((p) => p.team !== 1)
+        : finalPlayerList.filter((p) => p.id !== 0);
+    if (opponents.length > 0 && opponents.every((p) => p.score === 0)) {
+      unlockPlayAchievement('sehra_aslani_dry');
+    }
+  };
+
+  const recordInstant35WinAchievements = (
+    updatedPlayers: Player[],
+    activeMode: GameMode,
+    isWinnerUser: boolean
+  ) => {
+    if (!isWinnerUser) return;
+    unlockPlayAchievement('ejdaha_35');
+    checkSingleplayerDryWin(updatedPlayers, activeMode);
+  };
+
   // Handle Hand Completion with relaxed reveal sequence
   const finishHand = (
     endedInBaglandi: boolean,
@@ -1670,6 +1872,15 @@ export const App: React.FC = () => {
                 : res.nextMatchState.team1.mainScore > res.nextMatchState.team2.mainScore;
             setWinnerTeam(userWon ? 1 : 2);
             awardMatchCoins(userWon, '101');
+            if (userWon) {
+              const isDry101 =
+                finalPlayers.length === 3
+                  ? [1, 2].every((idx) => (res.nextMatchState.playerAccounts?.[idx]?.mainScore ?? 0) === 0)
+                  : res.nextMatchState.team2.mainScore === 0;
+              if (isDry101) {
+                unlockPlayAchievement('sehra_aslani_dry');
+              }
+            }
           } else {
             setIsMatchOver(false);
           }
@@ -1773,6 +1984,9 @@ export const App: React.FC = () => {
                 const userWon = t1Score > t2Score;
                 setWinnerTeam(userWon ? 1 : 2);
                 awardMatchCoins(userWon, '365');
+                if (userWon) {
+                  checkSingleplayerDryWin(playersWithBonus, mode);
+                }
               }
             } else {
               const winners = playersWithBonus.filter((p) => p.score === highestScore);
@@ -1788,6 +2002,9 @@ export const App: React.FC = () => {
                 setWinnerIndex(safeWinnerIndex);
                 const userWon = matchWinner.id === 0;
                 awardMatchCoins(userWon, '365');
+                if (userWon) {
+                  checkSingleplayerDryWin(playersWithBonus, mode);
+                }
               }
             }
           }
@@ -1807,18 +2024,46 @@ export const App: React.FC = () => {
 
     try {
       const existing = loadRecentPlayers();
-      const newOnes = playerList
-        .filter((p, idx) => idx !== localPlayerIndex && !p.isAI && !isBotName(p.name))
-        .map((p) => ({
-          name: p.name.replace(/\s*\((Siz|Вы|You)\)\s*/g, '').trim(),
-          avatarId: p.avatarId || 'avatar_tea_master',
-          date: new Date().toLocaleDateString('az-AZ'),
-          isRealPlayer: true
-        }));
+      const sourcePlayers: any[] =
+        mpGameStateRef.current?.players?.length ? mpGameStateRef.current.players : playerList;
+      const myIdx = mpGameStateRef.current?.myPlayerIndex ?? localPlayerIndex;
+      const newOnes = sourcePlayers
+        .filter((p, idx) => idx !== myIdx && !p.isAI && p.name && !isBotName(p.name))
+        .map((p) => {
+          const cleanName = p.name.replace(/\s*\((Siz|Вы|You)\)\s*/g, '').trim();
+          const prevMatch = existing.find(
+            (e) =>
+              (p.playerId && e.playerId && p.playerId === e.playerId) ||
+              e.name.toLowerCase() === cleanName.toLowerCase()
+          );
+          const playerTag = p.playerTag || prevMatch?.playerTag;
+          const playerId = p.playerId || prevMatch?.playerId;
+          const handle =
+            p.handle ||
+            (playerTag ? `${cleanName}#${playerTag}` : prevMatch?.handle);
+          return {
+            name: cleanName,
+            playerId,
+            playerTag,
+            handle,
+            avatarId: p.avatarId || prevMatch?.avatarId || 'avatar_tea_master',
+            frameId: p.frameId || prevMatch?.frameId,
+            title: p.title || prevMatch?.title,
+            date: new Date().toLocaleDateString('az-AZ'),
+            isRealPlayer: true
+          };
+        });
       if (newOnes.length === 0) return;
       const merged = [
         ...newOnes,
-        ...existing.filter((e) => !newOnes.some((n) => n.name.toLowerCase() === e.name.toLowerCase()))
+        ...existing.filter(
+          (e) =>
+            !newOnes.some(
+              (n) =>
+                (n.playerId && e.playerId && n.playerId === e.playerId) ||
+                n.name.toLowerCase() === e.name.toLowerCase()
+            )
+        )
       ].slice(0, 15);
       localStorage.setItem('domino_recent_players', JSON.stringify(merged));
     } catch (e) {
@@ -1826,13 +2071,17 @@ export const App: React.FC = () => {
     }
   };
 
-  const awardMatchCoins = (userWon: boolean, variant: GameVariant = gameVariant) => {
+  const awardMatchCoins = (
+    userWon: boolean,
+    variant: GameVariant = gameVariant,
+    forceWinGold: boolean = false
+  ) => {
     watchedRewardedOnCurrentMatchEndRef.current = false;
     triggerHaptic('success');
     if (isMultiplayer) {
       recordRecentOpponents(players);
     }
-    const coinReward = getMatchCoinReward(variant, userWon);
+    const coinReward = getMatchCoinReward(variant, userWon || forceWinGold);
     handleUpdateStats({
       ...statsRef.current,
       coins: statsRef.current.coins + coinReward,
@@ -1891,13 +2140,14 @@ export const App: React.FC = () => {
   };
 
   const handleForfeitAction = () => {
+    setShowRankedForfeitConfirm(false);
     if (isMultiplayer) {
       // If leaving mid-game in Ranked Çayxana, record Elo loss locally too (server also settles)
       if (mpGameState?.isRanked && mpGameState.status === 'in_game' && !mpGameState.isMatchOver) {
         const myIdx = mpGameState.myPlayerIndex ?? 0;
         const oppSlot = mpGameState.players.find((_, idx) => idx !== myIdx);
         const curMmr = statsRef.current.mmr ?? DEFAULT_RANKED_MMR;
-        const oppMmr = oppSlot?.mmr ?? DEFAULT_RANKED_MMR;
+        const oppMmr = oppSlot?.mmr ?? curMmr;
         const curPlayed = statsRef.current.rankedPlayed ?? 0;
         const { nextMmr } = calculateEloUpdate(curMmr, oppMmr, false, curPlayed);
         handleUpdateStats({
@@ -1908,7 +2158,6 @@ export const App: React.FC = () => {
         });
       }
       multiplayerSocket.leaveRoom();
-      multiplayerSocket.disconnectIfIdle();
       try {
         localStorage.removeItem('domino_mp_session');
         window.history.replaceState(null, '', window.location.pathname);
@@ -2001,13 +2250,21 @@ export const App: React.FC = () => {
       setLastScoredPoints(null);
     }
 
-    // Update player hand & scores
+    // Update player hand & scores (keep 4p_duo team score synced across both teammates)
+    const actingTeam = players[playerIndex]?.team;
     const updatedPlayers = players.map((p, idx) => {
       if (idx === playerIndex) {
         const nextHand = p.hand.filter((t) => t.id !== tile.id);
         return {
           ...p,
           hand: nextHand,
+          score: p.score + scored,
+          handRoundPoints: p.handRoundPoints + scored
+        };
+      }
+      if (mode === '4p_duo' && scored > 0 && actingTeam && p.team === actingTeam) {
+        return {
+          ...p,
           score: p.score + scored,
           handRoundPoints: p.handRoundPoints + scored
         };
@@ -2028,6 +2285,8 @@ export const App: React.FC = () => {
       sounds.playVictory();
       setIsInstant35(true);
       setIsMatchOver(true);
+      setHandRevealed(true);
+      setRevealPhase(2);
       const isWinnerUser =
         mode === '4p_duo'
           ? updatedPlayers[playerIndex].team === 1
@@ -2037,6 +2296,7 @@ export const App: React.FC = () => {
         setWinnerTeam(updatedPlayers[playerIndex].team);
       }
       awardMatchCoins(isWinnerUser, gameVariant);
+      recordInstant35WinAchievements(updatedPlayers, mode, isWinnerUser);
       setShowGameEnd(true);
       return;
     }
@@ -2114,12 +2374,20 @@ export const App: React.FC = () => {
     }
 
     const playedTileIds = new Set(combo.moves.map((m) => m.tile.id));
+    const comboActingTeam = players[playerIndex]?.team;
     const updatedPlayers = players.map((p, idx) => {
       if (idx === playerIndex) {
         const nextHand = p.hand.filter((t) => !playedTileIds.has(t.id));
         return {
           ...p,
           hand: nextHand,
+          score: p.score + scored,
+          handRoundPoints: p.handRoundPoints + scored
+        };
+      }
+      if (mode === '4p_duo' && scored > 0 && comboActingTeam && p.team === comboActingTeam) {
+        return {
+          ...p,
           score: p.score + scored,
           handRoundPoints: p.handRoundPoints + scored
         };
@@ -2138,6 +2406,8 @@ export const App: React.FC = () => {
       sounds.playVictory();
       setIsInstant35(true);
       setIsMatchOver(true);
+      setHandRevealed(true);
+      setRevealPhase(2);
       const isWinnerUser =
         mode === '4p_duo'
           ? updatedPlayers[playerIndex].team === 1
@@ -2147,6 +2417,7 @@ export const App: React.FC = () => {
         setWinnerTeam(updatedPlayers[playerIndex].team);
       }
       awardMatchCoins(isWinnerUser, gameVariant);
+      recordInstant35WinAchievements(updatedPlayers, mode, isWinnerUser);
       setShowGameEnd(true);
       return;
     }
@@ -2189,7 +2460,7 @@ export const App: React.FC = () => {
 
   // Human player selects a tile from hand
   const handleSelectTile = (tile: TileData) => {
-    if (effectiveHandRevealed) return;
+    if (effectiveHandRevealed || effectiveIsMatchOver) return;
     if (effectiveInMultiplayer) {
       if (!effectiveIsMyTurn) return;
       if (effectiveForcedTile && tile.id !== effectiveForcedTile.id) return;
@@ -2228,7 +2499,7 @@ export const App: React.FC = () => {
 
   // Human player selects a target branch on board
   const handleSelectBranch = (branchId: BranchId) => {
-    if (!selectedTile || effectiveHandRevealed) return;
+    if (!selectedTile || effectiveHandRevealed || effectiveIsMatchOver) return;
     if (effectiveInMultiplayer) {
       if (!effectiveIsMyTurn) return;
       multiplayerSocket.playTile(selectedTile.id, branchId);
@@ -2487,7 +2758,9 @@ export const App: React.FC = () => {
         : (mpGameState.handResults?.winnerIndex ?? 0))
     : winnerIndex;
   const effectiveWinnerTeam = effectiveInMultiplayer
-    ? (mpGameState.handResults?.winnerTeam || 1)
+    ? (mpGameState.isMatchOver
+        ? (mpGameState.players[mpGameState.matchWinnerIndex]?.team || mpGameState.handResults?.winnerTeam || 1)
+        : (mpGameState.handResults?.winnerTeam || 1))
     : winnerTeam;
   const effectiveIsInstant35 = effectiveInMultiplayer
     ? mpGameState.isInstant35
@@ -2630,7 +2903,7 @@ export const App: React.FC = () => {
 
   // Drag and Drop Handlers (Direct DOM ref updates for 60fps zero-re-render dragging)
   const handleStartDrag = (tile: TileData, point: { x: number; y: number }) => {
-    if (effectiveHandRevealed) return;
+    if (effectiveHandRevealed || effectiveIsMatchOver) return;
     if (effectiveInMultiplayer) {
       if (!effectiveIsMyTurn) return;
       if (effectiveForcedTile && tile.id !== effectiveForcedTile.id) return;
@@ -2884,7 +3157,18 @@ export const App: React.FC = () => {
 
               {/* Forfeit Match Button */}
               <button
-                onClick={handleForfeitAction}
+                onClick={() => {
+                  if (
+                    isMultiplayer &&
+                    mpGameState?.isRanked &&
+                    mpGameState.status === 'in_game' &&
+                    !mpGameState.isMatchOver
+                  ) {
+                    setShowRankedForfeitConfirm(true);
+                    return;
+                  }
+                  handleForfeitAction();
+                }}
                 title={t.forfeit}
                 className="px-2 py-1 rounded-lg bg-rose-950/80 hover:bg-rose-900 border border-rose-700 text-rose-200 transition flex items-center gap-1 active:scale-95"
               >
@@ -2929,7 +3213,7 @@ export const App: React.FC = () => {
               </div>
               <div className="flex flex-col text-left">
                 <span className="text-xs font-black text-white max-w-[100px] sm:max-w-[130px] truncate leading-tight">
-                  {googleUser?.name || 'Siz'}
+                  {getMyPlayerIdentity(googleUser, stats).name}
                 </span>
                 <span className="text-[9px] font-bold text-amber-400/90 leading-tight">
                   {googleUser ? 'Buludla bağlı' : 'Qonaq Oyunçu'}
@@ -3811,7 +4095,9 @@ export const App: React.FC = () => {
                             style={
                               portraitBoardSide > 0
                                 ? { width: portraitBoardSide, height: portraitBoardSide }
-                                : { width: '100%', aspectRatio: '1 / 1', maxHeight: '100%' }
+                                : viewportSize.h > viewportSize.w
+                                ? { width: '100%', aspectRatio: '1 / 1', maxHeight: '100%' }
+                                : { height: '100%', aspectRatio: '1 / 1', maxWidth: '100%' }
                             }
                           >
                             <BoardView
@@ -4047,7 +4333,15 @@ export const App: React.FC = () => {
         mode={effectiveInMultiplayer ? (mpGameState?.mode || mode) : mode}
         lang={lang}
         myPlayerIndex={localPlayerIndex}
-        isHost={effectiveInMultiplayer ? mpIsHost : true}
+        isHost={
+          effectiveInMultiplayer
+            ? Boolean(
+                mpIsHost ||
+                  mpGameState?.players[localPlayerIndex]?.isHost ||
+                  mpGameState?.players.every((p, idx) => idx === localPlayerIndex || p.isAI)
+              )
+            : true
+        }
         onNextHand={handleNextHandAction}
         onRestartMatch={async () => {
           if (effectiveIsMatchOver && !watchedRewardedOnCurrentMatchEndRef.current) {
@@ -4069,6 +4363,7 @@ export const App: React.FC = () => {
         isRanked={effectiveInMultiplayer ? Boolean(mpGameState?.isRanked) : false}
         teahousePrizePot={effectiveInMultiplayer ? (mpGameState?.teahousePrizePot || 0) : 0}
         userMmr={stats.mmr ?? DEFAULT_RANKED_MMR}
+        hadHumanOpponentLeave={effectiveInMultiplayer ? Boolean(mpGameState?.hadHumanOpponentLeave) : false}
       />
 
       <MultiplayerLobbyModal
@@ -4091,7 +4386,7 @@ export const App: React.FC = () => {
             ? mpRoom.players.find((p) => p.id === mpMyIndex)?.isHost ?? (mpMyIndex === 0)
             : false)
         }
-        defaultPlayerName={googleUser?.name}
+        defaultPlayerName={getMyPlayerIdentity(googleUser, stats).name}
         initialRoomCode={inviteCode || undefined}
         initialError={inviteError}
         isAutoJoining={isAutoJoining}
@@ -4119,6 +4414,14 @@ export const App: React.FC = () => {
           setAppTheme(nextTheme);
           triggerHaptic('medium');
         }}
+        onNicknameChange={(nextNickname) => {
+          if (googleUser) {
+            const updated = { ...googleUser, name: nextNickname };
+            saveGoogleUser(updated);
+            setGoogleUser(updated);
+          }
+          triggerHaptic('light');
+        }}
         onSignIn={(user) => {
           saveGoogleUser(user);
           setGoogleUser(user);
@@ -4140,6 +4443,7 @@ export const App: React.FC = () => {
         activeAnimation={activeGiftAnimation}
         onFinished={() => setActiveGiftAnimation(null)}
         playerCount={effectivePlayers.length}
+        myPlayerIndex={localPlayerIndex}
       />
 
       {/* Table Gift Picker Popover */}
@@ -4173,42 +4477,103 @@ export const App: React.FC = () => {
         onJoinTeahouse={handleJoinTeahouse}
       />
 
-      {/* Incoming Game Room Invite Banner */}
-      {incomingRoomInvite && !inGame && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] w-[92%] max-w-md bg-slate-900/95 border-2 border-emerald-400 rounded-2xl p-3 shadow-[0_10px_40px_rgba(16,185,129,0.45)] backdrop-blur-md animate-fade-in">
-          <div className="flex items-center justify-between gap-2.5">
-            <div className="min-w-0">
-              <div className="text-xs font-black text-emerald-300">
-                🎮 Oyun Dəvəti ({incomingRoomInvite.variant} • {incomingRoomInvite.roomCode})
-              </div>
-              <div className="text-xs text-white font-bold truncate mt-0.5">
-                {incomingRoomInvite.from.name}#{incomingRoomInvite.from.playerTag} sizi otağa dəvət edir!
+      {/* Çayxana Ranked Forfeit Warning Modal */}
+      {showRankedForfeitConfirm &&
+        isMultiplayer &&
+        mpGameState?.isRanked &&
+        mpGameState.status === 'in_game' &&
+        !mpGameState.isMatchOver && (() => {
+          const buyIn = mpGameState.teahouseBuyIn || 0;
+          const title =
+            lang === 'az'
+              ? 'Çayxanadan çıxmaq istəyirsiniz?'
+              : lang === 'ru'
+                ? 'Выйти из матча Чайханы?'
+                : 'Leave Çayxana Match?';
+          const body =
+            lang === 'az'
+              ? `Oyun bitmədən çıxsanız, təslim olmuş sayılacaqsınız — ${buyIn > 0 ? `${buyIn} sikkəlik giriş haqqınızı` : 'sikkələrinizi'} və reytinq xalınızı itirəcəksiniz.`
+              : lang === 'ru'
+                ? `Если вы выйдете до окончания игры, вам засчитается поражение — вы потеряете ${buyIn > 0 ? `взнос (${buyIn} монет)` : 'монеты'} и рейтинг.`
+                : `If you leave before the match ends, it counts as a forfeit — you will lose your ${buyIn > 0 ? `${buyIn} coin entry` : 'coins'} and rating.`;
+          const stayLabel =
+            lang === 'az' ? 'Oyuna davam et' : lang === 'ru' ? 'Продолжить игру' : 'Continue Match';
+          const leaveLabel =
+            lang === 'az' ? 'Təslim ol və çıx' : lang === 'ru' ? 'Сдаться и выйти' : 'Forfeit & Leave';
+          return (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+              <div className="bg-slate-900 border-2 border-rose-500/70 rounded-3xl max-w-sm w-full p-5 shadow-2xl text-center space-y-4">
+                <div className="w-12 h-12 mx-auto rounded-2xl bg-rose-500/20 border border-rose-400/40 flex items-center justify-center">
+                  <LogOut className="w-6 h-6 text-rose-400" />
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="text-lg font-black text-white">{title}</h3>
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">{body}</p>
+                </div>
+                <div className="flex flex-col gap-2 pt-1">
+                  <button
+                    onClick={() => setShowRankedForfeitConfirm(false)}
+                    className="w-full py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-lg transition"
+                  >
+                    {stayLabel}
+                  </button>
+                  <button
+                    onClick={handleForfeitAction}
+                    className="w-full py-2.5 rounded-2xl bg-rose-950/90 hover:bg-rose-900 border border-rose-700 text-rose-200 font-bold text-xs transition"
+                  >
+                    {leaveLabel}
+                  </button>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <button
-                onClick={async () => {
-                  const inv = incomingRoomInvite;
-                  setIncomingRoomInvite(null);
-                  try {
-                    const myId = getMyPlayerIdentity(googleUser, stats);
-                    setShowFriendsModal(false);
-                    await handleJoinRoom(inv.roomCode, googleUser?.name || myId.name);
-                    setShowMultiplayerLobby(true);
-                  } catch (e: any) {
-                    showTemporarySocialBanner(e?.message || 'Otağa qoşulmaq mümkün olmadı.');
-                  }
-                }}
-                className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow active:scale-95 transition"
-              >
-                Qoşul
-              </button>
-              <button
-                onClick={() => setIncomingRoomInvite(null)}
-                className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition"
-              >
-                Rədd et
-              </button>
+          );
+        })()}
+
+      {/* Incoming Game Room Invite Banner */}
+      {incomingRoomInvite && (
+        <div className="fixed inset-x-0 top-3 z-[120] flex justify-center px-3 pointer-events-none">
+          <div className="pointer-events-auto w-full max-w-md bg-slate-900/95 border-2 border-emerald-400 rounded-2xl p-3.5 shadow-[0_15px_40px_rgba(0,0,0,0.9)] backdrop-blur-md animate-fade-in">
+            <div className="flex items-center justify-between gap-2.5">
+              <div className="min-w-0">
+                <div className="text-xs font-black text-emerald-300">
+                  🎮 Oyun Dəvəti ({incomingRoomInvite.variant} • {incomingRoomInvite.roomCode})
+                </div>
+                <div className="text-xs text-white font-bold truncate mt-0.5">
+                  {incomingRoomInvite.from.name}#{incomingRoomInvite.from.playerTag} sizi otağa dəvət edir!
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                  onClick={async () => {
+                    const inv = incomingRoomInvite;
+                    setIncomingRoomInvite(null);
+                    try {
+                      const myId = getMyPlayerIdentity(googleUser, statsRef.current);
+                      setShowStore(false);
+                      setShowFriendsModal(false);
+                      setShowTeahousesModal(false);
+                      setShowRules(false);
+                      setShowDailyReward(false);
+                      setShowGoogleAuthModal(false);
+                      setInGame(false);
+                      setShowGameEnd(false);
+                      await handleJoinRoom(inv.roomCode, googleUser?.name || myId.name);
+                      setShowMultiplayerLobby(true);
+                    } catch (e: any) {
+                      showTemporarySocialBanner(e?.message || 'Otağa qoşulmaq mümkün olmadı.');
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow active:scale-95 transition"
+                >
+                  Qoşul
+                </button>
+                <button
+                  onClick={() => setIncomingRoomInvite(null)}
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition"
+                >
+                  Rədd et
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -4218,6 +4583,35 @@ export const App: React.FC = () => {
       {socialBanner && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-full bg-slate-900/95 border border-amber-400/70 text-amber-200 text-xs font-bold shadow-xl pointer-events-none animate-fade-in max-w-[90%] text-center">
           {socialBanner}
+        </div>
+      )}
+
+      {/* Closed Beta Tester Coin Gift Modal */}
+      {betaGiftModal && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in pointer-events-auto">
+          <div className="relative w-full max-w-md bg-gradient-to-b from-slate-900 via-slate-900 to-amber-950/50 border-2 border-amber-400 rounded-3xl p-6 shadow-[0_0_55px_rgba(245,158,11,0.4)] text-center flex flex-col items-center gap-3.5">
+            <div className="px-3.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/50 text-amber-300 text-xs font-black tracking-wide">
+              🎁 Closed Beta Tester Gift • Qapalı Beta Hədiyyəsi
+            </div>
+            <div className="text-3xl sm:text-4xl font-black text-amber-300 drop-shadow mt-1">
+              +{betaGiftModal.amount.toLocaleString()} 🪙 Qızıl Sikkə
+            </div>
+            <div className="space-y-1.5 text-sm text-slate-200 font-semibold leading-relaxed">
+              <p>Thank you for being a closed beta tester!</p>
+              <p className="text-slate-300 text-xs">
+                Qapalı beta test iştirakçısı olduğunuz üçün təşəkkür edirik!
+              </p>
+            </div>
+            <div className="w-full px-4 py-3 rounded-2xl bg-amber-500/15 border border-amber-400/60 text-amber-200 text-lg font-black italic tracking-wide shadow-inner">
+              &ldquo;yetime hediyye&rdquo;
+            </div>
+            <button
+              onClick={() => setBetaGiftModal(null)}
+              className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-lg active:scale-95 transition mt-1"
+            >
+              Təşəkkürlər! ({betaGiftModal.amount} 🪙 Təhvil Al)
+            </button>
+          </div>
         </div>
       )}
 

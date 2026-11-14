@@ -91,6 +91,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({
 
   const [copiedCode, setCopiedCode] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [sentRecentKeys, setSentRecentKeys] = useState<Record<string, boolean>>({});
 
   const myIdentity = getMyPlayerIdentity(googleUser, stats);
 
@@ -263,6 +264,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({
   };
 
   const handleAddFromRecent = async (rp: RecentPlayerItem) => {
+    const key = rp.playerId || rp.name;
     try {
       const res = await multiplayerSocket.sendFriendRequest({
         from: buildMySocialProfile(),
@@ -272,8 +274,10 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({
       });
       if (res.success) {
         triggerHaptic('success');
+        setSentRecentKeys((prev) => ({ ...prev, [key]: true }));
         if (res.autoAccepted) {
           onRefreshSocial?.();
+          setFriends(loadFriends());
         }
         showToast(res.message || `${rp.name} adlı oyunçuya sorğu göndərildi! 📩`);
       } else {
@@ -768,22 +772,26 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({
                   if (rp.playerTag && f.playerTag) return f.playerTag === rp.playerTag && f.name.toLowerCase() === rp.name.toLowerCase();
                   return f.name.toLowerCase() === rp.name.toLowerCase();
                 });
+                const isPending = Boolean(
+                  (rp.playerId && outgoingRequestIds.includes(rp.playerId)) ||
+                  sentRecentKeys[rp.playerId || rp.name]
+                );
 
                 return (
                   <div
                     key={idx}
-                    className="flex items-center justify-between p-3 rounded-2xl bg-slate-800/60 border border-slate-700/80 hover:border-slate-600 transition"
+                    className="flex items-center justify-between gap-2 p-3 rounded-2xl bg-slate-800/60 border border-slate-700/80 hover:border-slate-600 transition"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <AvatarView
                         avatarId={rp.avatarId || 'avatar_tea_master'}
                         frameId={rp.frameId}
                         size={34}
                         showBorder={false}
                       />
-                      <div className="flex flex-col text-left">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-white text-sm">
+                      <div className="flex flex-col text-left min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-white text-sm truncate max-w-[120px] sm:max-w-[160px]">
                             {rp.name}
                           </span>
                           {rp.playerTag && (
@@ -798,16 +806,48 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({
                       </div>
                     </div>
 
-                    <div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <button
+                        onClick={() => {
+                          triggerHaptic('medium');
+                          onInviteFriend({
+                            id: `recent_${rp.playerId || idx}`,
+                            playerId: rp.playerId || '',
+                            playerTag: rp.playerTag || '',
+                            name: rp.name,
+                            handle: rp.handle || (rp.playerTag ? `${rp.name}#${rp.playerTag}` : rp.name),
+                            avatarId: rp.avatarId,
+                            frameId: rp.frameId,
+                            title: rp.title,
+                            addedAt: rp.date,
+                            isOnline: true,
+                            isRealPlayer: true
+                          });
+                          onClose();
+                        }}
+                        className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:brightness-110 text-white font-black text-xs flex items-center gap-1 shadow active:scale-95 transition"
+                      >
+                        <Play className="w-3 h-3 fill-current" />
+                        <span>Dəvət</span>
+                      </button>
+
                       {alreadyFriend ? (
                         <span className="text-[11px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2.5 py-1 rounded-full flex items-center gap-1">
                           <Check className="w-3 h-3" />
                           <span>Dostdur</span>
                         </span>
+                      ) : isPending ? (
+                        <button
+                          disabled
+                          className="px-2.5 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-400 font-bold text-xs flex items-center gap-1 cursor-default"
+                        >
+                          <Check className="w-3 h-3" />
+                          <span>Göndərildi</span>
+                        </button>
                       ) : (
                         <button
                           onClick={() => handleAddFromRecent(rp)}
-                          className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1 shadow active:scale-95 transition"
+                          className="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1 shadow active:scale-95 transition"
                         >
                           <UserPlus className="w-3.5 h-3.5" />
                           <span>+ Dostluq At</span>

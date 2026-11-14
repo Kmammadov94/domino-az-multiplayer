@@ -59,11 +59,13 @@ export interface GoogleUserProfile {
 }
 
 export const DEFAULT_STATS: PlayerStats = {
-  coins: 20, // Starting gift: 20 gold coins
+  coins: 50, // Starting gift: 50 gold coins
   equippedSkin: 'ivory_classic',
   unlockedSkins: ['ivory_classic'],
   equippedAvatar: DEFAULT_AVATAR_ID,
   unlockedAvatars: [...FREE_AVATAR_IDS],
+  equippedTableTheme: 'classic_green',
+  unlockedTableThemes: ['classic_green'],
   dailyStreak: 0,
   matchesPlayed: 0,
   matchesWon: 0
@@ -98,6 +100,12 @@ export const loadPlayerStats = (): PlayerStats => {
         loaded.unlockedSkins.push(s.id);
       }
     });
+
+    if (!loaded.unlockedTableThemes || loaded.unlockedTableThemes.length === 0) {
+      loaded.unlockedTableThemes = ['classic_green'];
+    } else if (!loaded.unlockedTableThemes.includes('classic_green')) {
+      loaded.unlockedTableThemes.push('classic_green');
+    }
 
     return loaded;
   } catch {
@@ -178,6 +186,7 @@ export const syncWithCloud = async (
           unlockedAvatars: Array.from(new Set([...(statsToSend.unlockedAvatars || []), ...(backupStats.unlockedAvatars || [])])),
           unlockedFrames: Array.from(new Set([...(statsToSend.unlockedFrames || []), ...(backupStats.unlockedFrames || [])])),
           unlockedTitles: Array.from(new Set([...(statsToSend.unlockedTitles || []), ...(backupStats.unlockedTitles || [])])),
+          unlockedTableThemes: Array.from(new Set(['classic_green', ...(statsToSend.unlockedTableThemes || []), ...(backupStats.unlockedTableThemes || [])])),
           equippedSkin: (statsToSend.equippedSkin && statsToSend.equippedSkin !== 'ivory_classic')
             ? statsToSend.equippedSkin
             : (backupStats.equippedSkin || statsToSend.equippedSkin || 'ivory_classic'),
@@ -216,6 +225,10 @@ export const syncWithCloud = async (
             resolvedStats.unlockedSkins.push(s.id);
           }
         });
+        if (!resolvedStats.unlockedTableThemes) resolvedStats.unlockedTableThemes = ['classic_green'];
+        if (!resolvedStats.unlockedTableThemes.includes('classic_green')) {
+          resolvedStats.unlockedTableThemes.push('classic_green');
+        }
 
         savePlayerStats(resolvedStats);
         try {
@@ -228,6 +241,16 @@ export const syncWithCloud = async (
             ...data.profile,
             authToken: data.profile.authToken || profile.authToken
           });
+        }
+        if (typeof data.grantedCoins === 'number' && data.grantedCoins > 0 && typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('domino:coin-grant', {
+              detail: {
+                amount: data.grantedCoins,
+                message: data.grantMessage || ''
+              }
+            })
+          );
         }
         return resolvedStats;
       }

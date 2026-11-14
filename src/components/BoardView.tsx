@@ -66,7 +66,7 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
   // Safe padding so tiles never touch HUD margins or screen boundaries
   // In framed 1:1 portrait mode, opponent badges live outside the board so internal padding stays compact & symmetrical
   const isShortLandscape = !isFramedSquare && viewport.h < 350;
-  const squarePad = Math.max(14, Math.min(26, Math.min(viewport.w, viewport.h) * 0.06));
+  const squarePad = Math.max(28, Math.min(44, Math.min(viewport.w, viewport.h) * 0.1));
   const paddingX = isFramedSquare
     ? squarePad
     : viewport.w > 700
@@ -75,10 +75,10 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
   const paddingY = isFramedSquare
     ? squarePad
     : isShortLandscape
-    ? Math.min(22, viewport.h * 0.08)
+    ? Math.max(28, Math.min(42, viewport.h * 0.12))
     : Math.min(110, viewport.h * 0.18);
-  const usableW = Math.max(isFramedSquare ? 180 : 220, viewport.w - paddingX * 2);
-  const usableH = Math.max(isShortLandscape ? 130 : 180, viewport.h - paddingY * 2);
+  const usableW = Math.max(isFramedSquare ? 160 : 220, viewport.w - paddingX * 2);
+  const usableH = Math.max(isShortLandscape ? 120 : 160, viewport.h - paddingY * 2);
 
   // Dynamically re-fold domino layout visually mid-game so it stays big & fits the screen cleanly
   const visualBoard = useMemo(
@@ -123,7 +123,7 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
     ? viewport.w >= 600
     : viewport.w >= 768 || viewport.h >= 600;
   const maxAutoScale = isTabletOrLarge ? 1.85 : 1.35;
-  const minAutoScale = isFramedSquare ? 0.32 : 0.38;
+  const minAutoScale = isFramedSquare ? 0.24 : 0.28;
   const rawAutoScale = Math.min(usableW / spanX, usableH / spanY);
   const autoScale = Math.min(maxAutoScale, Math.max(minAutoScale, rawAutoScale));
 
@@ -235,7 +235,12 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
       className="relative w-full h-full flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing select-none"
     >
       {/* Dynamic Table Felt Texture */}
-      <div className={`absolute inset-0 ${tableTheme.feltClass} shadow-inner pointer-events-none opacity-95 transition-colors duration-500`}>
+      <div
+        className={`absolute inset-0 ${tableTheme.feltClass} ${
+          isFramedSquare ? 'rounded-2xl' : ''
+        } shadow-inner pointer-events-none opacity-95 transition-all duration-500`}
+        style={{ background: tableTheme.feltGradient }}
+      >
         {/* Rail border */}
         <div
           className={`absolute inset-0 ${
@@ -379,8 +384,6 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
                     className={`rounded-full border-2 flex items-center justify-center shadow-lg transition-all duration-200 pointer-events-none ${
                       isHovered
                         ? 'w-16 h-16 border-amber-300 bg-amber-400 text-slate-950 scale-125 ring-8 ring-amber-400/50 shadow-[0_0_35px_rgba(251,191,36,0.95)]'
-                        : variant !== '101' && expectedScore > 0
-                        ? 'w-12 h-12 border-amber-300 bg-amber-500/80 ring-4 ring-amber-400/50 shadow-[0_0_20px_rgba(251,191,36,0.8)] animate-bounce group-hover:scale-125'
                         : 'w-12 h-12 border-emerald-400 bg-emerald-500/40 shadow-[0_0_12px_rgba(52,211,153,0.8)] animate-pulse group-hover:scale-125'
                     }`}
                   >
@@ -392,17 +395,6 @@ export const BoardView: React.FC<BoardViewProps> = React.memo(({
                       {branch.openValue}
                     </span>
                   </div>
-
-                  {/* Expected Points Badge (+5, +10, etc.) - Only shown in 365 mode */}
-                  {variant !== '101' && expectedScore > 0 && (
-                    <div
-                      className={`absolute bg-amber-400 text-slate-950 text-xs font-black px-2 py-0.5 rounded-full shadow-xl border border-amber-200 pointer-events-none ${
-                        isHovered ? '-top-8 scale-110' : '-top-6 animate-bounce'
-                      }`}
-                    >
-                      +{expectedScore}
-                    </div>
-                  )}
 
                   {/* Drop hint when hovered */}
                   {isHovered && (

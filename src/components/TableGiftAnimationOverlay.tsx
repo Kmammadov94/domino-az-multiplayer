@@ -15,20 +15,36 @@ interface TableGiftAnimationOverlayProps {
   activeAnimation: ActiveGiftAnimation | null;
   onFinished: () => void;
   playerCount: number;
+  myPlayerIndex?: number;
 }
 
-// Seat approximate screen coordinate anchors (%)
-const SEAT_COORDINATES: Record<number, { x: number; y: number }> = {
-  0: { x: 50, y: 88 }, // Bottom (Local Player)
-  1: { x: 12, y: 48 }, // Left Opponent
-  2: { x: 50, y: 8 },  // Top Partner / Opponent
-  3: { x: 88, y: 48 }  // Right Opponent
+// Compute seat screen coordinate anchors (%) relative to the local viewer at bottom
+const getRelativeSeatCoord = (
+  seatIndex: number,
+  myPlayerIndex: number,
+  playerCount: number
+): { x: number; y: number } => {
+  if (seatIndex === myPlayerIndex) {
+    return { x: 50, y: 86 };
+  }
+  if (playerCount <= 2) {
+    return { x: 50, y: 12 };
+  }
+  if (playerCount === 3) {
+    const rel = (seatIndex - myPlayerIndex + 3) % 3;
+    return rel === 1 ? { x: 14, y: 48 } : { x: 86, y: 48 };
+  }
+  const rel = (seatIndex - myPlayerIndex + 4) % 4;
+  if (rel === 1) return { x: 14, y: 48 };
+  if (rel === 2) return { x: 50, y: 12 };
+  return { x: 86, y: 48 };
 };
 
 export const TableGiftAnimationOverlay: React.FC<TableGiftAnimationOverlayProps> = ({
   activeAnimation,
   onFinished,
-  playerCount
+  playerCount,
+  myPlayerIndex = 0
 }) => {
   const [phase, setPhase] = useState<'flying' | 'impact' | 'done'>('flying');
 
@@ -59,8 +75,8 @@ export const TableGiftAnimationOverlay: React.FC<TableGiftAnimationOverlayProps>
 
   if (!activeAnimation || phase === 'done') return null;
 
-  const senderCoord = SEAT_COORDINATES[activeAnimation.senderIndex % 4] || SEAT_COORDINATES[0];
-  const targetCoord = SEAT_COORDINATES[activeAnimation.targetIndex % 4] || SEAT_COORDINATES[2];
+  const senderCoord = getRelativeSeatCoord(activeAnimation.senderIndex, myPlayerIndex, playerCount);
+  const targetCoord = getRelativeSeatCoord(activeAnimation.targetIndex, myPlayerIndex, playerCount);
 
   return (
     <div className="fixed inset-0 pointer-events-none z-40 overflow-hidden select-none">
@@ -166,6 +182,11 @@ export const TableGiftAnimationOverlay: React.FC<TableGiftAnimationOverlayProps>
           <div className="mt-1 px-2.5 py-0.5 rounded-full bg-slate-900/90 border border-white/20 text-[11px] font-bold text-white shadow-lg text-center whitespace-nowrap">
             {activeAnimation.senderName} {activeAnimation.gift.message.az}
           </div>
+          {activeAnimation.gift.cost > 0 && (
+            <div className="mt-1 px-2.5 py-0.5 rounded-full bg-amber-500/95 border border-amber-200 text-[11px] font-black text-slate-950 shadow-lg whitespace-nowrap">
+              +{Math.floor(activeAnimation.gift.cost / 2)} 🪙 Hədiyyə!
+            </div>
+          )}
         </div>
       )}
     </div>

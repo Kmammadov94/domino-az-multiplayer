@@ -87,6 +87,7 @@ export interface PlayerStats {
   equippedTitle?: string;
   unlockedTitles?: string[];
   equippedTableTheme?: string;
+  unlockedTableThemes?: string[];
   lastDailyClaim?: string; // YYYY-MM-DD
   dailyStreak: number;
   matchesPlayed: number;

@@ -31,20 +31,20 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
   myPlayerIndex = 0
 }) => {
   const t = translations[lang];
-  // On mobile screens (< 640px), default to collapsed compact view so it doesn't block the board
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 640) {
-      return true;
-    }
-    return false;
-  });
+  // Default to compact collapsed view so the scoreboard stays unobtrusive across all screen sizes
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
+  const myTeam: 1 | 2 = players[myPlayerIndex]?.team || (myPlayerIndex % 2 === 0 ? 1 : 2);
+  const myPlayerObj = players[myPlayerIndex] || players[0];
+  const oppPlayerObj = players.find((_, idx) => idx !== myPlayerIndex) || players[1];
 
   // ==========================================
   // DOMINO 101 MODE SCOREBOARD
   // ==========================================
   if (variant === '101') {
-    const t1State = match101State?.team1 || { isOpen: false, draftScore: 0, mainScore: 0, unopenedAttempts: 0 };
-    const t2State = match101State?.team2 || { isOpen: false, draftScore: 0, mainScore: 0, unopenedAttempts: 0 };
+    const rawT1 = match101State?.team1 || { isOpen: false, draftScore: 0, mainScore: 0, unopenedAttempts: 0 };
+    const rawT2 = match101State?.team2 || { isOpen: false, draftScore: 0, mainScore: 0, unopenedAttempts: 0 };
+    const t1State = myTeam === 1 ? rawT1 : rawT2;
+    const t2State = myTeam === 1 ? rawT2 : rawT1;
     const sekaBank = match101State?.sekaBank || 0;
 
     // Compact collapsed view for mobile or user toggle
@@ -89,7 +89,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[11px] font-bold flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-950/70 border border-emerald-500/50">
                 <span className="text-emerald-300">
-                  {mode === '2p_solo' ? (myPlayerIndex === 0 ? 'Sən' : (players[0]?.name?.split(' ')[0] || 'O1')) : 'Sizin Kom.'}:
+                  {mode === '2p_solo' ? 'Sən' : 'Sizin Kom.'}:
                 </span>
                 <span className="text-white font-black text-xs">{t1State.mainScore}</span>
                 {t1State.isOpen ? (
@@ -103,7 +103,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
 
               <span className="text-[11px] font-bold flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-950/60 border border-rose-500/40">
                 <span className="text-rose-300">
-                  {mode === '2p_solo' ? (myPlayerIndex === 1 ? 'Sən' : (players[1]?.name?.split(' ')[0] || 'Rəqib')) : 'Rəqib Kom.'}:
+                  {mode === '2p_solo' ? (oppPlayerObj?.name?.split(' ')[0] || 'Rəqib') : 'Rəqib Kom.'}:
                 </span>
                 <span className="text-white font-black text-xs">{t2State.mainScore}</span>
                 {t2State.isOpen ? (
@@ -227,7 +227,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                 : 'bg-slate-800/70 border-slate-700'
             }`}>
               <span className="text-xs font-black text-emerald-400 flex items-center gap-1">
-                {mode === '2p_solo' ? (players[0]?.name || t.player) : t.team1}
+                {mode === '2p_solo' ? (myPlayerObj?.name || t.player) : t.team1}
                 {t1State.mainScore >= 101 && <Award className="w-3 h-3 text-amber-400" />}
               </span>
               <span className="text-2xl font-black text-white tracking-tight my-0.5">{t1State.mainScore}</span>
@@ -262,7 +262,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                 : 'bg-slate-800/70 border-slate-700'
             }`}>
               <span className="text-xs font-black text-rose-400 flex items-center gap-1">
-                {mode === '2p_solo' ? (players[1]?.name || 'Bot') : t.team2}
+                {mode === '2p_solo' ? (oppPlayerObj?.name || 'Bot') : t.team2}
                 {t2State.mainScore >= 101 && <Award className="w-3 h-3 text-amber-400" />}
               </span>
               <span className="text-2xl font-black text-white tracking-tight my-0.5">{t2State.mainScore}</span>
@@ -306,8 +306,8 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
   // ==========================================
   // In 4p_duo, group by team
   if (mode === '4p_duo') {
-    const team1Score = players.find(p => p.team === 1)?.score || 0;
-    const team2Score = players.find(p => p.team === 2)?.score || 0;
+    const team1Score = players.find(p => p.team === myTeam)?.score || 0;
+    const team2Score = players.find(p => p.team !== myTeam)?.score || 0;
 
     const team1Over300 = team1Score >= 300;
     const team2Over300 = team2Score >= 300;

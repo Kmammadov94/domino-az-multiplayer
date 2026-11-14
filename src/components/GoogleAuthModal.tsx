@@ -8,6 +8,8 @@ import {
   PRODUCTION_SERVER_URL,
   AppThemeMode
 } from '../utils/storage';
+import { getCustomNickname, saveCustomNickname } from '../utils/playerIdentity';
+import { validatePlayerName } from '../utils/profanityFilter';
 
 export const GOOGLE_CLIENT_ID =
   '345163175505-a7dv01uno2tof42k31omil6p5c9do20g.apps.googleusercontent.com';
@@ -25,6 +27,7 @@ interface GoogleAuthModalProps {
   openBugReportInitially?: boolean;
   themeMode?: AppThemeMode;
   onToggleTheme?: (mode: AppThemeMode) => void;
+  onNicknameChange?: (nickname: string) => void;
 }
 
 export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
@@ -36,12 +39,22 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
   apkAuthSessionId = null,
   openBugReportInitially = false,
   themeMode = 'dark',
-  onToggleTheme
+  onToggleTheme,
+  onNicknameChange
 }) => {
   const [showBugForm, setShowBugForm] = useState(openBugReportInitially);
   const [bugSubject, setBugSubject] = useState(DEFAULT_BUG_SUBJECT);
   const [bugDescription, setBugDescription] = useState('');
   const [bugNotice, setBugNotice] = useState<string | null>(null);
+  const [nicknameInput, setNicknameInput] = useState<string>(() => getCustomNickname() || currentUser?.name || '');
+  const [nicknameStatus, setNicknameStatus] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
+  useEffect(() => {
+    if (isOpen && currentUser) {
+      setNicknameInput(getCustomNickname() || currentUser.name || '');
+      setNicknameStatus(null);
+    }
+  }, [isOpen, currentUser]);
 
   useEffect(() => {
     if (isOpen && openBugReportInitially) {
@@ -499,12 +512,58 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
               </div>
             </div>
 
-            <h3 className="text-sm font-extrabold text-white">{currentUser.name}</h3>
+            <h3 className="text-sm font-extrabold text-white">{getCustomNickname() || currentUser.name}</h3>
             <span className="text-xs text-slate-400">{currentUser.email}</span>
 
             <div className="mt-3 py-1.5 px-3 bg-emerald-950/80 border border-emerald-500/40 rounded-xl text-emerald-300 text-xs font-bold flex items-center gap-1.5 shadow">
               <Cloud className="w-4 h-4 text-emerald-400" />
               <span>Qızıllarınız və tərəqqiniz buludla sinxronlaşdırılıb</span>
+            </div>
+
+            {/* Custom Nickname Editor for Google Account */}
+            <div className="w-full mt-4 p-3 rounded-2xl bg-slate-800/70 border border-slate-700/80 text-left">
+              <label className="text-[10px] font-bold text-amber-300 uppercase tracking-wide block mb-1.5">
+                Oyun Ləqəbi (Nickname)
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  maxLength={16}
+                  value={nicknameInput}
+                  onChange={(e) => {
+                    setNicknameInput(e.target.value);
+                    if (nicknameStatus) setNicknameStatus(null);
+                  }}
+                  placeholder={currentUser.name}
+                  className="flex-1 min-w-0 bg-slate-950/80 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none focus:border-amber-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const check = validatePlayerName(nicknameInput);
+                    if (!check.isValid) {
+                      setNicknameStatus({ type: 'err', text: check.error || 'Keçərsiz ad' });
+                      return;
+                    }
+                    const saved = saveCustomNickname(check.sanitizedName);
+                    setNicknameInput(saved);
+                    setNicknameStatus({ type: 'ok', text: '✓ Ləqəb yadda saxlanıldı' });
+                    onNicknameChange?.(saved);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:brightness-110 active:scale-95 text-slate-950 font-black text-xs shadow transition flex-shrink-0"
+                >
+                  Saxla
+                </button>
+              </div>
+              {nicknameStatus && (
+                <p
+                  className={`mt-1.5 text-[11px] font-bold ${
+                    nicknameStatus.type === 'ok' ? 'text-emerald-400' : 'text-rose-400'
+                  }`}
+                >
+                  {nicknameStatus.text}
+                </p>
+              )}
             </div>
 
             {apkAuthSessionId && (

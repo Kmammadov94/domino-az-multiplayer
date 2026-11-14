@@ -181,6 +181,9 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     : [DEFAULT_TITLE_ID];
 
   const currentEquippedTable = stats.equippedTableTheme || DEFAULT_TABLE_THEME_ID;
+  const currentUnlockedTables = stats.unlockedTableThemes && stats.unlockedTableThemes.length > 0
+    ? stats.unlockedTableThemes
+    : [DEFAULT_TABLE_THEME_ID];
 
   // Equip Frame
   const handleEquipFrame = (frameId: string) => {
@@ -248,6 +251,25 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     });
     triggerHaptic('medium');
     sounds.playTileDraw();
+  };
+
+  // Buy Table Theme
+  const handleBuyTableTheme = (theme: TableTheme) => {
+    if (stats.coins < theme.price) {
+      showNotice(t.notEnoughCoins, 'error');
+      return;
+    }
+
+    const nextCoins = stats.coins - theme.price;
+    const nextUnlocked = Array.from(new Set([...currentUnlockedTables, theme.id]));
+    onUpdateStats({
+      ...stats,
+      coins: nextCoins,
+      unlockedTableThemes: nextUnlocked,
+      equippedTableTheme: theme.id
+    });
+    triggerHaptic('success');
+    sounds.playCoinChime();
   };
 
   return (
@@ -734,6 +756,10 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 pr-3 sm:p-5 sm:pr-4 pb-12 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {TABLE_THEMES.map((theme) => {
               const isEquipped = currentEquippedTable === theme.id;
+              const isUnlocked =
+                Boolean(theme.unlockedByDefault) ||
+                theme.price === 0 ||
+                currentUnlockedTables.includes(theme.id);
 
               return (
                 <div
@@ -759,7 +785,10 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                     </p>
 
                     {/* Table Felt Swatch Preview */}
-                    <div className={`h-24 rounded-xl ${theme.feltClass} border-4 ${theme.railBorderClass} relative shadow-inner overflow-hidden flex items-center justify-center`}>
+                    <div
+                      className={`h-24 rounded-xl ${theme.feltClass} border-4 ${theme.railBorderClass} relative shadow-inner overflow-hidden flex items-center justify-center`}
+                      style={{ background: theme.feltGradient }}
+                    >
                       <span className="text-xs font-bold text-white/50 tracking-wider uppercase select-none">
                         {theme.patternType}
                       </span>
@@ -775,12 +804,20 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                         <Check className="w-3.5 h-3.5" />
                         <span>Masada İstifadə Olunur</span>
                       </button>
-                    ) : (
+                    ) : isUnlocked ? (
                       <button
                         onClick={() => handleEquipTableTheme(theme.id)}
                         className="w-full py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold transition active:scale-95 shadow"
                       >
-                        Bu Örtüyü Seç
+                        Masaya Sər (Seç)
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleBuyTableTheme(theme)}
+                        className="w-full py-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 text-xs font-black transition flex items-center justify-center gap-1.5 active:scale-95 shadow"
+                      >
+                        <Coins className="w-3.5 h-3.5" />
+                        <span>{theme.price} Qızıl</span>
                       </button>
                     )}
                   </div>

@@ -1,0 +1,368 @@
+{
+  "app": "Domino AZ (Telefon 365 & 101)",
+  "totalXp": 600,
+  "maxInitialGooglePlayXp": 1000,
+  "iconRequirements": {
+    "format": "PNG or JPG",
+    "recommendedSize": "512x512 px"
+  },
+  "setupInstructions": [
+    "1. Open Google Play Console -> Grow users -> Play Games Services -> Setup and management -> Achievements.",
+    "2. Add supported languages under Play Games Services -> Configuration (az-AZ, en-US, ru-RU).",
+    "3. Create each of the 14 achievements below (or prepare AchievementsMetadata.csv + AchievementsLocalizations.csv without header rows + 512x512 icons in a ZIP).",
+    "4. Copy the generated Achievement IDs (CgkI...) from Play Console into google-play-achievements/games-ids.xml (android/app/src/main/res/values/games-ids.xml) and src/services/playGamesAchievements.ts.",
+    "5. Publish the Play Games Services configuration changes in Google Play Console."
+  ],
+  "achievements": [
+    {
+      "order": 1,
+      "internalKey": "cayxana_winner",
+      "xmlResourceName": "achievement_winner",
+      "placeholderId": "CgkI_DOMINO_AZ_CAYXANA_WIN",
+      "type": "standard",
+      "steps": null,
+      "initialState": "Revealed",
+      "pointsXp": 25,
+      "triggerCondition": "Win a ranked Çayxana match (101 or 365).",
+      "localizations": {
+        "az-AZ": {
+          "name": "Qalib",
+          "description": "Çayxanada reytinqli oyunda (101 və ya Telefon 365) qalib gəl."
+        },
+        "en-US": {
+          "name": "Winner",
+          "description": "Win a ranked game in the Teahouse (101 or All Fives 365)."
+        },
+        "ru-RU": {
+          "name": "Победитель",
+          "description": "Одержите победу в рейтинговой игре в Чайхане (101 или Телефон 365)."
+        }
+      }
+    },
+    {
+      "order": 2,
+      "internalKey": "ejdaha_35",
+      "xmlResourceName": "achievement_dragon",
+      "placeholderId": "CgkI_DOMINO_AZ_EJDAHA_35",
+      "type": "standard",
+      "steps": null,
+      "initialState": "Revealed",
+      "pointsXp": 50,
+      "triggerCondition": "Win a match instantly by scoring 35 points on the table in a single move.",
+      "localizations": {
+        "az-AZ": {
+          "name": "Əjdaha",
+          "description": "Masada bir gedişdə 35 xal toplayaraq oyunu dərhal qazan."
+        },
+        "en-US": {
+          "name": "Dragon",
+          "description": "Win a game instantly by scoring 35 points on the board in a single move."
+        },
+        "ru-RU": {
+          "name": "Дракон",
+          "description": "Мгновенно выиграйте матч за один ход с 35 очками на столе."
+        }
+      }
+    },
+    {
+      "order": 3,
+      "internalKey": "sehra_aslani_dry",
+      "xmlResourceName": "achievement_desert_lion",
+      "placeholderId": "CgkI_DOMINO_AZ_SEHRA_ASLANI",
+      "type": "standard",
+      "steps": null,
+      "initialState": "Revealed",
+      "pointsXp": 50,
+      "triggerCondition": "Win a match while all opponents/opposing team finish with 0 points.",
+      "localizations": {
+        "az-AZ": {
+          "name": "Səhra Aslanı",
+          "description": "Rəqibi 0 xalda saxlayaraq quru hesabla oyunu qazan."
+        },
+        "en-US": {
+          "name": "Desert Lion",
+          "description": "Win a dry game while keeping your opponent at 0 points."
+        },
+        "ru-RU": {
+          "name": "Лев Пустыни",
+          "description": "Выиграйте игру всухую с нулём очков у соперника."
+        }
+      }
+    },
+    {
+      "order": 4,
+      "internalKey": "high_roller_top5",
+      "xmlResourceName": "achievement_high_roller",
+      "placeholderId": "CgkI_DOMINO_AZ_HIGH_ROLLER",
+      "type": "standard",
+      "steps": null,
+      "initialState": "Revealed",
+      "pointsXp": 100,
+      "triggerCondition": "Appear in the Top 5 of the Çayxana ranked leaderboard.",
+      "localizations": {
+        "az-AZ": {
+          "name": "Yüksək Mərc",
+          "description": "Çayxana liderlər cədvəlində İlk 5-liyə yüksəl."
+        },
+        "en-US": {
+          "name": "High Roller",
+          "description": "Reach the Top 5 on the Teahouse leaderboard."
+        },
+        "ru-RU": {
+          "name": "Хайроллер",
+          "description": "Войдите в Топ-5 таблицы лидеров Чайханы."
+        }
+      }
+    },
+    {
+      "order": 5,
+      "internalKey": "rank_gold_1150",
+      "xmlResourceName": "achievement_gold_contender",
+      "placeholderId": "CgkI_DOMINO_AZ_RANK_GOLD",
+      "type": "standard",
+      "steps": null,
+      "initialState": "Revealed",
+      "pointsXp": 15,
+      "triggerCondition": "Reach 1150 MMR rating in Çayxana.",
+      "localizations": {
+        "az-AZ": {
+          "name": "Qızıl Ustad",
+          "description": "Çayxana reytinqində 1150 xala çat (Qızıl liqa)."
+        },
+        "en-US": {
+          "name": "Gold Contender",
+          "description": "Reach 1150 rating in the Teahouse (Gold league)."
+        },
+        "ru-RU": {
+          "name": "Золотой Игрок",
+          "description": "Достигните рейтинга 1150 в Чайхане (Золотая лига)."
+        }
+      }
+    },
+    {
+      "order": 6,
+      "internalKey": "rank_platinum_1400",
+      "xmlResourceName": "achievement_platinum_tactician",
+      "placeholderId": "CgkI_DOMINO_AZ_RANK_PLATINUM",
+      "type": "standard",
+      "steps": null,
+      "initialState": "Revealed",
+      "pointsXp": 25,
+      "triggerCondition": "Reach 1400 MMR rating in Çayxana.",
+      "localizations": {
+        "az-AZ": {
+          "name": "Platin Sənətkar",
+          "description": "Çayxana reytinqində 1400 xala çat (Platin liqa)."
+        },
+        "en-US": {
+          "name": "Platinum Tactician",
+          "description": "Reach 1400 rating in the Teahouse (Platinum league)."
+        },
+        "ru-RU": {
+          "name": "Платиновый Тактик",
+          "description": "Достигните рейтинга 1400 в Чайхане (Платиновая лига)."
+        }
+      }
+    },
+    {
+      "order": 7,
+      "internalKey": "rank_diamond_1650",
+      "xmlResourceName": "achievement_diamond_mind",
+      "placeholderId": "CgkI_DOMINO_AZ_RANK_DIAMOND",
+      "type": "standard",
+      "steps": null,
+      "initialState": "Revealed",
+      "pointsXp": 40,
+      "triggerCondition": "Reach 1650 MMR rating in Çayxana.",
+      "localizations": {
+        "az-AZ": {
+          "name": "Almaz Zəka",
+          "description": "Çayxana reytinqində 1650 xala çat (Almaz liqa)."
+        },
+        "en-US": {
+          "name": "Diamond Mind",
+          "description": "Reach 1650 rating in the Teahouse (Diamond league)."
+        },
+        "ru-RU": {
+          "name": "Алмазный Ум",
+          "description": "Достигните рейтинга 1650 в Чайхане (Алмазная лига)."
+        }
+      }
+    },
+    {
+      "order": 8,
+      "internalKey": "rank_master_1900",
+      "xmlResourceName": "achievement_grand_tactician",
+      "placeholderId": "CgkI_DOMINO_AZ_RANK_MASTER",
+      "type": "standard",
+      "steps": null,
+      "initialState": "Revealed",
+      "pointsXp": 60,
+      "triggerCondition": "Reach 1900 MMR rating in Çayxana.",
+      "localizations": {
+        "az-AZ": {
+          "name": "Böyük Usta",
+          "description": "Çayxana reytinqində 1900 xala çat (Usta liqası)."
+        },
+        "en-US": {
+          "name": "Grand Tactician",
+          "description": "Reach 1900 rating in the Teahouse (Master league)."
+        },
+        "ru-RU": {
+          "name": "Мастер Домино",
+          "description": "Достигните рейтинга 1900 в Чайхане (Лига Мастеров)."
+        }
+      }
+    },
+    {
+      "order": 9,
+      "internalKey": "rank_grandmaster_2200",
+      "xmlResourceName": "achievement_grandmaster",
+      "placeholderId": "CgkI_DOMINO_AZ_RANK_GM",
+      "type": "standard",
+      "steps": null,
+      "initialState": "Revealed",
+      "pointsXp": 100,
+      "triggerCondition": "Reach 2200 MMR rating in Çayxana (Grandmaster tier).",
+      "localizations": {
+        "az-AZ": {
+          "name": "Qrossmeyster",
+          "description": "Çayxana reytinqində 2200 xala çat (Qrossmeyster zirvəsi)."
+        },
+        "en-US": {
+          "name": "Grandmaster",
+          "description": "Reach 2200 rating in the Teahouse (Grandmaster tier)."
+        },
+        "ru-RU": {
+          "name": "Гроссмейстер",
+          "description": "Достигните рейтинга 2200 в Чайхане (Ранг Гроссмейстера)."
+        }
+      }
+    },
+    {
+      "order": 10,
+      "internalKey": "friends_1",
+      "xmlResourceName": "achievement_power_of_friendship_1",
+      "placeholderId": "CgkI_DOMINO_AZ_FRIENDS_1",
+      "type": "standard",
+      "steps": null,
+      "initialState": "Revealed",
+      "pointsXp": 10,
+      "triggerCondition": "Add 1 friend.",
+      "localizations": {
+        "az-AZ": {
+          "name": "Dostluğun Gücü I",
+          "description": "İlk dostunu əlavə et."
+        },
+        "en-US": {
+          "name": "Power of Friendship I",
+          "description": "Add your first friend."
+        },
+        "ru-RU": {
+          "name": "Сила Дружбы I",
+          "description": "Добавьте своего первого друга."
+        }
+      }
+    },
+    {
+      "order": 11,
+      "internalKey": "friends_5",
+      "xmlResourceName": "achievement_power_of_friendship_5",
+      "placeholderId": "CgkI_DOMINO_AZ_FRIENDS_5",
+      "type": "incremental",
+      "steps": 5,
+      "initialState": "Revealed",
+      "pointsXp": 15,
+      "triggerCondition": "Add 5 friends (Incremental: 5 steps).",
+      "localizations": {
+        "az-AZ": {
+          "name": "Dostluğun Gücü II (5 Dost)",
+          "description": "5 dost əlavə et."
+        },
+        "en-US": {
+          "name": "Power of Friendship II (5 Friends)",
+          "description": "Add 5 friends."
+        },
+        "ru-RU": {
+          "name": "Сила Дружбы II (5 друзей)",
+          "description": "Добавьте 5 друзей."
+        }
+      }
+    },
+    {
+      "order": 12,
+      "internalKey": "friends_10",
+      "xmlResourceName": "achievement_power_of_friendship_10",
+      "placeholderId": "CgkI_DOMINO_AZ_FRIENDS_10",
+      "type": "incremental",
+      "steps": 10,
+      "initialState": "Revealed",
+      "pointsXp": 25,
+      "triggerCondition": "Add 10 friends (Incremental: 10 steps).",
+      "localizations": {
+        "az-AZ": {
+          "name": "Dostluğun Gücü III (10 Dost)",
+          "description": "10 dost əlavə et."
+        },
+        "en-US": {
+          "name": "Power of Friendship III (10 Friends)",
+          "description": "Add 10 friends."
+        },
+        "ru-RU": {
+          "name": "Сила Дружбы III (10 друзей)",
+          "description": "Добавьте 10 друзей."
+        }
+      }
+    },
+    {
+      "order": 13,
+      "internalKey": "friends_25",
+      "xmlResourceName": "achievement_power_of_friendship_25",
+      "placeholderId": "CgkI_DOMINO_AZ_FRIENDS_25",
+      "type": "incremental",
+      "steps": 25,
+      "initialState": "Revealed",
+      "pointsXp": 35,
+      "triggerCondition": "Add 25 friends (Incremental: 25 steps).",
+      "localizations": {
+        "az-AZ": {
+          "name": "Dostluğun Gücü IV (25 Dost)",
+          "description": "25 dost əlavə et."
+        },
+        "en-US": {
+          "name": "Power of Friendship IV (25 Friends)",
+          "description": "Add 25 friends."
+        },
+        "ru-RU": {
+          "name": "Сила Дружбы IV (25 друзей)",
+          "description": "Добавьте 25 друзей."
+        }
+      }
+    },
+    {
+      "order": 14,
+      "internalKey": "friends_50",
+      "xmlResourceName": "achievement_power_of_friendship_50",
+      "placeholderId": "CgkI_DOMINO_AZ_FRIENDS_50",
+      "type": "incremental",
+      "steps": 50,
+      "initialState": "Revealed",
+      "pointsXp": 50,
+      "triggerCondition": "Add 50 friends (Incremental: 50 steps).",
+      "localizations": {
+        "az-AZ": {
+          "name": "Dostluğun Gücü V (50 Dost)",
+          "description": "50 dost əlavə et."
+        },
+        "en-US": {
+          "name": "Power of Friendship V (50 Friends)",
+          "description": "Add 50 friends."
+        },
+        "ru-RU": {
+          "name": "Сила Дружбы V (50 друзей)",
+          "description": "Добавьте 50 друзей."
+        }
+      }
+    }
+  ]
+}

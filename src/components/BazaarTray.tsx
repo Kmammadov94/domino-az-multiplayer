@@ -51,7 +51,7 @@ export const BazaarTray: React.FC<BazaarTrayProps> = ({
 
   return (
     <div
-      className={`relative bg-slate-900/95 backdrop-blur-md rounded-2xl border transition-all duration-300 shadow-2xl flex flex-col items-center select-none ${
+      className={`relative bg-slate-900/55 backdrop-blur-md rounded-2xl border transition-all duration-300 shadow-lg flex flex-col items-center select-none ${
         canDraw
           ? 'border-emerald-400 ring-2 ring-emerald-400/50 shadow-[0_0_25px_rgba(52,211,153,0.35)]'
           : 'border-white/10'

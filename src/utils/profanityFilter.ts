@@ -262,11 +262,10 @@ export function validatePlayerName(name: string): {
     };
   }
 
-  if (trimmed.length > 16) {
+  if (trimmed.length > 30) {
     return {
-      isValid: false,
-      error: 'Ad ən çox 16 simvol ola bilər.',
-      sanitizedName: trimmed.slice(0, 16)
+      isValid: true,
+      sanitizedName: trimmed.slice(0, 30).trim()
     };
   }
 
