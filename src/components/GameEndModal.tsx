@@ -41,6 +41,14 @@ interface GameEndModalProps {
   teahousePrizePot?: number;
   userMmr?: number;
   hadHumanOpponentLeave?: boolean;
+  isMultiplayer?: boolean;
+  rematchState?: {
+    requesterIndex: number;
+    requesterName: string;
+    acceptedPlayerIndices: number[];
+    rejectedByName?: string;
+  } | null;
+  onRespondRematch?: (accept: boolean) => void;
 }
 
 export const GameEndModal: React.FC<GameEndModalProps> = ({
@@ -69,7 +77,10 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
   isRanked = false,
   teahousePrizePot = 0,
   userMmr,
-  hadHumanOpponentLeave = false
+  hadHumanOpponentLeave = false,
+  isMultiplayer = false,
+  rematchState = null,
+  onRespondRematch
 }) => {
   const [isViewingBoard, setIsViewingBoard] = useState<boolean>(false);
   const [claimingAdBonus, setClaimingAdBonus] = useState<boolean>(false);
@@ -86,6 +97,18 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
   }, [isOpen]);
 
   const myIndex = myPlayerIndex ?? 0;
+
+  useEffect(() => {
+    if (
+      isOpen &&
+      rematchState &&
+      !rematchState.rejectedByName &&
+      !rematchState.acceptedPlayerIndices.includes(myIndex)
+    ) {
+      setIsViewingBoard(false);
+    }
+  }, [isOpen, rematchState, myIndex]);
+
   const myPlayer = players[myIndex];
   const myTeam = myPlayer?.team ?? 1;
 
@@ -315,23 +338,76 @@ export const GameEndModal: React.FC<GameEndModalProps> = ({
             )}
 
             <div className="w-full space-y-2 mt-auto">
-              {isHost ? (
-                <button
-                  onClick={onRestartMatch}
-                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-xl transition flex items-center justify-center gap-2 active:scale-95"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  <span>🔄 Təkrar Oyna (Rematch)</span>
-                </button>
-              ) : (
-                <button
-                  onClick={onRestartMatch}
-                  className="w-full py-3 rounded-xl bg-amber-950/60 border border-amber-500/50 text-amber-300 font-bold text-xs flex items-center justify-center gap-2 hover:bg-amber-900/60 transition active:scale-95"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  <span>🔄 Otaq Sahibi ilə Təkrar Oyna</span>
-                </button>
-              )}
+              {(() => {
+                const humanCount = players.filter((p) => !p.isAI).length;
+                if (isMultiplayer && !isRanked && humanCount > 1) {
+                  if (rematchState && !rematchState.rejectedByName) {
+                    if (rematchState.acceptedPlayerIndices.includes(myIndex)) {
+                      return (
+                        <div className="w-full py-3 px-4 rounded-xl bg-amber-950/60 border border-amber-500/50 text-amber-300 font-bold text-xs flex items-center justify-center gap-2 animate-pulse">
+                          <span>⏳ Rəqibin təkrar oyun (Rematch) cavabı gözlənilir...</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="w-full p-3 rounded-xl bg-amber-950/50 border-2 border-amber-400/70 space-y-2.5 animate-fade-in">
+                        <div className="text-xs sm:text-sm font-black text-amber-200">
+                          🔄 {rematchState.requesterName} təkrar oynamaq (Rematch) istəyir!
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => onRespondRematch?.(true)}
+                            className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-slate-950 font-black text-xs shadow-lg transition active:scale-95"
+                          >
+                            ✓ Qəbul Et
+                          </button>
+                          <button
+                            onClick={() => onRespondRematch?.(false)}
+                            className="py-2.5 px-3 rounded-xl bg-rose-950/90 hover:bg-rose-900 border border-rose-700 text-rose-200 font-bold text-xs transition active:scale-95"
+                          >
+                            ✕ Rədd Et
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <>
+                      {rematchState?.rejectedByName && (
+                        <div className="w-full py-2 px-3 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-200 font-bold text-xs">
+                          ❌ {rematchState.rejectedByName} təkrar oyun təklifini rədd etdi.
+                        </div>
+                      )}
+                      <button
+                        onClick={onRestartMatch}
+                        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-xl transition flex items-center justify-center gap-2 active:scale-95"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        <span>🔄 Təkrar Oyna (Rematch)</span>
+                      </button>
+                    </>
+                  );
+                }
+
+                return isHost ? (
+                  <button
+                    onClick={onRestartMatch}
+                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:brightness-110 text-slate-950 font-black text-sm shadow-xl transition flex items-center justify-center gap-2 active:scale-95"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    <span>🔄 Təkrar Oyna (Rematch)</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={onRestartMatch}
+                    className="w-full py-3 rounded-xl bg-amber-950/60 border border-amber-500/50 text-amber-300 font-bold text-xs flex items-center justify-center gap-2 hover:bg-amber-900/60 transition active:scale-95"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    <span>🔄 Otaq Sahibi ilə Təkrar Oyna</span>
+                  </button>
+                );
+              })()}
 
               {/* View Board Final State Button */}
               <button

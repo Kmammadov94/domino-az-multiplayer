@@ -353,8 +353,12 @@ class MultiplayerSocketService {
     return this.emitWithTimeout('pass_turn');
   }
 
-  public nextHand(): Promise<{ success: boolean; error?: string }> {
+  public nextHand(): Promise<{ success: boolean; started?: boolean; error?: string }> {
     return this.emitWithTimeout('next_hand');
+  }
+
+  public respondRematch(accept: boolean): Promise<{ success: boolean; started?: boolean; error?: string }> {
+    return this.emitWithTimeout('respond_rematch', { accept });
   }
 
   public sendChat(text?: string, emoji?: string): void {

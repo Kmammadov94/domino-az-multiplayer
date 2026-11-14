@@ -75,6 +75,7 @@ export class GameRoom {
   public teahousePrizePot?: number;
   public isRanked: boolean = false;
   public hadHumanOpponentLeave: boolean = false;
+  public rematchState: MultiplayerClientGameState['rematchState'] = null;
 
   private turnTimerInterval: NodeJS.Timeout | null = null;
   private autoPassTimeout: NodeJS.Timeout | null = null;
@@ -211,6 +212,13 @@ export class GameRoom {
     const p = this.players.find((x) => x.socketId === socketId);
     if (p) {
       p.isConnected = false;
+      if (this.isMatchOver && this.rematchState && !this.rematchState.rejectedByName) {
+        this.rematchState = {
+          ...this.rematchState,
+          acceptedPlayerIndices: [],
+          rejectedByName: p.name
+        };
+      }
       this.notifyState();
     }
   }
@@ -284,6 +292,7 @@ export class GameRoom {
     this.isMatchOver = false;
     this.isInstant35 = false;
     this.hadHumanOpponentLeave = false;
+    this.rematchState = null;
     if (this.variant === '101') {
       this.match101State = createInitial101State();
     }
@@ -306,6 +315,12 @@ export class GameRoom {
         p.team = idx === 0 ? 1 : 2;
       }
     });
+
+    this.reassignHostIfNeeded();
+    const activeHost = this.players.find((p) => p.isHost);
+    if (activeHost) {
+      this.hostSocketId = activeHost.socketId;
+    }
 
     this.startHand(true, 0);
     return { success: true };
@@ -361,6 +376,7 @@ export class GameRoom {
     this.handRevealed = false;
     this.revealPhase = 0;
     this.handResults = null;
+    this.rematchState = null;
 
     let starter = Math.max(0, Math.min(this.players.length - 1, prevWinnerIndex));
     let mustPlayTile: TileData | null = null;
@@ -887,18 +903,85 @@ export class GameRoom {
     this.notifyState();
   }
 
-  public nextHand(requestSocketId: string): { success: boolean; error?: string } {
+  public requestOrRespondRematch(
+    socketId: string,
+    action: 'request' | 'accept' | 'reject'
+  ): { success: boolean; started?: boolean; error?: string } {
+    if (!this.isMatchOver) {
+      return { success: false, error: 'Oyun hələ bitməyib!' };
+    }
+    if (this.isRanked) {
+      return {
+        success: false,
+        error: 'Çayxana reytinq matçı bitdi! Yeni oyun üçün Çayxanadan qoşulun.'
+      };
+    }
+
+    const caller = this.players.find((p) => p.socketId === socketId);
+    if (!caller) {
+      return { success: false, error: 'Oyunçu tapılmadı!' };
+    }
+
+    const connectedHumans = this.players.filter((p) => !p.isAI && p.isConnected);
+    if (connectedHumans.length <= 1) {
+      if (action === 'reject') {
+        return { success: true, started: false };
+      }
+      this.reassignHostIfNeeded();
+      this.rematchState = null;
+      const res = this.startMatch(this.hostSocketId);
+      return { ...res, started: res.success };
+    }
+
+    if (action === 'reject') {
+      this.rematchState = {
+        requesterIndex: this.rematchState?.requesterIndex ?? caller.id,
+        requesterName: this.rematchState?.requesterName ?? caller.name,
+        acceptedPlayerIndices: [],
+        rejectedByName: caller.name
+      };
+      this.notifyState();
+      return { success: true, started: false };
+    }
+
+    if (!this.rematchState || this.rematchState.rejectedByName) {
+      this.rematchState = {
+        requesterIndex: caller.id,
+        requesterName: caller.name,
+        acceptedPlayerIndices: [caller.id]
+      };
+    } else if (!this.rematchState.acceptedPlayerIndices.includes(caller.id)) {
+      this.rematchState = {
+        ...this.rematchState,
+        acceptedPlayerIndices: [...this.rematchState.acceptedPlayerIndices, caller.id]
+      };
+    }
+
+    const allAccepted = connectedHumans.every((h) =>
+      this.rematchState!.acceptedPlayerIndices.includes(h.id)
+    );
+    if (allAccepted) {
+      this.rematchState = null;
+      this.reassignHostIfNeeded();
+      const res = this.startMatch(this.hostSocketId);
+      return { ...res, started: res.success };
+    }
+
+    this.notifyState();
+    return { success: true, started: false };
+  }
+
+  public nextHand(requestSocketId: string): { success: boolean; started?: boolean; error?: string } {
+    if (this.isMatchOver) {
+      return this.requestOrRespondRematch(requestSocketId, 'request');
+    }
+
     const isHost =
       this.hostSocketId === requestSocketId ||
       Boolean(this.players.find((p) => p.socketId === requestSocketId)?.isHost) ||
       !this.players.some((p) => p.isHost && p.isConnected && !p.isAI);
     if (!isHost && this.players.length > 1) {
       return { success: false, error: 'Yalnız otaq sahibi növbəti ələ başlaya bilər!' };
-    }
-
-    if (this.isMatchOver) {
-      // Restart full match
-      return this.startMatch(requestSocketId);
     }
 
     this.roundNumber++;
@@ -960,8 +1043,16 @@ export class GameRoom {
       }
       this.notifyState();
     } else if (this.isMatchOver || this.status === 'finished') {
-      this.players[pIdx].isConnected = false;
+      const leavingPlayer = this.players[pIdx];
+      leavingPlayer.isConnected = false;
       this.reassignHostIfNeeded();
+      if (this.rematchState && !this.rematchState.rejectedByName) {
+        this.rematchState = {
+          ...this.rematchState,
+          acceptedPlayerIndices: [],
+          rejectedByName: leavingPlayer.name
+        };
+      }
       this.notifyState();
     } else {
       const p = this.players[pIdx];
@@ -1182,7 +1273,8 @@ export class GameRoom {
       teahouseBuyIn: this.teahouseBuyIn,
       teahousePrizePot: this.teahousePrizePot,
       isRanked: this.isRanked,
-      hadHumanOpponentLeave: this.hadHumanOpponentLeave
+      hadHumanOpponentLeave: this.hadHumanOpponentLeave,
+      rematchState: this.rematchState
     };
   }
 

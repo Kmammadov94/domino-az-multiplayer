@@ -93,6 +93,12 @@ export interface MultiplayerClientGameState {
   matchWinnerIndex: number;
   isInstant35: boolean;
   hadHumanOpponentLeave?: boolean;
+  rematchState?: {
+    requesterIndex: number;
+    requesterName: string;
+    acceptedPlayerIndices: number[];
+    rejectedByName?: string;
+  } | null;
   match101State?: Match101State;
   teahouseTierId?: string;
   teahouseBuyIn?: number;

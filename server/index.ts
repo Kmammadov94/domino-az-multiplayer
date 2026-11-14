@@ -243,6 +243,7 @@ const findPlayerProfileByQuery = (qRaw: string): (SocialProfile & { isOnline: bo
 };
 
 const guestRankedDb: Map<string, RankedLeaderboardEntry> = new Map();
+const chargedRankedRooms: Set<string> = new Set();
 const settledRankedRooms: Set<string> = new Set();
 
 app.use(
@@ -312,8 +313,33 @@ const findUserRecordByPlayerId = (playerId?: string): { googleId: string; record
   return null;
 };
 
+// Server-authoritative buy-in deduction once when a Ranked Çayxana match starts
+const deductRankedBuyInIfNeeded = (room: GameRoom) => {
+  if (!room.isRanked || room.status !== 'in_game' || chargedRankedRooms.has(room.code)) return;
+  if (room.players.length < 2) return;
+  chargedRankedRooms.add(room.code);
+
+  const buyIn = room.teahouseBuyIn || 0;
+  if (buyIn <= 0) return;
+
+  for (const slot of room.players) {
+    const resolved = findUserRecordByPlayerId(slot.playerId);
+    if (resolved?.record && resolved.googleId) {
+      const s = resolved.record.stats || {};
+      const curCoins = typeof s.coins === 'number' ? s.coins : 0;
+      resolved.record.stats = {
+        ...s,
+        coins: Math.max(0, curCoins - buyIn)
+      };
+      resolved.record.updatedAt = Date.now();
+      persistUserRecord(resolved.googleId, resolved.record, userDatabase);
+    }
+  }
+};
+
 // Server-authoritative settlement for Ranked Çayxana matches (MMR + coins + Guest leaderboard)
 const settleRankedMatchIfNeeded = (room: GameRoom) => {
+  deductRankedBuyInIfNeeded(room);
   if (!room.isRanked || !room.isMatchOver || settledRankedRooms.has(room.code)) return;
   if (room.players.length < 2) return;
   settledRankedRooms.add(room.code);
@@ -321,7 +347,6 @@ const settleRankedMatchIfNeeded = (room: GameRoom) => {
   const p0 = room.players[0];
   const p1 = room.players[1];
   const winnerIdx = room.matchWinnerIndex;
-  const buyIn = room.teahouseBuyIn || 0;
   const prizePot = room.teahousePrizePot || 0;
 
   const p0Resolved = findUserRecordByPlayerId(p0.playerId);
@@ -348,7 +373,7 @@ const settleRankedMatchIfNeeded = (room: GameRoom) => {
       const curWon = typeof s.rankedWon === 'number' ? s.rankedWon : 0;
       const { nextMmr } = calculateEloUpdate(curMmr, oppMmr, won, curPlayed);
       const curCoins = typeof s.coins === 'number' ? s.coins : 0;
-      const nextCoins = Math.max(0, curCoins - buyIn + (won ? prizePot : 0));
+      const nextCoins = Math.max(0, curCoins + (won ? prizePot : 0));
 
       record.stats = {
         ...s,
@@ -382,6 +407,7 @@ const settleRankedMatchIfNeeded = (room: GameRoom) => {
 
 // Broadcast personalized state to each player in room
 const broadcastRoom = (room: GameRoom) => {
+  deductRankedBuyInIfNeeded(room);
   settleRankedMatchIfNeeded(room);
   const summary = getRoomSummary(room);
 
@@ -418,6 +444,8 @@ function leaveCurrentRoomIfAny(socket: Socket) {
   if (realPlayers.length === 0) {
     prevRoom.destroy();
     rooms.delete(prevCode);
+    chargedRankedRooms.delete(prevCode);
+    settledRankedRooms.delete(prevCode);
     const timer = roomCleanupTimers.get(prevCode);
     if (timer) {
       clearTimeout(timer);
@@ -514,18 +542,26 @@ io.on('connection', (socket: Socket) => {
           safeAck(callback, { success: false, error: 'Otaq tapılmadı! Kodu yoxlayın.' });
           return;
         }
+        if (room.status !== 'waiting') {
+          safeAck(callback, { success: false, error: 'Oyun artıq başlayıb!' });
+          return;
+        }
+        if (room.players.length >= room.maxPlayers) {
+          safeAck(callback, { success: false, error: 'Otaq doludur!' });
+          return;
+        }
         leaveCurrentRoomIfAny(socket);
 
         const sessionToken = data.sessionToken || `sess_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-
-        socketToRoom.set(socket.id, code);
-        socket.join(`room_${code}`);
 
         const res = room.addPlayer(socket.id, nameValidation.sanitizedName, data.skinId, data.avatarId, sessionToken, data.playerId, data.playerTag, data.frameId, data.title);
         if (!res.success) {
           safeAck(callback, { success: false, error: res.error });
           return;
         }
+
+        socketToRoom.set(socket.id, code);
+        socket.join(`room_${code}`);
 
         const mySlot = room.players.find((p) => p.socketId === socket.id);
         const myPlayerIndex = mySlot ? mySlot.id : room.players.length - 1;
@@ -1333,6 +1369,16 @@ io.on('connection', (socket: Socket) => {
     safeAck(callback, res);
   });
 
+  // 11b. Respond to Rematch Request (Accept / Reject)
+  socket.on('respond_rematch', (data: { accept: boolean }, callback) => {
+    const code = socketToRoom.get(socket.id);
+    if (!code) return safeAck(callback, { success: false, error: 'Otaq tapılmadı' });
+    const room = rooms.get(code);
+    if (!room) return safeAck(callback, { success: false, error: 'Otaq tapılmadı' });
+    const res = room.requestOrRespondRematch(socket.id, data?.accept ? 'accept' : 'reject');
+    safeAck(callback, res);
+  });
+
   // 12. Send Chat / Teahouse Phrase
   socket.on('send_chat', (data: { text?: string; emoji?: string }) => {
     const code = socketToRoom.get(socket.id);
@@ -1421,6 +1467,8 @@ io.on('connection', (socket: Socket) => {
             }
             activeRoom.destroy();
             rooms.delete(code);
+            chargedRankedRooms.delete(code);
+            settledRankedRooms.delete(code);
           }
         }
         roomCleanupTimers.delete(code);

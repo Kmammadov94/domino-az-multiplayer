@@ -607,6 +607,9 @@ export const App: React.FC = () => {
             })
             .catch(() => {});
           setShowFriendsModal(true);
+          try {
+            window.history.replaceState(null, '', window.location.pathname);
+          } catch {}
         }
 
         const code = (params.get('room') || params.get('invite') || '').trim().toUpperCase();
@@ -619,9 +622,11 @@ export const App: React.FC = () => {
           try {
             savedName = localStorage.getItem('domino_player_name') || '';
           } catch {}
+          const myId = getMyPlayerIdentity(googleUser, statsRef.current);
           const resolvedName =
             googleUser?.name ||
             savedName ||
+            myId.name ||
             `Qonaq ${Math.floor(100 + Math.random() * 900)}`;
 
           multiplayerSocket.connect();
@@ -629,8 +634,13 @@ export const App: React.FC = () => {
             .joinRoom(
               code,
               resolvedName,
-              stats.equippedSkin,
-              stats.equippedAvatar || DEFAULT_AVATAR_ID
+              statsRef.current.equippedSkin,
+              statsRef.current.equippedAvatar || DEFAULT_AVATAR_ID,
+              undefined,
+              myId.id,
+              myId.tag,
+              statsRef.current.equippedFrame,
+              statsRef.current.equippedTitle
             )
             .then((res) => {
               setIsAutoJoining(false);
@@ -658,11 +668,17 @@ export const App: React.FC = () => {
                   if (mySlot) setMpMyIndex(mySlot.id);
                 }
               } else {
+                try {
+                  window.history.replaceState(null, '', window.location.pathname);
+                } catch {}
                 setInviteError(res.error || 'Otaq tapılmadı və ya artıq dolub.');
               }
             })
             .catch((err) => {
               setIsAutoJoining(false);
+              try {
+                window.history.replaceState(null, '', window.location.pathname);
+              } catch {}
               setInviteError(err?.message || 'Otağa qoşulmaq mümkün olmadı');
             });
         }
@@ -1539,7 +1555,16 @@ export const App: React.FC = () => {
     }
     const activeGoogleUser = googleUserRef.current || googleUser;
     if (activeGoogleUser) {
-      syncWithCloud(activeGoogleUser, newStats);
+      void syncWithCloud(activeGoogleUser, newStats).then((synced) => {
+        if (
+          synced &&
+          typeof synced.rankedPlayed === 'number' &&
+          synced.rankedPlayed > (newStats.rankedPlayed || 0)
+        ) {
+          statsRef.current = synced;
+          setStats(synced);
+        }
+      });
     }
   };
   const handleUpdateStatsRef = useRef(handleUpdateStats);
@@ -2132,11 +2157,25 @@ export const App: React.FC = () => {
         setShowTeahousesModal(true);
         return;
       }
-      multiplayerSocket.nextHand();
-      setShowGameEnd(false);
+      void multiplayerSocket.nextHand().then((res) => {
+        if (!res.success && res.error) {
+          showTemporarySocialBanner(res.error);
+        }
+      });
       return;
     }
     handleRestartMatch();
+  };
+
+  const handleRespondRematch = async (accept: boolean) => {
+    try {
+      const res = await multiplayerSocket.respondRematch(accept);
+      if (!res.success && res.error) {
+        showTemporarySocialBanner(res.error);
+      }
+    } catch (e: any) {
+      showTemporarySocialBanner(e?.message || 'Serverlə əlaqə xətası');
+    }
   };
 
   const handleForfeitAction = () => {
@@ -4344,7 +4383,7 @@ export const App: React.FC = () => {
         }
         onNextHand={handleNextHandAction}
         onRestartMatch={async () => {
-          if (effectiveIsMatchOver && !watchedRewardedOnCurrentMatchEndRef.current) {
+          if (!effectiveInMultiplayer && effectiveIsMatchOver && !watchedRewardedOnCurrentMatchEndRef.current) {
             await maybeShowMatchEndInterstitial();
           }
           handleRestartMatchAction();
@@ -4364,6 +4403,9 @@ export const App: React.FC = () => {
         teahousePrizePot={effectiveInMultiplayer ? (mpGameState?.teahousePrizePot || 0) : 0}
         userMmr={stats.mmr ?? DEFAULT_RANKED_MMR}
         hadHumanOpponentLeave={effectiveInMultiplayer ? Boolean(mpGameState?.hadHumanOpponentLeave) : false}
+        isMultiplayer={effectiveInMultiplayer}
+        rematchState={effectiveInMultiplayer ? (mpGameState?.rematchState ?? null) : null}
+        onRespondRematch={handleRespondRematch}
       />
 
       <MultiplayerLobbyModal
@@ -4531,7 +4573,10 @@ export const App: React.FC = () => {
 
       {/* Incoming Game Room Invite Banner */}
       {incomingRoomInvite && (
-        <div className="fixed inset-x-0 top-3 z-[120] flex justify-center px-3 pointer-events-none">
+        <div
+          style={{ top: 'max(0.75rem, env(safe-area-inset-top))' }}
+          className="fixed inset-x-0 z-[120] flex justify-center px-3 pointer-events-none"
+        >
           <div className="pointer-events-auto w-full max-w-md bg-slate-900/95 border-2 border-emerald-400 rounded-2xl p-3.5 shadow-[0_15px_40px_rgba(0,0,0,0.9)] backdrop-blur-md animate-fade-in">
             <div className="flex items-center justify-between gap-2.5">
               <div className="min-w-0">
@@ -4549,15 +4594,17 @@ export const App: React.FC = () => {
                     setIncomingRoomInvite(null);
                     try {
                       const myId = getMyPlayerIdentity(googleUser, statsRef.current);
+                      await handleJoinRoom(inv.roomCode, googleUser?.name || myId.name);
                       setShowStore(false);
                       setShowFriendsModal(false);
                       setShowTeahousesModal(false);
                       setShowRules(false);
                       setShowDailyReward(false);
                       setShowGoogleAuthModal(false);
+                      setMpGameState(null);
+                      setIsMultiplayer(false);
                       setInGame(false);
                       setShowGameEnd(false);
-                      await handleJoinRoom(inv.roomCode, googleUser?.name || myId.name);
                       setShowMultiplayerLobby(true);
                     } catch (e: any) {
                       showTemporarySocialBanner(e?.message || 'Otağa qoşulmaq mümkün olmadı.');
